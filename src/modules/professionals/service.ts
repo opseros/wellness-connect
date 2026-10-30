@@ -3,7 +3,7 @@ import { z } from "zod";
 import { credential, professionalCategory, professionalProfile, service } from "@/db/schema";
 import { getDb } from "@/db/client";
 import { badRequest, notFound } from "@/lib/errors";
-import { audit } from "@/modules/platform/outbox";
+import { audit, enqueue } from "@/modules/platform/outbox";
 
 const modes = z.array(z.enum(["in_person", "virtual", "hybrid"])).max(3);
 
@@ -113,6 +113,7 @@ export async function reviewCredential(reviewerId: string, credentialId: string,
       }
     }
     await audit(tx, { actorId: reviewerId, action: `credential.${d.decision}`, targetType: "credential", targetId: row.id, metadata: { note: d.note } });
+    await enqueue(tx, { type: "credential.reviewed", payload: { credentialId: row.id, decision: d.decision } });
     return row;
   });
 }

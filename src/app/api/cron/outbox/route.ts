@@ -1,7 +1,7 @@
 import { processOutbox } from "@/modules/platform/outbox";
 import "@/modules/platform/handlers";
 
-// Vercel Cron calls this every minute (vercel.json) with
+// Retry sweep for the outbox. Vercel Cron calls it on the schedule in vercel.json with
 // "Authorization: Bearer $CRON_SECRET".
 export const maxDuration = 60;
 

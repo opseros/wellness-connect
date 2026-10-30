@@ -10,6 +10,7 @@ export type CurrentUser = {
   emailVerified: boolean;
   platformRole: "user" | "ops" | "super_admin";
   twoFactorEnabled: boolean;
+  sessionId: string;
 };
 
 export async function getCurrentUser(reqHeaders?: Headers): Promise<CurrentUser | null> {
@@ -26,6 +27,7 @@ export async function getCurrentUser(reqHeaders?: Headers): Promise<CurrentUser 
     emailVerified: u.emailVerified,
     platformRole: (u.platformRole as CurrentUser["platformRole"]) ?? "user",
     twoFactorEnabled: Boolean(u.twoFactorEnabled),
+    sessionId: session.session.id,
   };
 }
 

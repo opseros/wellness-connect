@@ -31,6 +31,9 @@ Read README.md for the product and setup. These rules are not optional.
 - Use `requireUser()` (signed in AND email verified) in every route/action.
   Admin tools use `requirePlatformStaff()` (staff role AND two-factor on).
 - Never let sign-up or profile input set `platformRole`, `emailVerified` or roles.
+- Admin features live in `src/modules/admin/service.ts`; every function takes the acting
+  staff member and calls `assertStaff` / `assertSuperAdmin` itself, and audits changes.
+  Admin pages use `getStaffOrExit()` (404 for non-staff). Don't add admin logic elsewhere.
 - Don't collect individual employee health information. Referrals and messages carry
   the minimum needed. Keep the "no health details" copy in the UI.
 
@@ -43,7 +46,8 @@ Read README.md for the product and setup. These rules are not optional.
 
 ## Side effects
 - Emails/notifications go through the outbox: `enqueue(tx, event)` in the SAME
-  transaction as the change. `/api/cron/outbox` delivers them every minute.
+  transaction as the change. Delivery starts right after the response (Next.js `after`);
+  `/api/cron/outbox` (daily on Hobby) retries failures.
 - Auth emails (verify, reset) are the exception and are sent directly by Better Auth.
 
 ## Database changes

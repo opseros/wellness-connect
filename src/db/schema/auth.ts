@@ -12,6 +12,9 @@ export const user = pgTable("user", {
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   // Platform-level role. Never settable from sign-up input (see auth.ts).
   platformRole: text("platform_role", { enum: ["user", "ops", "super_admin"] }).notNull().default("user"),
+  // Set by platform staff. A suspended user's sessions are deleted and new sign-ins are refused.
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  suspendedReason: text("suspended_reason"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

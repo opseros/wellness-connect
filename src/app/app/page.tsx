@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/brand";
+import { mainNav } from "@/components/nav";
 import { getCurrentUser } from "@/modules/identity/session";
 import { listMemberships } from "@/modules/organizations/service";
 import { getOwnProfile } from "@/modules/professionals/service";
@@ -17,7 +18,7 @@ export default async function AppHome() {
 
   return (
     <div>
-      <AppHeader name={me.name} nav={[{ href: "/app", label: "Home", active: true }, { href: "/connect", label: "Connect" }]} />
+      <AppHeader name={me.name} nav={mainNav(me, "home")} />
       <main className="mx-auto flex max-w-[1120px] flex-col gap-7 px-6 py-8">
         <div className="flex flex-col gap-1">
           <h1 className="text-[28px] font-bold">Welcome, {firstName}</h1>

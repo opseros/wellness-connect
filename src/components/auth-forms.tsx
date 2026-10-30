@@ -63,7 +63,8 @@ export function SignInForm({ providers }: { providers: Providers }) {
     });
     setPending(false);
     if (!error) return router.push("/app");
-    if (error.status === 403) {
+    if (error.code === "ACCOUNT_SUSPENDED") return setError("This account is suspended. Contact support if you think this is a mistake.");
+    if (error.code === "EMAIL_NOT_VERIFIED" || error.status === 403) {
       setUnverified(true);
       return setError("Please verify your email first. We've just sent you a new link.");
     }

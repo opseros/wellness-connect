@@ -17,7 +17,7 @@ Phase 1 is web + installable PWA with no AI. The `/api/v1` REST API is what the 
 | Sign-in | Better Auth: **Google, Microsoft and email/password**, users stored in Neon |
 | Email | Resend (printed to the server log when no key is set) |
 | Files | Vercel Blob, **private** store, for credential documents |
-| Background jobs | Transactional outbox processed by Vercel Cron every minute |
+| Background jobs | Transactional outbox, delivered right after each request; a daily Vercel Cron retries failures |
 | Tests | Vitest + PGlite (in-memory Postgres, RLS enforced) |
 
 ## Run it locally
@@ -36,7 +36,7 @@ Without Resend configured, verification and reset links appear in the terminal r
 Google/Microsoft buttons appear only when their keys are set.
 
 ```bash
-npm test          # 33 tests: matching, tenant isolation, auth rules, marketplace flow, Connect
+npm test          # 41 tests: matching, tenant isolation, auth rules, marketplace flow, Connect
 npm run typecheck && npm run lint && npm run build
 ```
 
@@ -53,9 +53,12 @@ npm run typecheck && npm run lint && npm run build
 6. **Microsoft sign-in**: Microsoft Entra → App registrations → New, "Accounts in any organizational directory and personal Microsoft accounts".
    Redirect URI (Web) `https://<your-domain>/api/auth/callback/microsoft`. Create a client secret.
 7. **Deploy.** `vercel-build` runs `drizzle-kit migrate` before `next build`, so each deployment (and each Neon preview branch) gets the schema.
-   `vercel.json` pins functions to Singapore and schedules the outbox cron every minute (requires the Pro plan, which commercial use needs anyway).
-8. **Make yourself platform staff** (for the credential review API), then turn on two-factor in the app:
-   `update "user" set platform_role = 'super_admin' where email = 'you@yourdomain.com';`
+   `vercel.json` pins functions to Singapore and runs the outbox retry once a day (03:00 IST), which the Hobby plan allows.
+   Emails are normally sent right after each action; the cron only retries failures. On Pro, change the schedule to `*/5 * * * *` for faster retries.
+   Note: Vercel's Hobby plan is for non-commercial use, so move to Pro before real customers use it.
+8. **Make yourself super admin**: set `SUPER_ADMIN_EMAILS=you@yourdomain.com` in Vercel and redeploy, then sign up
+   (or sign in) with that email and verify it. Open **Admin**; you'll be asked to turn on two-factor first.
+   Add more staff from **Admin → Users → Make ops staff**.
 
 ## Project layout
 
@@ -85,11 +88,28 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
 - Append-only finance ledger and the payment table, ready for Razorpay.
 - Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, Connect feed and profile setup.
 
+## Admin portal (`/admin`)
+
+Only `super_admin` and `ops` users with two-factor on can open it; everyone else gets a 404.
+
+| Section | Ops | Super admin |
+|---|---|---|
+| Verification queue: view documents, approve, request info, reject (professional is emailed) | ✓ | ✓ |
+| Users: search and view | ✓ | ✓ |
+| Users: grant/remove ops, suspend/unsuspend (signs out everywhere, blocks sign-in) | | ✓ |
+| Organizations: view; link and verify company email domains | view | ✓ |
+| Reports: remove reported posts/comments or dismiss | ✓ | ✓ |
+| Audit log | ✓ | ✓ |
+
+Every account also has **Account → security**: authenticator-app two-factor with backup codes, active sessions, and setting a password for Google/Microsoft accounts.
+
+In production (`VERCEL_ENV=production`) the app refuses to start if `DATABASE_URL`, `BETTER_AUTH_SECRET`,
+`BETTER_AUTH_URL`, `RESEND_API_KEY` or `EMAIL_FROM` is missing, so emails can never silently fail.
+
 ## Next steps
 
 1. Screens for the company flow (requirement form, matches, proposals, booking) from the prototype; the APIs exist.
 2. Professional screens: profile editor, services, credential upload, enquiry inbox.
-3. Admin verification queue UI.
 4. Razorpay orders + signed webhooks writing ledger entries.
 5. Connect: network page, messages UI, groups, referrals.
 6. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).

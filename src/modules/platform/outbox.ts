@@ -8,7 +8,8 @@ export type OutboxEvent =
   | { type: "membership.requested"; payload: { orgId: string; userId: string; email: string } }
   | { type: "enquiry.sent"; payload: { enquiryId: string; requirementId: string; professionalUserId: string } }
   | { type: "booking.created"; payload: { bookingId: string; orgId: string; professionalUserId: string } }
-  | { type: "connection.requested"; payload: { connectionId: string; fromUserId: string; toUserId: string } };
+  | { type: "connection.requested"; payload: { connectionId: string; fromUserId: string; toUserId: string } }
+  | { type: "credential.reviewed"; payload: { credentialId: string; decision: string } };
 
 /**
  * Call inside the same transaction as the business change. Delivery starts

@@ -6,7 +6,8 @@ import { haveIBeenPwned } from "better-auth/plugins/haveibeenpwned";
 import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
 import { sendEmail } from "@/lib/email";
-import { onUserCreated, onEmailVerified } from "@/modules/identity/hooks";
+import { onUserCreated, onEmailVerified, assertNotSuspended, onSessionCreated } from "@/modules/identity/hooks";
+import { APIError } from "better-auth/api";
 
 function socialProviders(): BetterAuthOptions["socialProviders"] {
   const providers: NonNullable<BetterAuthOptions["socialProviders"]> = {};
@@ -103,6 +104,20 @@ function buildAuth() {
       },
     },
     databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            try {
+              await assertNotSuspended(session.userId);
+            } catch {
+              throw new APIError("FORBIDDEN", { message: "This account is suspended. Contact support.", code: "ACCOUNT_SUSPENDED" });
+            }
+          },
+          after: async (session) => {
+            await onSessionCreated(session.userId);
+          },
+        },
+      },
       user: {
         create: {
           after: async (user) => {

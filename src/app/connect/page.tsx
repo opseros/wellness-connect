@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/brand";
+import { mainNav } from "@/components/nav";
 import { getCurrentUser } from "@/modules/identity/session";
 import { getFeed, listInvitations } from "@/modules/connect/service";
 import { createPostAction, toggleLikeAction } from "@/app/app/actions";
@@ -15,7 +16,7 @@ export default async function ConnectFeedPage() {
 
   return (
     <div>
-      <AppHeader name={me.name} nav={[{ href: "/app", label: "Home" }, { href: "/connect", label: "Feed", active: true }, { href: "/connect/setup", label: "My profile" }]} />
+      <AppHeader name={me.name} nav={mainNav(me, "connect")} />
       <div className="mx-auto flex max-w-[1180px] flex-wrap items-start gap-5 px-6 py-7">
         <main className="flex min-w-0 flex-[999_1_460px] flex-col gap-4">
           <form action={createPostAction} className="card flex flex-col gap-3 p-4">
