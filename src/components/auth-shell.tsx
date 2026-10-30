@@ -6,9 +6,9 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
       <section className="flex flex-[1_1_420px] flex-col justify-between gap-10 bg-brand p-10 text-white sm:p-14">
         <Logo light />
         <div className="flex max-w-md flex-col gap-4">
-          <h1 className="text-4xl font-bold leading-tight">Verified wellness professionals for your teams.</h1>
+          <h1 className="font-display text-[40px] font-extrabold leading-[1.05] tracking-[-0.02em]">Find your people for walks, retreats and better workdays.</h1>
           <p className="text-[17px] leading-relaxed text-[#ddede9]">
-            Post a requirement, compare proposals and book workshops, coaching and programs, all in one place.
+            A free social space for working professionals: wellness, travel, meet-ups, fitness, food and careers, plus verified experts your company can book.
           </p>
         </div>
         <p className="text-sm leading-relaxed text-[#ddede9]">

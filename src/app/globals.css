@@ -8,7 +8,21 @@
   --color-muted: #55615b;
   --color-line: #e0e5e2;
   --color-ground: #f5f7f5;
-  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Connect spaces: each has a tint and an ink that passes contrast on the tint. */
+  --color-wellness: #e3f0ec;
+  --color-wellness-ink: #0b4f44;
+  --color-travel: #dde9f6;
+  --color-travel-ink: #1d4f7a;
+  --color-meetup: #fbecc4;
+  --color-meetup-ink: #6b4300;
+  --color-move: #f3e0ec;
+  --color-move-ink: #7a2a5c;
+  --color-food: #e8efd6;
+  --color-food-ink: #3f5413;
+  --color-career: #e8e4f6;
+  --color-career-ink: #43357a;
 }
 
 body {
@@ -34,4 +48,30 @@ body {
 }
 @utility label {
   @apply text-sm font-semibold;
+}
+
+/* Landing page: one orchestrated entrance for the hero collage. */
+@keyframes deal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) rotate(var(--tilt, 0deg)) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) rotate(var(--tilt, 0deg)) scale(1);
+  }
+}
+.deal {
+  transform: rotate(var(--tilt, 0deg));
+  animation: deal-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: var(--delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .deal {
+    animation: none;
+  }
+}
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
