@@ -36,6 +36,20 @@
       "when": 1793344949904,
       "tag": "0004_requirement_visible_to_invited_pro",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793377104173,
+      "tag": "0005_company_marketplace",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793377105246,
+      "tag": "0006_requirements_private_to_company",
+      "breakpoints": true
     }
   ]
 }

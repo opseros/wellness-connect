@@ -11,12 +11,13 @@ import { AppError } from "@/lib/errors";
 
 export async function createCompanyAction(_: string | null, form: FormData): Promise<string | null> {
   const me = await requireUser();
+  let orgId: string;
   try {
-    await createOrganization(me, { name: String(form.get("name") ?? ""), kind: "company" });
+    orgId = (await createOrganization(me, { name: String(form.get("name") ?? ""), kind: "company" })).id;
   } catch (e) {
     return e instanceof AppError ? e.message : "Enter a company name of at least 2 characters.";
   }
-  redirect("/app");
+  redirect(`/company/${orgId}`);
 }
 
 export async function startProfessionalAction(_: string | null, form: FormData): Promise<string | null> {

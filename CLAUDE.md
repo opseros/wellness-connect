@@ -55,6 +55,8 @@ Read README.md for the product and setup. These rules are not optional.
   transaction as the change. Delivery starts right after the response (Next.js `after`);
   `/api/cron/outbox` (daily on Hobby) retries failures.
 - Auth emails (verify, reset) are the exception and are sent directly by Better Auth.
+  Company invitations are also sent directly, because the outbox must never store the
+  raw invitation token (only its SHA-256 hash is saved).
 
 ## Database changes
 - Edit `src/db/schema/*.ts`, then `npm run db:generate` to create a migration. Never

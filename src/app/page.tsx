@@ -4,10 +4,10 @@ import { SignInForm } from "@/components/auth-forms";
 import { enabledProviders } from "@/lib/providers";
 import { getCurrentUser } from "@/modules/identity/session";
 
-export default async function SignInPage({ searchParams }: { searchParams: Promise<{ reset?: string }> }) {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ reset?: string; next?: string }> }) {
   const user = await getCurrentUser();
-  if (user) redirect("/app");
-  const { reset } = await searchParams;
+  const { reset, next } = await searchParams;
+  if (user) redirect(next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/app");
   return (
     <AuthShell title="Sign in" subtitle={reset ? "Password changed. Sign in with your new password." : "Use your work account or email."}>
       <SignInForm providers={enabledProviders()} />

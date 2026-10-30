@@ -39,7 +39,10 @@ export default async function ProposalsAndBookings({ searchParams }: { searchPar
               <td>{b.orgName}</td>
               <td className="whitespace-nowrap">{dayTime(b.booking.scheduledStart)}</td>
               <td className="whitespace-nowrap">{formatPaise(b.feePaise)}</td>
-              <td><Badge status={b.booking.status} /></td>
+              <td>
+                <Badge status={b.booking.status === "pending" ? "active" : b.booking.status} label={b.booking.status === "pending" ? "Booked" : undefined} />
+                {b.booking.cancelReason && <span className="mt-1 block text-[13px] text-muted">{b.booking.cancelReason}</span>}
+              </td>
             </tr>
           ))}
         </Table>
@@ -60,7 +63,12 @@ export default async function ProposalsAndBookings({ searchParams }: { searchPar
               <td>{p.orgName}</td>
               <td className="whitespace-nowrap">{formatPaise(p.proposal.feePaise)}</td>
               <td className="whitespace-nowrap">{dayTime(p.proposal.proposedStart)}</td>
-              <td><Badge status={p.proposal.status} /></td>
+              <td>
+                <Badge status={p.proposal.status} label={{ submitted: "Waiting", revision_requested: "Changes requested", rejected: "Not selected" }[p.proposal.status as string]} />
+                {p.proposal.status === "revision_requested" && p.enquiryId && (
+                  <Link href={`/pro/enquiries/${p.enquiryId}`} className="ml-2 text-[13px] font-semibold text-brand hover:underline">Revise</Link>
+                )}
+              </td>
               <td>
                 {p.proposal.status === "submitted" && (
                   <form action={withdrawProposalAction}>

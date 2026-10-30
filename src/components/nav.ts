@@ -1,14 +1,18 @@
 import type { CurrentUser } from "@/modules/identity/session";
 
-type Section = "home" | "pro" | "connect" | "admin" | "account";
+type Section = "home" | "company" | "pro" | "connect" | "admin" | "account";
 
 /**
- * Main navigation for signed-in pages. "Professional" appears once the user
- * has a professional profile; "Admin" only for platform staff.
+ * Main navigation for signed-in pages. "Company" appears for owners, admins
+ * and wellness managers; "Professional" once the user has a professional
+ * profile; "Admin" only for platform staff. Get the options from navOptions().
  */
-export function mainNav(me: Pick<CurrentUser, "platformRole">, active: Section, opts: { professional?: boolean } = {}) {
+export type NavOptions = { professional?: boolean; companyHref?: string | null };
+
+export function mainNav(me: Pick<CurrentUser, "platformRole">, active: Section, opts: NavOptions = {}) {
   const items: { href: string; label: string; key: Section }[] = [
     { href: "/app", label: "Home", key: "home" },
+    ...(opts.companyHref ? [{ href: opts.companyHref, label: "Company", key: "company" as const }] : []),
     ...(opts.professional ? [{ href: "/pro", label: "Professional", key: "pro" as const }] : []),
     { href: "/connect", label: "Connect", key: "connect" },
     ...(me.platformRole !== "user" ? [{ href: "/admin", label: "Admin", key: "admin" as const }] : []),

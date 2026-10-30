@@ -10,7 +10,13 @@ export type OutboxEvent =
   | { type: "booking.created"; payload: { bookingId: string; orgId: string; professionalUserId: string } }
   | { type: "connection.requested"; payload: { connectionId: string; fromUserId: string; toUserId: string } }
   | { type: "credential.reviewed"; payload: { credentialId: string; decision: string } }
-  | { type: "proposal.submitted"; payload: { proposalId: string; requirementId: string; orgId: string; createdBy: string } };
+  | { type: "proposal.submitted"; payload: { proposalId: string; requirementId: string; orgId: string; createdBy: string; revised?: boolean } }
+  | { type: "proposal.revision_requested"; payload: { proposalId: string; professionalUserId: string } }
+  | { type: "proposal.not_selected"; payload: { proposalId: string; professionalUserId: string } }
+  | { type: "requirement.withdrawn"; payload: { requirementId: string; professionalUserId: string } }
+  | { type: "enquiry.reminder"; payload: { enquiryId: string; professionalUserId: string } }
+  | { type: "booking.rescheduled"; payload: { bookingId: string; professionalUserId: string; from: string; to: string; reason: string } }
+  | { type: "booking.cancelled"; payload: { bookingId: string; professionalUserId: string; reason: string; late: boolean } };
 
 /**
  * Call inside the same transaction as the business change. Delivery starts

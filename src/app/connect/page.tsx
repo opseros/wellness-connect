@@ -5,7 +5,7 @@ import { mainNav } from "@/components/nav";
 import { getCurrentUser } from "@/modules/identity/session";
 import { getFeed, listInvitations } from "@/modules/connect/service";
 import { createPostAction, toggleLikeAction } from "@/app/app/actions";
-import { getOwnProfile } from "@/modules/professionals/service";
+import { navOptions } from "@/components/nav-options";
 
 const when = (d: Date) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(d);
 
@@ -13,11 +13,11 @@ export default async function ConnectFeedPage() {
   const me = await getCurrentUser();
   if (!me) redirect("/");
   if (!me.emailVerified) redirect("/check-email");
-  const [feed, invites, pro] = await Promise.all([getFeed(me.id), listInvitations(me.id), getOwnProfile(me.id)]);
+  const [feed, invites] = await Promise.all([getFeed(me.id), listInvitations(me.id)]);
 
   return (
     <div>
-      <AppHeader name={me.name} nav={mainNav(me, "connect", { professional: Boolean(pro) })} />
+      <AppHeader name={me.name} nav={mainNav(me, "connect", await navOptions(me.id))} />
       <div className="mx-auto flex max-w-[1180px] flex-wrap items-start gap-5 px-6 py-7">
         <main className="flex min-w-0 flex-[999_1_460px] flex-col gap-4">
           <form action={createPostAction} className="card flex flex-col gap-3 p-4">

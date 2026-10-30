@@ -36,7 +36,7 @@ Without Resend configured, verification and reset links appear in the terminal r
 Google/Microsoft buttons appear only when their keys are set.
 
 ```bash
-npm test          # 49 tests: matching, tenant isolation, auth, marketplace, professionals, admin, Connect
+npm test          # 56 tests: matching, tenant isolation, auth, company flow, professionals, admin, Connect
 npm run typecheck && npm run lint && npm run build
 ```
 
@@ -84,6 +84,7 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
 - Every account gets a Connect profile. Verified work emails request to join the company that owns the domain (public mail domains never do); owners and admins approve and assign roles.
 - Marketplace: requirements → rule-based matching with hard filters and explained scores → enquiries to eligible professionals only → proposals → acceptance creating an idempotent booking, all inside row-level security.
 - Credential upload to private storage and staff review with an audit trail. Without `BLOB_READ_WRITE_TOKEN` (local development only) files are kept in `./.data/uploads`.
+- Company workspace (`/company/<orgId>`): dashboard (open requirements, proposals to review, upcoming sessions); requirement form with drafts and publishing; matches with a score breakdown, "why excluded" counts and a shortlist to send enquiries; enquiry tracking with reminders (once a day); side-by-side proposal comparison with accept and request-revision; bookings with location, reschedule (outside the free-cancellation window, at most twice), cancel (marked late inside the window) and mark completed; settings with company details (city, address, billing email, GSTIN), members and roles, join-request approval and email invitations (`/invite/<token>`, 14-day links, only a hash is stored). Requirements are private to the company and the professionals it contacts.
 - Professional workspace (`/pro`): overview with a "get discovered" checklist, profile editor and search visibility, services (add, edit, pause; price ranges in rupees), credentials (upload, see review notes, resubmit), enquiry inbox (opening marks it viewed; decline), proposal form, proposals, bookings and earnings (agreed fees until payments go live). Public profile page `/p/<profileId>` with a Connect button; only verified, visible professionals in good standing are shown to others.
 - Connect: connection requests, feed (own + connections + groups), likes, connection-gated messages, blocking.
 - Append-only finance ledger and the payment table, ready for Razorpay.
@@ -111,7 +112,6 @@ In production (`VERCEL_ENV=production`) the app refuses to start if `DATABASE_UR
 
 ## Next steps
 
-1. M3: screens for the company flow (requirement form, matches, sending enquiries, comparing and accepting proposals); the APIs exist.
-2. Razorpay orders + signed webhooks writing ledger entries.
-3. Connect: network page, messages UI, groups, referrals.
-4. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).
+1. M4: Razorpay orders + signed webhooks writing ledger entries, GST invoices, pay by invoice, refunds by policy, admin finance view.
+2. Connect: network page, messages UI, groups, referrals.
+3. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).

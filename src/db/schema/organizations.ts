@@ -12,6 +12,11 @@ export const organization = pgTable(
     domain: text("domain"),
     domainVerifiedAt: timestamp("domain_verified_at", { withTimezone: true }),
     countryCode: text("country_code").notNull().default("IN"),
+    // Company settings: where sessions usually happen and who receives invoices (M4).
+    city: text("city").notNull().default(""),
+    address: text("address").notNull().default(""),
+    billingEmail: text("billing_email").notNull().default(""),
+    gstin: text("gstin").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("organization_domain_uq").on(t.domain)],
@@ -32,4 +37,28 @@ export const membership = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("membership_org_user_uq").on(t.orgId, t.userId), index("membership_user_idx").on(t.userId)],
+);
+
+export const INVITE_ROLES = ["admin", "wellness_manager", "member"] as const;
+
+/**
+ * Invitations by email. Only a SHA-256 hash of the token is stored; the
+ * link in the email is the only copy of the token. Accepting requires being
+ * signed in with a verified email equal to the invited address.
+ */
+export const invitation = pgTable(
+  "invitation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role", { enum: INVITE_ROLES }).notNull().default("member"),
+    tokenHash: text("token_hash").notNull().unique(),
+    invitedBy: uuid("invited_by").notNull().references(() => user.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("invitation_org_idx").on(t.orgId), index("invitation_email_idx").on(t.email)],
 );

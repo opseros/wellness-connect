@@ -4,6 +4,7 @@ import { mainNav } from "@/components/nav";
 import { listMyEnquiries } from "@/modules/marketplace/service";
 import { getProOrExit } from "./me";
 import { ProNav } from "./pro-nav";
+import { navOptions } from "@/components/nav-options";
 
 export const metadata: Metadata = { title: { default: "Professional", template: "%s · Professional" } };
 
@@ -13,7 +14,7 @@ export default async function ProLayout({ children }: { children: React.ReactNod
   const open = enquiries.filter((e) => e.status === "sent").length;
   return (
     <div>
-      <AppHeader name={me.name} nav={mainNav(me, "pro", { professional: true })} />
+      <AppHeader name={me.name} nav={mainNav(me, "pro", await navOptions(me.id))} />
       <div className="border-b border-line bg-ground">
         <div className="mx-auto max-w-[1120px] px-6 py-2">
           <ProNav openEnquiries={open} profileId={profile.id} />

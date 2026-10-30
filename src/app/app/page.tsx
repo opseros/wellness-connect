@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/modules/identity/session";
 import { listMemberships } from "@/modules/organizations/service";
 import { getOwnProfile } from "@/modules/professionals/service";
 import { BRAND } from "@/lib/brand";
+import { navOptions } from "@/components/nav-options";
 
 const roleLabel: Record<string, string> = { owner: "Owner", admin: "Admin", wellness_manager: "Wellness manager", member: "Member" };
 
@@ -19,7 +20,7 @@ export default async function AppHome() {
 
   return (
     <div>
-      <AppHeader name={me.name} nav={mainNav(me, "home", { professional: Boolean(pro) })} />
+      <AppHeader name={me.name} nav={mainNav(me, "home", await navOptions(me.id))} />
       <main className="mx-auto flex max-w-[1120px] flex-col gap-7 px-6 py-8">
         <div className="flex flex-col gap-1">
           <h1 className="text-[28px] font-bold">Welcome, {firstName}</h1>
@@ -42,7 +43,11 @@ export default async function AppHome() {
               <ul className="flex flex-col gap-2">
                 {memberships.map(({ membership: m, organization: o }) => (
                   <li key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-ground px-3.5 py-3 text-sm">
-                    <span className="font-semibold">{o.name}</span>
+                    {m.status === "active" && m.role !== "member" ? (
+                      <Link href={`/company/${o.id}`} className="font-semibold text-brand hover:underline">{o.name}</Link>
+                    ) : (
+                      <span className="font-semibold">{o.name}</span>
+                    )}
                     <span className={m.status === "pending" ? "font-semibold text-[#7a4b00]" : "text-muted"}>
                       {m.status === "pending" ? "Waiting for approval" : roleLabel[m.role]}
                     </span>

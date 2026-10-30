@@ -4,7 +4,7 @@ import { createTestDb } from "@/test/db";
 import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import { withScope, type DB } from "@/db/client";
 import { membership, organization, proposal, requirement } from "@/db/schema";
-import { createRequirement, listOrgRequirements, getMatches } from "./service";
+import { createRequirement, listOrgRequirements, getMatches, sendEnquiries } from "./service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 let db: DB;
@@ -69,11 +69,14 @@ describe("tenant isolation (row-level security)", () => {
     await expect(createRequirement(bob.id, orgA, draft("nope"))).rejects.toMatchObject({ status: 403 });
   });
 
-  it("published requirements are readable by signed-in professionals; drafts are not", async () => {
+  it("even published requirements are private until a professional is sent an enquiry", async () => {
     const pub = await createRequirement(alice.id, orgA, { ...draft("Alpha published"), publish: true });
     const pro = await makeProfessional(db, { categoryId: catId });
-    const seen = await withScope({ userId: pro.user.id }, (tx) => tx.select().from(requirement));
-    expect(seen.map((r) => r.id)).toEqual([pub.id]);
+    const before = await withScope({ userId: pro.user.id }, (tx) => tx.select().from(requirement));
+    expect(before).toHaveLength(0);
+    await sendEnquiries(alice.id, orgA, pub.id, [pro.user.id]);
+    const after = await withScope({ userId: pro.user.id }, (tx) => tx.select().from(requirement));
+    expect(after.map((r) => r.id)).toEqual([pub.id]);
   });
 
   it("a professional sees only their own proposals", async () => {

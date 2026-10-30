@@ -15,7 +15,7 @@ import {
   updateService,
   upsertProfessionalProfile,
 } from "@/modules/professionals/service";
-import { declineEnquiry, submitProposal, withdrawProposal } from "@/modules/marketplace/service";
+import { declineEnquiry, reviseProposal, submitProposal, withdrawProposal } from "@/modules/marketplace/service";
 import { requestConnection } from "@/modules/connect/service";
 
 // Every action re-checks the session; the services check ownership again.
@@ -116,24 +116,36 @@ export async function declineEnquiryAction(form: FormData) {
   await run({ to: "/pro/enquiries", msg: "Enquiry declined." }, `/pro/enquiries/${id}`, () => declineEnquiry(me.id, id));
 }
 
+function proposalFromForm(form: FormData) {
+  const date = str(form, "date");
+  const time = str(form, "time") || "10:00";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) throw new AppError(400, "invalid_input", "Choose a start date and time");
+  const start = `${date}T${time}:00+05:30`; // times are entered in IST
+  if (new Date(start) <= new Date()) throw new AppError(400, "invalid_input", "The start time must be in the future");
+  return {
+    feeRupees: num(form, "feeRupees"),
+    proposedStart: start,
+    maxParticipants: num(form, "maxParticipants"),
+    inclusions: str(form, "inclusions"),
+    message: str(form, "message"),
+    freeCancellationDays: num(form, "freeCancellationDays"),
+  };
+}
+
 export async function submitProposalAction(form: FormData) {
   const me = await requireUser();
   const enquiryId = str(form, "enquiryId");
-  const date = str(form, "date");
-  const time = str(form, "time") || "10:00";
-  await run({ to: `/pro/enquiries/${enquiryId}`, msg: "Proposal sent. The company has been notified." }, `/pro/enquiries/${enquiryId}`, async () => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) throw new AppError(400, "invalid_input", "Choose a start date and time");
-    const start = `${date}T${time}:00+05:30`; // times are entered in IST
-    if (new Date(start) <= new Date()) throw new AppError(400, "invalid_input", "The start time must be in the future");
-    return submitProposal(me.id, str(form, "requirementId"), {
-      feeRupees: num(form, "feeRupees"),
-      proposedStart: start,
-      maxParticipants: num(form, "maxParticipants"),
-      inclusions: str(form, "inclusions"),
-      message: str(form, "message"),
-      freeCancellationDays: num(form, "freeCancellationDays"),
-    });
-  });
+  await run({ to: `/pro/enquiries/${enquiryId}`, msg: "Proposal sent. The company has been notified." }, `/pro/enquiries/${enquiryId}`, async () =>
+    submitProposal(me.id, str(form, "requirementId"), proposalFromForm(form)),
+  );
+}
+
+export async function reviseProposalAction(form: FormData) {
+  const me = await requireUser();
+  const enquiryId = str(form, "enquiryId");
+  await run({ to: `/pro/enquiries/${enquiryId}`, msg: "Revised proposal sent. The company has been notified." }, `/pro/enquiries/${enquiryId}`, async () =>
+    reviseProposal(me.id, str(form, "proposalId"), proposalFromForm(form)),
+  );
 }
 
 export async function withdrawProposalAction(form: FormData) {

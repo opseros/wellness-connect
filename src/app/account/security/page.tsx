@@ -7,7 +7,7 @@ import { listMySessions, listMySignInMethods } from "@/modules/identity/account"
 import { revokeOtherSessionsAction, revokeSessionAction } from "../actions";
 import { TwoFactorPanel } from "./two-factor-panel";
 import { SetPasswordForm } from "./set-password-form";
-import { getOwnProfile } from "@/modules/professionals/service";
+import { navOptions } from "@/components/nav-options";
 
 export const metadata: Metadata = { title: "Account security" };
 
@@ -25,7 +25,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
   const me = await getCurrentUser();
   if (!me) redirect("/");
   if (!me.emailVerified) redirect("/check-email");
-  const [{ need2fa }, sessions, methods, pro] = await Promise.all([searchParams, listMySessions(me.id), listMySignInMethods(me.id), getOwnProfile(me.id)]);
+  const [{ need2fa }, sessions, methods] = await Promise.all([searchParams, listMySessions(me.id), listMySignInMethods(me.id)]);
   const hasPassword = methods.some((m) => m.providerId === "credential");
   const isStaff = me.platformRole !== "user";
 
@@ -33,7 +33,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
     <div>
       <AppHeader
         name={me.name}
-        nav={mainNav(me, "account", { professional: Boolean(pro) })}
+        nav={mainNav(me, "account", await navOptions(me.id))}
       />
       <main className="mx-auto flex max-w-[820px] flex-col gap-5 px-6 py-8">
         <div className="flex flex-col gap-1">

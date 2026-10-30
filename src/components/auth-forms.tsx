@@ -6,12 +6,19 @@ import { authClient } from "@/lib/auth-client";
 
 export type Providers = { google: boolean; microsoft: boolean };
 
+/** Where to go after signing in: a same-site path from ?next=, otherwise /app. */
+function useNext() {
+  const n = useSearchParams().get("next") ?? "";
+  return n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : "/app";
+}
+
 function SocialButtons({ providers }: { providers: Providers }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const next = useNext();
   if (!providers.google && !providers.microsoft) return null;
   const go = async (provider: "google" | "microsoft") => {
     setBusy(provider);
-    await authClient.signIn.social({ provider, callbackURL: "/app" });
+    await authClient.signIn.social({ provider, callbackURL: next });
   };
   // Replace these with each provider's official branded button before launch.
   return (
@@ -46,6 +53,7 @@ function ErrorText({ message }: { message: string | null }) {
 
 export function SignInForm({ providers }: { providers: Providers }) {
   const router = useRouter();
+  const next = useNext();
   const [error, setError] = useState<string | null>(null);
   const [unverified, setUnverified] = useState(false);
   const [pending, setPending] = useState(false);
@@ -59,10 +67,10 @@ export function SignInForm({ providers }: { providers: Providers }) {
     const { error } = await authClient.signIn.email({
       email: String(form.get("email")),
       password: String(form.get("password")),
-      callbackURL: "/app",
+      callbackURL: next,
     });
     setPending(false);
-    if (!error) return router.push("/app");
+    if (!error) return router.push(next);
     if (error.code === "ACCOUNT_SUSPENDED") return setError("This account is suspended. Contact support if you think this is a mistake.");
     if (error.code === "EMAIL_NOT_VERIFIED" || error.status === 403) {
       setUnverified(true);
@@ -91,7 +99,7 @@ export function SignInForm({ providers }: { providers: Providers }) {
         <button className="btn-primary w-full" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
       </form>
       <p className="text-center text-sm text-muted">
-        New here? <Link href="/sign-up" className="font-semibold text-brand hover:underline">Create an account</Link>
+        New here? <Link href={next === "/app" ? "/sign-up" : `/sign-up?next=${encodeURIComponent(next)}`} className="font-semibold text-brand hover:underline">Create an account</Link>
       </p>
     </div>
   );
@@ -99,6 +107,8 @@ export function SignInForm({ providers }: { providers: Providers }) {
 
 export function SignUpForm({ providers }: { providers: Providers }) {
   const router = useRouter();
+  const next = useNext();
+  const presetEmail = useSearchParams().get("email") ?? "";
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -110,7 +120,7 @@ export function SignUpForm({ providers }: { providers: Providers }) {
     setPending(true);
     setError(null);
     const email = String(form.get("email"));
-    const { error } = await authClient.signUp.email({ name: String(form.get("name")), email, password, callbackURL: "/app" });
+    const { error } = await authClient.signUp.email({ name: String(form.get("name")), email, password, callbackURL: next });
     setPending(false);
     if (error) {
       return setError(
@@ -134,7 +144,7 @@ export function SignUpForm({ providers }: { providers: Providers }) {
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="email" className="label">Email</label>
-          <input id="email" name="email" type="email" autoComplete="email" required className="input" placeholder="Use your work email to join your company" />
+          <input id="email" name="email" type="email" autoComplete="email" required defaultValue={presetEmail} className="input" placeholder="Use your work email to join your company" />
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="password" className="label">Password</label>
@@ -144,7 +154,7 @@ export function SignUpForm({ providers }: { providers: Providers }) {
         <button className="btn-primary w-full" disabled={pending}>{pending ? "Creating account…" : "Create account"}</button>
       </form>
       <p className="text-center text-sm text-muted">
-        Already have an account? <Link href="/" className="font-semibold text-brand hover:underline">Sign in</Link>
+        Already have an account? <Link href={next === "/app" ? "/" : `/?next=${encodeURIComponent(next)}`} className="font-semibold text-brand hover:underline">Sign in</Link>
       </p>
     </div>
   );

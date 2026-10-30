@@ -5,9 +5,11 @@ import { getMyEnquiry } from "@/modules/marketplace/service";
 import { AppError } from "@/lib/errors";
 import { formatPaise, paiseRange } from "@/lib/money";
 import { Badge, Flash, PageTitle } from "@/components/ui";
-import { declineEnquiryAction, submitProposalAction } from "../../actions";
-import { Field } from "../../fields";
-import { day, dayTime, getProOrExit, MODE_LABEL, tomorrowInIndia } from "../../me";
+import { declineEnquiryAction, reviseProposalAction, submitProposalAction } from "../../actions";
+import { ProposalForm } from "./proposal-form";
+import { day, dayTime, getProOrExit, istParts, MODE_LABEL, tomorrowInIndia } from "../../me";
+
+const PROPOSAL_LABEL: Record<string, string> = { submitted: "Waiting for the company", accepted: "Accepted", rejected: "Not selected", withdrawn: "Withdrawn", revision_requested: "Changes requested" };
 
 export const metadata: Metadata = { title: "Enquiry" };
 
@@ -42,11 +44,34 @@ export default async function EnquiryDetail({ params, searchParams }: { params: 
         </section>
 
         <section className="flex min-w-0 flex-[1_1_420px] flex-col gap-4">
-          {d.proposal ? (
+          {d.proposal?.status === "revision_requested" && r.status === "published" ? (
+            <div className="flex flex-col gap-3">
+              <p className="rounded-xl bg-[#fbf0dc] px-4 py-3 text-sm text-[#7a4b00]">
+                <span className="font-semibold">The company asked for changes: </span>
+                {d.proposal.revisionNote}
+              </p>
+              <ProposalForm
+                title="Send a revised proposal"
+                action={reviseProposalAction}
+                hidden={{ enquiryId: d.enquiry.id, proposalId: d.proposal.id }}
+                min={tomorrow}
+                budget={paiseRange(r.budgetMinPaise, r.budgetMaxPaise)}
+                defaults={{
+                  fee: d.proposal.feePaise / 100,
+                  participants: d.proposal.maxParticipants,
+                  ...istParts(d.proposal.proposedStart),
+                  inclusions: d.proposal.inclusions,
+                  message: d.proposal.message,
+                  cancellationDays: d.proposal.freeCancellationDays,
+                }}
+                submit="Send revised proposal"
+              />
+            </div>
+          ) : d.proposal ? (
             <div className="card flex flex-col gap-3 p-6">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="font-bold">Your proposal</h2>
-                <Badge status={d.proposal.status} />
+                <Badge status={d.proposal.status} label={PROPOSAL_LABEL[d.proposal.status]} />
               </div>
               <dl className="grid grid-cols-[150px_minmax(0,1fr)] gap-x-4 gap-y-2 text-[15px]">
                 <dt className="text-muted">Fee</dt><dd className="font-semibold">{formatPaise(d.proposal.feePaise)}</dd>
@@ -55,38 +80,19 @@ export default async function EnquiryDetail({ params, searchParams }: { params: 
                 <dt className="text-muted">Free cancellation</dt><dd>Up to {d.proposal.freeCancellationDays} days before</dd>
               </dl>
               {d.proposal.inclusions && <p className="whitespace-pre-line text-sm"><span className="font-semibold">Includes: </span>{d.proposal.inclusions}</p>}
+              {d.proposal.revisionCount > 0 && <p className="text-[13px] text-muted">Revised {d.proposal.revisionCount} time{d.proposal.revisionCount === 1 ? "" : "s"}.</p>}
               <Link href="/pro/proposals" className="text-sm font-semibold text-brand hover:underline">All proposals and bookings →</Link>
             </div>
           ) : d.canPropose ? (
-            <form action={submitProposalAction} className="card flex flex-col gap-4 p-6">
-              <h2 className="font-bold">Send a proposal</h2>
-              <input type="hidden" name="enquiryId" value={d.enquiry.id} />
-              <input type="hidden" name="requirementId" value={r.id} />
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4">
-                <Field id="feeRupees" label="Your fee (₹)" hint={`Their budget: ${paiseRange(r.budgetMinPaise, r.budgetMaxPaise)}`}>
-                  <input id="feeRupees" name="feeRupees" type="number" min={1} step={1} required className="input" />
-                </Field>
-                <Field id="maxParticipants" label="Max participants">
-                  <input id="maxParticipants" name="maxParticipants" type="number" min={1} defaultValue={r.participants} required className="input" />
-                </Field>
-                <Field id="date" label="Start date">
-                  <input id="date" name="date" type="date" min={tomorrow} defaultValue={r.preferredDate ?? undefined} required className="input" />
-                </Field>
-                <Field id="time" label="Start time (IST)">
-                  <input id="time" name="time" type="time" defaultValue="10:00" required className="input" />
-                </Field>
-              </div>
-              <Field id="inclusions" label="What's included">
-                <textarea id="inclusions" name="inclusions" rows={3} maxLength={2000} className="input py-3" placeholder="Session plan, handouts, follow-up session…" />
-              </Field>
-              <Field id="message" label="Message to the company">
-                <textarea id="message" name="message" rows={3} maxLength={2000} className="input py-3" />
-              </Field>
-              <Field id="freeCancellationDays" label="Free cancellation up to (days before)">
-                <input id="freeCancellationDays" name="freeCancellationDays" type="number" min={0} max={60} defaultValue={7} className="input max-w-[160px]" />
-              </Field>
-              <button className="btn-primary self-start">Send proposal</button>
-            </form>
+            <ProposalForm
+              title="Send a proposal"
+              action={submitProposalAction}
+              hidden={{ enquiryId: d.enquiry.id, requirementId: r.id }}
+              min={tomorrow}
+              budget={paiseRange(r.budgetMinPaise, r.budgetMaxPaise)}
+              defaults={{ participants: r.participants, date: r.preferredDate ?? undefined, time: "10:00", cancellationDays: 7 }}
+              submit="Send proposal"
+            />
           ) : (
             <p className="card p-6 text-[15px] text-muted">
               {d.enquiry.status === "declined" ? "You declined this enquiry." : "This requirement is closed and no longer accepts proposals."}

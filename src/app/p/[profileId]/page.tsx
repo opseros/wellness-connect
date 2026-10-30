@@ -7,10 +7,11 @@ import { Badge, Flash } from "@/components/ui";
 import { AppError } from "@/lib/errors";
 import { paiseRange } from "@/lib/money";
 import { getCurrentUser } from "@/modules/identity/session";
-import { getOwnProfile, getPublicProfile } from "@/modules/professionals/service";
+import { getPublicProfile } from "@/modules/professionals/service";
 import { connectionState } from "@/modules/connect/service";
 import { connectAction } from "@/app/pro/actions";
 import { BRAND } from "@/lib/brand";
+import { navOptions } from "@/components/nav-options";
 
 const MODE: Record<string, string> = { in_person: "In person", virtual: "Virtual", hybrid: "Hybrid" };
 
@@ -21,7 +22,7 @@ export default async function PublicProfile({ params, searchParams }: { params: 
   const { profileId } = await params;
   if (!me) redirect(`/?next=/p/${profileId}`);
   if (!me.emailVerified) redirect("/check-email");
-  const [sp, ownPro] = await Promise.all([searchParams, getOwnProfile(me.id)]);
+  const sp = await searchParams;
   const d = await getPublicProfile(me.id, profileId).catch((e) => {
     if (e instanceof AppError && e.status === 404) notFound();
     throw e;
@@ -32,7 +33,7 @@ export default async function PublicProfile({ params, searchParams }: { params: 
 
   return (
     <div>
-      <AppHeader name={me.name} nav={mainNav(me, d.isOwner ? "pro" : "connect", { professional: Boolean(ownPro) })} />
+      <AppHeader name={me.name} nav={mainNav(me, d.isOwner ? "pro" : "connect", await navOptions(me.id))} />
       <main className="mx-auto flex max-w-[960px] flex-col gap-5 px-6 py-8">
         {d.isOwner && (
           <p className="rounded-xl bg-[#e8ecf5] px-4 py-3 text-sm text-[#2e3f66]">

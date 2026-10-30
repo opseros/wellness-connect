@@ -25,3 +25,13 @@ export const dayTime = (d: Date | null | undefined) =>
 export function tomorrowInIndia() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(Date.now() + 86_400_000));
 }
+
+/** "YYYY-MM-DD" and "HH:MM" in India time, for prefilling date and time inputs. */
+export function istParts(d: Date) {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "Asia/Kolkata" })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  );
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+}

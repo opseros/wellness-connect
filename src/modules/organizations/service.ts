@@ -1,8 +1,11 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { createHash, randomBytes } from "node:crypto";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { organization, membership, user, type OrgRole } from "@/db/schema";
+import { invitation, organization, membership, user, type OrgRole } from "@/db/schema";
 import { getDb, type Executor } from "@/db/client";
-import { badRequest, forbidden, notFound } from "@/lib/errors";
+import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
+import { sendEmail } from "@/lib/email";
+import { BRAND } from "@/lib/brand";
 import { enqueue, audit } from "@/modules/platform/outbox";
 
 /** Free/public mailbox domains never link someone to a company. */
@@ -93,6 +96,7 @@ export async function listMemberships(userId: string, db: Executor = getDb()) {
 
 /** Throws unless the user is an ACTIVE member of the org with one of the roles. */
 export async function requireOrgRole(userId: string, orgId: string, roles: readonly OrgRole[], db: Executor = getDb()) {
+  assertUuid(orgId, "Organization");
   const m = await db.query.membership.findFirst({
     where: and(eq(membership.orgId, orgId), eq(membership.userId, userId), eq(membership.status, "active")),
   });
@@ -141,4 +145,214 @@ export async function orgAdminEmails(orgId: string, db: Executor = getDb()) {
     .innerJoin(user, eq(user.id, membership.userId))
     .where(and(eq(membership.orgId, orgId), eq(membership.status, "active"), inArray(membership.role, ["owner", "admin"])));
   return rows.map((r) => r.email);
+}
+
+// ---------- M3: company settings, members and invitations ----------
+
+export const ORG_ALL: readonly OrgRole[] = ["owner", "admin", "wellness_manager", "member"];
+const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
+/** The org plus the caller's active membership; 404 for non-members (no hint the org exists). */
+export async function getOrgForMember(userId: string, orgId: string) {
+  assertUuid(orgId, "Organization");
+  const db = getDb();
+  const m = await db.query.membership.findFirst({
+    where: and(eq(membership.orgId, orgId), eq(membership.userId, userId), eq(membership.status, "active")),
+  });
+  if (!m) throw notFound("Organization not found");
+  const org = await db.query.organization.findFirst({ where: eq(organization.id, orgId) });
+  if (!org) throw notFound("Organization not found");
+  return { org, role: m.role };
+}
+
+/** Active memberships where the user can run the marketplace (owner, admin, wellness manager). */
+export async function listBuyerOrgs(userId: string) {
+  const rows = await listMemberships(userId);
+  return rows.filter((r) => r.membership.status === "active" && ORG_BUYERS.includes(r.membership.role));
+}
+
+export const orgSettingsInput = z.object({
+  name: z.string().trim().min(2, "Company name must be at least 2 characters").max(120),
+  city: z.string().trim().max(80).default(""),
+  address: z.string().trim().max(400).default(""),
+  billingEmail: z.union([z.literal(""), z.string().trim().toLowerCase().email("Enter a valid billing email")]).default(""),
+  gstin: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine((v) => v === "" || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(v), "GSTIN should be 15 characters, e.g. 29ABCDE1234F1Z5")
+    .default(""),
+});
+
+export async function updateOrgSettings(actorId: string, orgId: string, input: z.input<typeof orgSettingsInput>) {
+  const d = orgSettingsInput.parse(input);
+  return getDb().transaction(async (tx) => {
+    await requireOrgRole(actorId, orgId, ORG_ADMINS, tx);
+    const [row] = await tx.update(organization).set(d).where(eq(organization.id, orgId)).returning();
+    await audit(tx, { actorId, action: "organization.update", targetType: "organization", targetId: orgId });
+    return row;
+  });
+}
+
+export async function listMembers(actorId: string, orgId: string) {
+  await requireOrgRole(actorId, orgId, ORG_ALL);
+  return getDb()
+    .select({ membershipId: membership.id, userId: user.id, name: user.name, email: user.email, role: membership.role, status: membership.status, createdAt: membership.createdAt })
+    .from(membership)
+    .innerJoin(user, eq(user.id, membership.userId))
+    .where(and(eq(membership.orgId, orgId), isNull(user.deletedAt)))
+    .orderBy(asc(membership.status), asc(user.name));
+}
+
+export const memberRoleInput = z.object({ role: z.enum(["admin", "wellness_manager", "member"]) });
+
+/**
+ * Owners and admins manage roles. Only an owner grants or removes admin.
+ * Nobody changes their own role, and owners can't be changed here.
+ */
+export async function changeMemberRole(actorId: string, orgId: string, membershipId: string, input: z.input<typeof memberRoleInput>) {
+  const { role } = memberRoleInput.parse(input);
+  assertUuid(membershipId, "Member");
+  return getDb().transaction(async (tx) => {
+    const actor = await requireOrgRole(actorId, orgId, ORG_ADMINS, tx);
+    const target = await tx.query.membership.findFirst({ where: and(eq(membership.id, membershipId), eq(membership.orgId, orgId)) });
+    if (!target) throw notFound("Member not found");
+    if (target.userId === actorId) throw badRequest("You can't change your own role");
+    if (target.role === "owner") throw forbidden("Owners can't be changed");
+    if ((role === "admin" || target.role === "admin") && actor.role !== "owner") throw forbidden("Only an owner can grant or remove admin");
+    const [row] = await tx.update(membership).set({ role, status: "active" }).where(eq(membership.id, membershipId)).returning();
+    await audit(tx, { actorId, action: target.status === "pending" ? "membership.approve" : "membership.role", targetType: "membership", targetId: row.id, metadata: { from: target.role, to: role } });
+    return row;
+  });
+}
+
+/** Removes a member, or declines a pending join request. Same role rules as changing roles. */
+export async function removeMember(actorId: string, orgId: string, membershipId: string) {
+  assertUuid(membershipId, "Member");
+  return getDb().transaction(async (tx) => {
+    const actor = await requireOrgRole(actorId, orgId, ORG_ADMINS, tx);
+    const target = await tx.query.membership.findFirst({ where: and(eq(membership.id, membershipId), eq(membership.orgId, orgId)) });
+    if (!target) throw notFound("Member not found");
+    if (target.userId === actorId) throw badRequest("You can't remove yourself");
+    if (target.role === "owner") throw forbidden("Owners can't be removed");
+    if (target.role === "admin" && actor.role !== "owner") throw forbidden("Only an owner can remove an admin");
+    await tx.delete(membership).where(eq(membership.id, membershipId));
+    await audit(tx, { actorId, action: target.status === "pending" ? "membership.decline" : "membership.remove", targetType: "membership", targetId: membershipId, metadata: { userId: target.userId } });
+  });
+}
+
+export const inviteInput = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+  role: z.enum(["admin", "wellness_manager", "member"]).default("member"),
+});
+
+const INVITE_DAYS = 14;
+const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+
+/**
+ * Invite a colleague by email. Any address is allowed (agencies, consultants),
+ * not just the company domain. The email is sent directly (like sign-in
+ * emails) because the outbox must never store the raw token.
+ */
+export async function inviteMember(actorId: string, orgId: string, input: z.input<typeof inviteInput>) {
+  const d = inviteInput.parse(input);
+  const token = randomBytes(32).toString("base64url");
+  const { org, inviter } = await getDb().transaction(async (tx) => {
+    const actor = await requireOrgRole(actorId, orgId, ORG_ADMINS, tx);
+    if (d.role === "admin" && actor.role !== "owner") throw forbidden("Only an owner can invite admins");
+    const existing = await tx
+      .select({ id: membership.id })
+      .from(membership)
+      .innerJoin(user, eq(user.id, membership.userId))
+      .where(and(eq(membership.orgId, orgId), eq(user.email, d.email), eq(membership.status, "active")));
+    if (existing.length) throw badRequest("That person is already a member");
+    // Re-inviting replaces any open invitation for the same address.
+    await tx
+      .update(invitation)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(invitation.orgId, orgId), eq(invitation.email, d.email), isNull(invitation.acceptedAt), isNull(invitation.revokedAt)));
+    const [row] = await tx
+      .insert(invitation)
+      .values({ orgId, email: d.email, role: d.role, tokenHash: hashToken(token), invitedBy: actorId, expiresAt: new Date(Date.now() + INVITE_DAYS * 86_400_000) })
+      .returning();
+    await audit(tx, { actorId, action: "invitation.create", targetType: "invitation", targetId: row.id, metadata: { email: d.email, role: d.role } });
+    const o = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
+    const u = await tx.query.user.findFirst({ where: eq(user.id, actorId) });
+    return { org: o!, inviter: u! };
+  });
+  await sendEmail({
+    to: d.email,
+    subject: `${inviter.name} invited you to ${org.name} on ${BRAND.name}`,
+    text: `${inviter.name} invited you to join ${org.name} on ${BRAND.name}, where your team books verified wellness professionals.\n\nAccept the invitation (sign in or create an account with this email address):\n${appUrl()}/invite/${token}\n\nThe link expires in ${INVITE_DAYS} days. If you weren't expecting this, ignore this email.`,
+  });
+  return { email: d.email, role: d.role };
+}
+
+export async function listInvitations(actorId: string, orgId: string) {
+  await requireOrgRole(actorId, orgId, ORG_ADMINS);
+  return getDb()
+    .select({ id: invitation.id, email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt, createdAt: invitation.createdAt })
+    .from(invitation)
+    .where(and(eq(invitation.orgId, orgId), isNull(invitation.acceptedAt), isNull(invitation.revokedAt), gt(invitation.expiresAt, new Date())))
+    .orderBy(desc(invitation.createdAt));
+}
+
+export async function revokeInvitation(actorId: string, orgId: string, invitationId: string) {
+  assertUuid(invitationId, "Invitation");
+  return getDb().transaction(async (tx) => {
+    await requireOrgRole(actorId, orgId, ORG_ADMINS, tx);
+    const [row] = await tx
+      .update(invitation)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(invitation.id, invitationId), eq(invitation.orgId, orgId), isNull(invitation.acceptedAt), isNull(invitation.revokedAt)))
+      .returning();
+    if (!row) throw notFound("Invitation not found");
+    await audit(tx, { actorId, action: "invitation.revoke", targetType: "invitation", targetId: row.id });
+  });
+}
+
+async function findOpenInvitation(token: string, db: Executor) {
+  if (!/^[A-Za-z0-9_-]{20,100}$/.test(token)) return null;
+  const inv = await db.query.invitation.findFirst({ where: eq(invitation.tokenHash, hashToken(token)) });
+  if (!inv || inv.acceptedAt || inv.revokedAt || inv.expiresAt <= new Date()) return null;
+  return inv;
+}
+
+/** For the invitation page: who invited you where, without revealing anything to a wrong account. */
+export async function previewInvitation(token: string) {
+  const db = getDb();
+  const inv = await findOpenInvitation(token, db);
+  if (!inv) return null;
+  const org = await db.query.organization.findFirst({ where: eq(organization.id, inv.orgId) });
+  return { email: inv.email, role: inv.role, orgName: org?.name ?? "", orgId: inv.orgId };
+}
+
+/** The signed-in user's VERIFIED email must equal the invited address. */
+export async function acceptInvitation(actor: { id: string; email: string; emailVerified: boolean }, token: string) {
+  if (!actor.emailVerified) throw forbidden("Verify your email first");
+  return getDb().transaction(async (tx) => {
+    const inv = await findOpenInvitation(token, tx);
+    if (!inv) throw notFound("This invitation has expired or was already used");
+    if (inv.email !== actor.email.toLowerCase()) throw forbidden(`This invitation is for ${inv.email}. Sign in with that email to accept it.`);
+    const existing = await tx.query.membership.findFirst({ where: and(eq(membership.orgId, inv.orgId), eq(membership.userId, actor.id)) });
+    if (existing?.status === "active") {
+      await tx.update(invitation).set({ acceptedAt: new Date() }).where(eq(invitation.id, inv.id));
+      return { orgId: inv.orgId, role: existing.role };
+    }
+    if (existing) await tx.update(membership).set({ status: "active", role: inv.role }).where(eq(membership.id, existing.id));
+    else await tx.insert(membership).values({ orgId: inv.orgId, userId: actor.id, role: inv.role, status: "active" });
+    await tx.update(invitation).set({ acceptedAt: new Date() }).where(eq(invitation.id, inv.id));
+    await audit(tx, { actorId: actor.id, action: "invitation.accept", targetType: "invitation", targetId: inv.id, metadata: { orgId: inv.orgId, role: inv.role } });
+    return { orgId: inv.orgId, role: inv.role };
+  });
+}
+
+/** Count of members per status, for the dashboard header. */
+export async function memberCounts(orgId: string) {
+  const rows = await getDb()
+    .select({ status: membership.status, n: sql<number>`count(*)::int` })
+    .from(membership)
+    .where(and(eq(membership.orgId, orgId), ne(membership.role, "owner")))
+    .groupBy(membership.status);
+  return Object.fromEntries(rows.map((r) => [r.status, r.n])) as Partial<Record<"active" | "pending", number>>;
 }

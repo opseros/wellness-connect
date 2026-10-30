@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { category, credential, professionalCategory, professionalProfile, service, user } from "@/db/schema";
 import { getDb } from "@/db/client";
@@ -319,4 +319,14 @@ export async function getPublicProfile(viewerId: string | null, profileId: strin
       .where(and(eq(credential.profileId, profileId), eq(credential.status, "approved"))),
   ]);
   return { profile: row.p, name: row.name, image: row.image, isOwner, isPublic, categories: cats, services, credentials: creds };
+}
+
+/** userId → professional profile id, for linking to public profiles. */
+export async function profileIdsForUsers(userIds: string[]) {
+  if (!userIds.length) return new Map<string, string>();
+  const rows = await getDb()
+    .select({ id: professionalProfile.id, userId: professionalProfile.userId })
+    .from(professionalProfile)
+    .where(inArray(professionalProfile.userId, [...new Set(userIds)]));
+  return new Map(rows.map((r) => [r.userId, r.id]));
 }

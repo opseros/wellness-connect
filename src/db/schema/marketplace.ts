@@ -40,6 +40,9 @@ export const enquiry = pgTable(
     orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
     professionalUserId: uuid("professional_user_id").notNull().references(() => user.id),
     status: text("status", { enum: ["sent", "viewed", "responded", "declined", "closed"] }).notNull().default("sent"),
+    // Match score when the enquiry was sent, shown when comparing proposals.
+    matchScore: integer("match_score"),
+    remindedAt: timestamp("reminded_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("enquiry_req_pro_uq").on(t.requirementId, t.professionalUserId)],
@@ -59,6 +62,9 @@ export const proposal = pgTable(
     inclusions: text("inclusions").notNull().default(""),
     message: text("message").notNull().default(""),
     freeCancellationDays: integer("free_cancellation_days").notNull().default(7),
+    // Set when the company asks for changes; cleared when the professional revises.
+    revisionNote: text("revision_note"),
+    revisionCount: integer("revision_count").notNull().default(0),
     status: text("status", { enum: ["draft", "submitted", "revision_requested", "accepted", "rejected", "withdrawn"] })
       .notNull()
       .default("submitted"),
@@ -77,6 +83,14 @@ export const booking = pgTable(
     professionalUserId: uuid("professional_user_id").notNull().references(() => user.id),
     scheduledStart: timestamp("scheduled_start", { withTimezone: true }).notNull(),
     status: text("status", { enum: ["pending", "confirmed", "in_progress", "completed", "cancelled"] }).notNull().default("pending"),
+    location: text("location").notNull().default(""),
+    rescheduleCount: integer("reschedule_count").notNull().default(0),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: uuid("cancelled_by").references(() => user.id),
+    cancelReason: text("cancel_reason"),
+    // True when cancelled inside the free-cancellation window (a fee may apply, see M4).
+    cancelledLate: boolean("cancelled_late").notNull().default(false),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
     idempotencyKey: text("idempotency_key").notNull().unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
