@@ -14,6 +14,15 @@ export async function isBlockedEitherWay(a: string, b: string) {
   return Boolean(row);
 }
 
+/** How `viewer` relates to `other`, for showing the right Connect button. */
+export async function connectionState(viewer: string, other: string): Promise<"self" | "none" | "sent" | "received" | "connected"> {
+  if (viewer === other) return "self";
+  const row = await getDb().query.connection.findFirst({ where: and(eq(connection.userLow, pair(viewer, other).userLow), eq(connection.userHigh, pair(viewer, other).userHigh)) });
+  if (row?.status === "accepted") return "connected";
+  if (row?.status === "pending") return row.requestedBy === viewer ? "sent" : "received";
+  return "none";
+}
+
 export async function areConnected(a: string, b: string) {
   const row = await getDb().query.connection.findFirst({ where: and(eq(connection.userLow, pair(a, b).userLow), eq(connection.userHigh, pair(a, b).userHigh)) });
   return row?.status === "accepted";
@@ -47,7 +56,7 @@ export async function requestConnection(fromUserId: string, toUserId: string) {
   if (fromUserId === toUserId) throw badRequest("You can't connect with yourself");
   if (await isBlockedEitherWay(fromUserId, toUserId)) throw notFound("Member not found");
   const target = await getDb().query.user.findFirst({ where: eq(user.id, toUserId) });
-  if (!target) throw notFound("Member not found");
+  if (!target || target.deletedAt || target.suspendedAt) throw notFound("Member not found");
   const p = pair(fromUserId, toUserId);
   return getDb().transaction(async (tx) => {
     const existing = await tx.query.connection.findFirst({ where: and(eq(connection.userLow, p.userLow), eq(connection.userHigh, p.userHigh)) });

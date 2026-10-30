@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
 import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import type { DB } from "@/db/client";
-import { auditLog, credential, organization, post, professionalProfile, report, session, user } from "@/db/schema";
+import { account, auditLog, credential, membership, memberProfile, organization, post, professionalProfile, report, session, user } from "@/db/schema";
 import { getAuth } from "@/lib/auth";
 import { sentEmails } from "@/lib/email";
 import { processOutbox } from "@/modules/platform/outbox";
@@ -11,10 +11,13 @@ import "@/modules/platform/handlers";
 import { onSessionCreated, promoteBootstrapSuperAdmin } from "@/modules/identity/hooks";
 import {
   decideCredential,
+  editUser,
   listAuditLog,
   listCredentialQueue,
   resolveReport,
   setOrganizationDomain,
+  removeUser,
+  searchUsers,
   setPlatformRole,
   suspendUser,
   unsuspendUser,
@@ -150,5 +153,73 @@ describe("organizations and moderation", () => {
     await expect(resolveReport(ops, r.id, { action: "dismiss" })).rejects.toMatchObject({ status: 404 });
     const audited = await db.select().from(auditLog).where(eq(auditLog.action, "report.remove_content"));
     expect(audited).toHaveLength(1);
+  });
+});
+
+describe("edit and remove users", () => {
+  const signInAs = (email: string, password: string) =>
+    getAuth().handler(
+      new Request("http://localhost:3000/api/auth/sign-in/email", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+        body: JSON.stringify({ email, password }),
+      }),
+    );
+
+  it("super admins edit name and email; an email change un-verifies and signs out", async () => {
+    const target = await makeUser(db, "typo@exmaple.test");
+    const taken = await makeUser(db, "taken@example.test");
+    await db.insert(session).values({ userId: target.id, token: `t-${target.id}`, expiresAt: new Date(Date.now() + 86400000) });
+    await expect(editUser(ops, target.id, { name: "X Y", email: "a@b.test" })).rejects.toMatchObject({ status: 403 });
+    await expect(editUser(boss, target.id, { name: "Asha Rao", email: taken.email })).rejects.toMatchObject({ status: 400 });
+
+    expect(await editUser(boss, target.id, { name: "Asha Rao", email: target.email })).toEqual({ emailChanged: false });
+    expect(await db.select().from(session).where(eq(session.userId, target.id))).toHaveLength(1);
+
+    expect(await editUser(boss, target.id, { name: "Asha Rao", email: "Typo@Example.test" })).toEqual({ emailChanged: true });
+    const row = (await db.query.user.findFirst({ where: eq(user.id, target.id) }))!;
+    expect(row).toMatchObject({ name: "Asha Rao", email: "typo@example.test", emailVerified: false });
+    expect(await db.select().from(session).where(eq(session.userId, target.id))).toHaveLength(0);
+    expect((await db.select().from(auditLog).where(eq(auditLog.action, "user.edit"))).length).toBeGreaterThan(0);
+  });
+
+  it("removal anonymises the account, blocks sign-in and hides it from the default list", async () => {
+    const email = "leaving@example.test";
+    await db.insert(user).values({ name: "Leaving Person", email, emailVerified: true });
+    const target = (await db.query.user.findFirst({ where: eq(user.email, email) }))!;
+    await db.insert(memberProfile).values({ userId: target.id, headline: "Coach", city: "Pune" }).onConflictDoNothing();
+    const ctx = await getAuth().$context;
+    await ctx.internalAdapter.linkAccount({ userId: target.id, providerId: "credential", accountId: target.id, password: await ctx.password.hash("correct horse battery") });
+    const [org] = await db.insert(organization).values({ name: "Leavers", slug: "leavers" }).returning();
+    await db.insert(membership).values({ orgId: org.id, userId: target.id, role: "member", status: "active" });
+    const [p] = await db.insert(post).values({ authorId: target.id, body: "hello" }).returning();
+    expect((await signInAs(email, "correct horse battery")).status).toBe(200);
+
+    await expect(removeUser(ops, target.id, email)).rejects.toMatchObject({ status: 403 });
+    await expect(removeUser(boss, target.id, "wrong@example.test")).rejects.toMatchObject({ status: 400 });
+    await expect(removeUser(boss, boss.id, "boss@opseros.com")).rejects.toMatchObject({ status: 400 });
+    await removeUser(boss, target.id, "Leaving@Example.test");
+
+    const row = (await db.query.user.findFirst({ where: eq(user.id, target.id) }))!;
+    expect(row.name).toBe("Removed user");
+    expect(row.email).toBe(`removed-${target.id}@removed.invalid`);
+    expect(row.deletedAt).toBeTruthy();
+    expect(await db.select().from(session).where(eq(session.userId, target.id))).toHaveLength(0);
+    expect(await db.select().from(account).where(eq(account.userId, target.id))).toHaveLength(0);
+    expect(await db.select().from(membership).where(eq(membership.userId, target.id))).toHaveLength(0);
+    expect((await db.query.memberProfile.findFirst({ where: eq(memberProfile.userId, target.id) }))?.headline).toBe("");
+    expect((await db.query.post.findFirst({ where: eq(post.id, p.id) }))?.deletedAt).toBeTruthy();
+    expect((await signInAs(email, "correct horse battery")).status).not.toBe(200);
+
+    expect((await searchUsers(boss, "removed-")).some((u) => u.id === target.id)).toBe(false);
+    expect((await searchUsers(boss, "", 200, "removed")).some((u) => u.id === target.id)).toBe(true);
+    await expect(removeUser(boss, target.id, row.email)).rejects.toMatchObject({ status: 404 });
+    await expect(editUser(boss, target.id, { name: "Back Again", email })).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("super admins can't be removed", async () => {
+    const other = await makeUser(db);
+    await db.update(user).set({ platformRole: "super_admin" }).where(eq(user.id, other.id));
+    await expect(removeUser(boss, other.id, other.email)).rejects.toMatchObject({ status: 403 });
   });
 });

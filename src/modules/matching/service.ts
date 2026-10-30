@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Tx } from "@/db/client";
 import { category, credential, matchingWeights, professionalCategory, professionalProfile, requirement, service, user } from "@/db/schema";
 import { DEFAULT_WEIGHTS, FACTORS, rankCandidates, type MatchCandidate, type Weights } from "./engine";
@@ -20,7 +20,14 @@ export async function loadCandidates(tx: Tx, categoryId: string): Promise<MatchC
     .select({ p: professionalProfile, name: user.name })
     .from(professionalProfile)
     .innerJoin(user, eq(user.id, professionalProfile.userId))
-    .where(sql`${professionalProfile.id} in (${listed}) or ${professionalProfile.id} in (${viaService})`);
+    .where(
+      and(
+        sql`(${professionalProfile.id} in (${listed}) or ${professionalProfile.id} in (${viaService}))`,
+        // Suspended and removed accounts are never matched.
+        isNull(user.suspendedAt),
+        isNull(user.deletedAt),
+      ),
+    );
   if (!profiles.length) return [];
   const ids = profiles.map((r) => r.p.id);
 

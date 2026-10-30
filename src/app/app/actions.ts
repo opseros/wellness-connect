@@ -30,7 +30,7 @@ export async function startProfessionalAction(_: string | null, form: FormData):
   } catch {
     return "Check the details and try again.";
   }
-  redirect("/app");
+  redirect("/pro");
 }
 
 export async function saveConnectProfileAction(form: FormData) {

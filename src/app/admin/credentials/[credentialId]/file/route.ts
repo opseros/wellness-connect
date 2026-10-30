@@ -1,5 +1,5 @@
-import { get } from "@vercel/blob";
 import { AppError } from "@/lib/errors";
+import { getPrivateFile } from "@/lib/storage";
 import { requirePlatformStaff } from "@/modules/identity/session";
 import { openCredentialDocument } from "@/modules/admin/service";
 
@@ -14,11 +14,11 @@ export async function GET(req: Request, ctx: Ctx) {
   try {
     const staff = await requirePlatformStaff(req.headers);
     const path = await openCredentialDocument(staff, (await ctx.params).credentialId);
-    const file = await get(path, { access: "private" });
-    if (!file || file.statusCode !== 200) return new Response("Not found", { status: 404 });
-    return new Response(file.stream, {
+    const file = await getPrivateFile(path);
+    if (!file) return new Response("Not found", { status: 404 });
+    return new Response(file.body as BodyInit, {
       headers: {
-        "content-type": file.blob.contentType ?? "application/octet-stream",
+        "content-type": file.contentType,
         "content-disposition": "inline",
         "cache-control": "private, no-store",
         "x-content-type-options": "nosniff",

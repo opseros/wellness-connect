@@ -4,7 +4,7 @@
 //   super_admin  everything ops can do + staff roles, suspensions, domain changes
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import { account, auditLog, comment, credential, membership, organization, post, professionalProfile, report, session, user } from "@/db/schema";
+import { account, auditLog, comment, connection, credential, memberProfile, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
 import { getDb } from "@/db/client";
 import { badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit } from "@/modules/platform/outbox";
@@ -79,9 +79,16 @@ export async function decideCredential(actor: StaffActor, credentialId: string, 
 
 // ---------- Users ----------
 
-export async function searchUsers(actor: StaffActor, q = "", limit = 50) {
+export type UserFilter = "active" | "suspended" | "removed" | "all";
+
+export async function searchUsers(actor: StaffActor, q = "", limit = 50, filter: UserFilter = "active") {
   assertStaff(actor);
   const term = q.trim();
+  const conds: SQL[] = [];
+  if (term) conds.push(or(ilike(user.email, like(term)), ilike(user.name, like(term)))!);
+  if (filter === "active") conds.push(isNull(user.deletedAt), isNull(user.suspendedAt));
+  if (filter === "suspended") conds.push(isNull(user.deletedAt), sql`${user.suspendedAt} is not null`);
+  if (filter === "removed") conds.push(sql`${user.deletedAt} is not null`);
   return getDb()
     .select({
       id: user.id,
@@ -91,10 +98,11 @@ export async function searchUsers(actor: StaffActor, q = "", limit = 50) {
       platformRole: user.platformRole,
       twoFactorEnabled: user.twoFactorEnabled,
       suspendedAt: user.suspendedAt,
+      deletedAt: user.deletedAt,
       createdAt: user.createdAt,
     })
     .from(user)
-    .where(term ? or(ilike(user.email, like(term)), ilike(user.name, like(term))) : undefined)
+    .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(user.createdAt))
     .limit(Math.min(limit, 200));
 }
@@ -157,6 +165,88 @@ export async function unsuspendUser(actor: StaffActor, userId: string) {
     const [row] = await tx.update(user).set({ suspendedAt: null, suspendedReason: null, updatedAt: new Date() }).where(eq(user.id, userId)).returning();
     if (!row) throw notFound("User not found");
     await audit(tx, { actorId: actor.id, action: "user.unsuspend", targetType: "user", targetId: userId });
+  });
+}
+
+export const editUserInput = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters").max(120),
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+});
+
+/**
+ * Super admins correct a user's name or email. Changing the email marks it
+ * unverified and signs the user out everywhere; they verify the new address
+ * at their next sign-in.
+ */
+export async function editUser(actor: StaffActor, userId: string, input: z.input<typeof editUserInput>) {
+  assertSuperAdmin(actor);
+  const d = editUserInput.parse(input);
+  return getDb().transaction(async (tx) => {
+    const target = await tx.query.user.findFirst({ where: eq(user.id, userId) });
+    if (!target || target.deletedAt) throw notFound("User not found");
+    if (target.platformRole === "super_admin" && target.id !== actor.id) throw forbidden("Super admins can't be edited here");
+    const emailChanged = d.email !== target.email.toLowerCase();
+    if (emailChanged) {
+      const taken = await tx.query.user.findFirst({ where: eq(user.email, d.email) });
+      if (taken) throw badRequest("Another account already uses that email");
+    }
+    await tx
+      .update(user)
+      .set({ name: d.name, email: d.email, ...(emailChanged ? { emailVerified: false } : {}), updatedAt: new Date() })
+      .where(eq(user.id, userId));
+    if (emailChanged) await tx.delete(session).where(eq(session.userId, userId));
+    await audit(tx, {
+      actorId: actor.id,
+      action: "user.edit",
+      targetType: "user",
+      targetId: userId,
+      metadata: { ...(d.name !== target.name ? { name: [target.name, d.name] } : {}), ...(emailChanged ? { email: [target.email, d.email] } : {}) },
+    });
+    return { emailChanged };
+  });
+}
+
+/**
+ * Removes an account: personal details are erased and sign-in is impossible,
+ * but the row stays (anonymised) so bookings, payments, reviews and the audit
+ * trail remain intact. Their posts and comments are hidden; connections and
+ * company memberships are deleted. This can't be undone.
+ */
+export async function removeUser(actor: StaffActor, userId: string, confirmEmail: string) {
+  assertSuperAdmin(actor);
+  if (userId === actor.id) throw badRequest("You can't remove your own account here");
+  return getDb().transaction(async (tx) => {
+    const target = await tx.query.user.findFirst({ where: eq(user.id, userId) });
+    if (!target || target.deletedAt) throw notFound("User not found");
+    if (target.platformRole === "super_admin") throw forbidden("Super admins can't be removed here");
+    if (confirmEmail.trim().toLowerCase() !== target.email.toLowerCase()) throw badRequest("Type the user's email exactly to confirm");
+    const now = new Date();
+    await tx
+      .update(user)
+      .set({
+        name: "Removed user",
+        email: `removed-${target.id}@removed.invalid`,
+        image: null,
+        emailVerified: false,
+        twoFactorEnabled: false,
+        platformRole: "user",
+        deletedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(user.id, userId));
+    await tx.delete(session).where(eq(session.userId, userId));
+    await tx.delete(account).where(eq(account.userId, userId));
+    await tx.delete(twoFactor).where(eq(twoFactor.userId, userId));
+    await tx.delete(connection).where(or(eq(connection.userLow, userId), eq(connection.userHigh, userId)));
+    await tx.delete(membership).where(eq(membership.userId, userId));
+    await tx
+      .update(memberProfile)
+      .set({ headline: "", city: "", jobTitle: "", company: "", topics: [], visibility: "connections", updatedAt: now })
+      .where(eq(memberProfile.userId, userId));
+    await tx.update(professionalProfile).set({ discoverable: false, headline: "", bio: "", updatedAt: now }).where(eq(professionalProfile.userId, userId));
+    await tx.update(post).set({ deletedAt: now }).where(and(eq(post.authorId, userId), isNull(post.deletedAt)));
+    await tx.update(comment).set({ deletedAt: now }).where(and(eq(comment.authorId, userId), isNull(comment.deletedAt)));
+    await audit(tx, { actorId: actor.id, action: "user.remove", targetType: "user", targetId: userId });
   });
 }
 

@@ -18,7 +18,7 @@ export default async function AppHome() {
 
   return (
     <div>
-      <AppHeader name={me.name} nav={mainNav(me, "home")} />
+      <AppHeader name={me.name} nav={mainNav(me, "home", { professional: Boolean(pro) })} />
       <main className="mx-auto flex max-w-[1120px] flex-col gap-7 px-6 py-8">
         <div className="flex flex-col gap-1">
           <h1 className="text-[28px] font-bold">Welcome, {firstName}</h1>
@@ -60,7 +60,7 @@ export default async function AppHome() {
                 <span className="self-start rounded-full bg-brand-soft px-3 py-1 text-[13px] font-semibold text-brand-dark">
                   Verification: {pro.verificationStatus}
                 </span>
-                <p className="text-sm text-muted">Upload credentials and add services through the API for now; screens come next.</p>
+                <Link href="/pro" className="text-sm font-semibold text-brand hover:underline">Open my professional workspace →</Link>
               </>
             ) : (
               <>

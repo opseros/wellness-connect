@@ -42,6 +42,6 @@ export async function onSessionCreated(userId: string) {
 
 /** Called before any session is created: suspended users can't sign in by any method. */
 export async function assertNotSuspended(userId: string) {
-  const row = await getDb().query.user.findFirst({ where: eq(user.id, userId), columns: { suspendedAt: true } });
-  if (row?.suspendedAt) throw forbidden("This account is suspended. Contact support.");
+  const row = await getDb().query.user.findFirst({ where: eq(user.id, userId), columns: { suspendedAt: true, deletedAt: true } });
+  if (row?.suspendedAt || row?.deletedAt) throw forbidden("This account is suspended. Contact support.");
 }

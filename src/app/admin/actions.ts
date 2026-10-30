@@ -6,6 +6,8 @@ import { AppError } from "@/lib/errors";
 import { requirePlatformStaff } from "@/modules/identity/session";
 import {
   decideCredential,
+  editUser,
+  removeUser,
   resolveReport,
   setOrganizationDomain,
   setPlatformRole,
@@ -63,7 +65,43 @@ export async function suspendAction(form: FormData) {
 export async function unsuspendAction(form: FormData) {
   const staff = await requirePlatformStaff();
   const id = String(form.get("userId"));
-  await run(`/admin/users/${id}`, "Suspension lifted. They can sign in again.", () => unsuspendUser(staff, id));
+  const back = String(form.get("back") ?? "") === "list" ? "/admin/users?filter=suspended" : `/admin/users/${id}`;
+  await run(back, "Suspension lifted. They can sign in again.", () => unsuspendUser(staff, id));
+}
+
+export async function editUserAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const id = String(form.get("userId"));
+  let result: { emailChanged: boolean } | undefined;
+  try {
+    result = await editUser(staff, id, { name: String(form.get("name") ?? ""), email: String(form.get("email") ?? "") });
+  } catch (e) {
+    const text = e instanceof AppError ? e.message : e instanceof ZodError ? (e.issues[0]?.message ?? "Check the form") : "Something went wrong";
+    if (!(e instanceof AppError) && !(e instanceof ZodError)) console.error(e);
+    redirect(withMessage(`/admin/users/${id}/edit`, "error", text));
+  }
+  revalidatePath("/admin", "layout");
+  redirect(
+    withMessage(
+      `/admin/users/${id}`,
+      "msg",
+      result?.emailChanged ? "Saved. The new email must be verified at their next sign-in, and they were signed out." : "Saved.",
+    ),
+  );
+}
+
+export async function removeUserAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const id = String(form.get("userId"));
+  try {
+    await removeUser(staff, id, String(form.get("confirmEmail") ?? ""));
+  } catch (e) {
+    const text = e instanceof AppError ? e.message : "Something went wrong";
+    if (!(e instanceof AppError)) console.error(e);
+    redirect(withMessage(`/admin/users/${id}/remove`, "error", text));
+  }
+  revalidatePath("/admin", "layout");
+  redirect(withMessage("/admin/users", "msg", "Account removed. Personal details were erased and they can no longer sign in."));
 }
 
 export async function setDomainAction(form: FormData) {

@@ -1,8 +1,8 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { z } from "zod";
-import { booking, enquiry, proposal, requirement } from "@/db/schema";
+import { booking, category, enquiry, organization, proposal, requirement } from "@/db/schema";
 import { withScope } from "@/db/client";
-import { badRequest, conflict, forbidden, notFound } from "@/lib/errors";
+import { assertUuid, badRequest, conflict, forbidden, notFound } from "@/lib/errors";
 import { enqueue, audit } from "@/modules/platform/outbox";
 import { ORG_BUYERS, requireOrgRole } from "@/modules/organizations/service";
 import { matchRequirement } from "@/modules/matching/service";
@@ -112,6 +112,7 @@ export async function submitProposal(professionalUserId: string, requirementId: 
       where: and(eq(enquiry.requirementId, requirementId), eq(enquiry.professionalUserId, professionalUserId)),
     });
     if (!enq) throw forbidden("You can only respond to enquiries sent to you");
+    if (enq.status === "declined") throw badRequest("You declined this enquiry");
     const req = await tx.query.requirement.findFirst({ where: eq(requirement.id, requirementId) });
     if (!req || req.status !== "published") throw badRequest("This requirement is no longer open");
     const [row] = await tx
@@ -131,6 +132,7 @@ export async function submitProposal(professionalUserId: string, requirementId: 
       .returning();
     if (!row) throw conflict("You already sent a proposal for this requirement");
     await tx.update(enquiry).set({ status: "responded" }).where(eq(enquiry.id, enq.id));
+    await enqueue(tx, { type: "proposal.submitted", payload: { proposalId: row.id, requirementId, orgId: req.orgId, createdBy: req.createdBy } });
     return row;
   });
 }
@@ -173,4 +175,134 @@ export async function acceptProposal(userId: string, orgId: string, proposalId: 
     await audit(tx, { actorId: userId, action: "proposal.accept", targetType: "proposal", targetId: p.id, metadata: { bookingId: b.id } });
     return b;
   });
+}
+
+// ---------- M2: the professional's side ----------
+// All of these run scoped to the professional (no org), so RLS only shows rows
+// where professional_user_id is them (and requirements they were invited to).
+
+const ENQUIRY_OPEN = ["sent", "viewed"] as const;
+
+export async function listMyEnquiries(proUserId: string) {
+  return withScope({ userId: proUserId }, async (tx) => {
+    return tx
+      .select({
+        id: enquiry.id,
+        status: enquiry.status,
+        createdAt: enquiry.createdAt,
+        requirementId: requirement.id,
+        title: requirement.title,
+        requirementStatus: requirement.status,
+        city: requirement.city,
+        deliveryMode: requirement.deliveryMode,
+        participants: requirement.participants,
+        budgetMinPaise: requirement.budgetMinPaise,
+        budgetMaxPaise: requirement.budgetMaxPaise,
+        preferredDate: requirement.preferredDate,
+        categoryName: category.name,
+        orgName: organization.name,
+      })
+      .from(enquiry)
+      .innerJoin(requirement, eq(requirement.id, enquiry.requirementId))
+      .innerJoin(category, eq(category.id, requirement.categoryId))
+      .innerJoin(organization, eq(organization.id, enquiry.orgId))
+      .where(eq(enquiry.professionalUserId, proUserId))
+      .orderBy(desc(enquiry.createdAt));
+  });
+}
+
+/** Opening an enquiry marks it viewed (the company sees that). */
+export async function getMyEnquiry(proUserId: string, enquiryId: string) {
+  assertUuid(enquiryId, "Enquiry");
+  return withScope({ userId: proUserId }, async (tx) => {
+    const [row] = await tx
+      .select({ enquiry, requirement, categoryName: category.name, orgName: organization.name })
+      .from(enquiry)
+      .innerJoin(requirement, eq(requirement.id, enquiry.requirementId))
+      .innerJoin(category, eq(category.id, requirement.categoryId))
+      .innerJoin(organization, eq(organization.id, enquiry.orgId))
+      .where(and(eq(enquiry.id, enquiryId), eq(enquiry.professionalUserId, proUserId)));
+    if (!row) throw notFound("Enquiry not found");
+    if (row.enquiry.status === "sent") {
+      await tx.update(enquiry).set({ status: "viewed" }).where(eq(enquiry.id, enquiryId));
+      row.enquiry.status = "viewed";
+    }
+    const myProposal = await tx.query.proposal.findFirst({
+      where: and(eq(proposal.requirementId, row.requirement.id), eq(proposal.professionalUserId, proUserId)),
+    });
+    return { ...row, proposal: myProposal ?? null, canPropose: row.requirement.status === "published" && !myProposal && row.enquiry.status !== "declined" };
+  });
+}
+
+export async function declineEnquiry(proUserId: string, enquiryId: string) {
+  return withScope({ userId: proUserId }, async (tx) => {
+    const [row] = await tx
+      .update(enquiry)
+      .set({ status: "declined" })
+      .where(and(eq(enquiry.id, enquiryId), eq(enquiry.professionalUserId, proUserId), inArray(enquiry.status, [...ENQUIRY_OPEN])))
+      .returning();
+    if (!row) throw badRequest("This enquiry can no longer be declined");
+    return row;
+  });
+}
+
+/** Withdraw a proposal the company hasn't decided on yet. */
+export async function withdrawProposal(proUserId: string, proposalId: string) {
+  return withScope({ userId: proUserId }, async (tx) => {
+    const [row] = await tx
+      .update(proposal)
+      .set({ status: "withdrawn", updatedAt: new Date() })
+      .where(and(eq(proposal.id, proposalId), eq(proposal.professionalUserId, proUserId), eq(proposal.status, "submitted")))
+      .returning();
+    if (!row) throw badRequest("Only a proposal that is still waiting can be withdrawn");
+    return row;
+  });
+}
+
+export async function listMyProposals(proUserId: string) {
+  return withScope({ userId: proUserId }, async (tx) => {
+    return tx
+      .select({
+        proposal,
+        title: requirement.title,
+        orgName: organization.name,
+        enquiryId: enquiry.id,
+        bookingId: booking.id,
+        bookingStatus: booking.status,
+      })
+      .from(proposal)
+      .innerJoin(requirement, eq(requirement.id, proposal.requirementId))
+      .innerJoin(organization, eq(organization.id, proposal.orgId))
+      .leftJoin(enquiry, and(eq(enquiry.requirementId, proposal.requirementId), eq(enquiry.professionalUserId, proUserId)))
+      .leftJoin(booking, eq(booking.proposalId, proposal.id))
+      .where(eq(proposal.professionalUserId, proUserId))
+      .orderBy(desc(proposal.createdAt));
+  });
+}
+
+export async function listMyBookings(proUserId: string) {
+  return withScope({ userId: proUserId }, async (tx) => {
+    return tx
+      .select({ booking, title: requirement.title, orgName: organization.name, feePaise: proposal.feePaise, currency: proposal.currency, participants: proposal.maxParticipants })
+      .from(booking)
+      .innerJoin(proposal, eq(proposal.id, booking.proposalId))
+      .innerJoin(requirement, eq(requirement.id, proposal.requirementId))
+      .innerJoin(organization, eq(organization.id, booking.orgId))
+      .where(eq(booking.professionalUserId, proUserId))
+      .orderBy(desc(booking.scheduledStart));
+  });
+}
+
+/**
+ * Earnings from agreed fees. Until payments go live (M4) this is the value of
+ * booked work, not money paid out; the page says so.
+ */
+export function summarizeEarnings(rows: { booking: { status: string }; feePaise: number }[]) {
+  const sum = (pred: (s: string) => boolean) => rows.filter((r) => pred(r.booking.status)).reduce((t, r) => t + r.feePaise, 0);
+  return {
+    completedPaise: sum((s) => s === "completed"),
+    upcomingPaise: sum((s) => s === "pending" || s === "confirmed" || s === "in_progress"),
+    cancelledPaise: sum((s) => s === "cancelled"),
+    bookingCount: rows.filter((r) => r.booking.status !== "cancelled").length,
+  };
 }

@@ -15,6 +15,9 @@ export const user = pgTable("user", {
   // Set by platform staff. A suspended user's sessions are deleted and new sign-ins are refused.
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   suspendedReason: text("suspended_reason"),
+  // Removed accounts are anonymised, not hard-deleted, so bookings, payments
+  // and the audit trail keep their references.
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

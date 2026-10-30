@@ -20,12 +20,17 @@ registerOutboxHandler("membership.requested", async (tx, p) => {
 
 registerOutboxHandler("enquiry.sent", async (tx, p) => {
   const pro = await tx.query.user.findFirst({ where: eq(user.id, String(p.professionalUserId)) });
-  if (pro) await sendEmail({ to: pro.email, subject: "New enquiry from a company", text: `You have a new enquiry. Respond here: ${appUrl()}/app` });
+  if (pro)
+    await sendEmail({
+      to: pro.email,
+      subject: "New enquiry from a company",
+      text: `A company would like a proposal from you. See the details and respond:\n\n${appUrl()}/pro/enquiries/${p.enquiryId}`,
+    });
 });
 
 registerOutboxHandler("booking.created", async (tx, p) => {
   const pro = await tx.query.user.findFirst({ where: eq(user.id, String(p.professionalUserId)) });
-  if (pro) await sendEmail({ to: pro.email, subject: "Your proposal was accepted", text: `A company accepted your proposal. Details: ${appUrl()}/app` });
+  if (pro) await sendEmail({ to: pro.email, subject: "Your proposal was accepted", text: `A company accepted your proposal. Details: ${appUrl()}/pro/proposals` });
 });
 
 registerOutboxHandler("connection.requested", async (tx, p) => {
@@ -45,7 +50,17 @@ registerOutboxHandler("credential.reviewed", async (tx, p) => {
       : p.decision === "info_requested"
         ? `We need a little more information about "${cred.name}":\n\n${cred.reviewNote ?? ""}\n\nPlease upload an updated document.`
         : `"${cred.name}" could not be approved:\n\n${cred.reviewNote ?? ""}`;
-  await sendEmail({ to: pro.email, subject: "Update on your credential review", text: `${outcome}\n\n${appUrl()}/app` });
+  await sendEmail({ to: pro.email, subject: "Update on your credential review", text: `${outcome}\n\n${appUrl()}/pro/credentials` });
+});
+
+registerOutboxHandler("proposal.submitted", async (tx, p) => {
+  const to = await tx.query.user.findFirst({ where: eq(user.id, String(p.createdBy)) });
+  if (!to || to.deletedAt) return;
+  await sendEmail({
+    to: to.email,
+    subject: "New proposal for your wellness requirement",
+    text: `A professional sent a proposal for one of your requirements. Review it: ${appUrl()}/app`,
+  });
 });
 
 export {};

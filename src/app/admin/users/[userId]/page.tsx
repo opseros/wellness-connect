@@ -18,7 +18,8 @@ export default async function UserDetail({ params, searchParams }: { params: Pro
   });
   const u = d.user;
   const isSuper = me.platformRole === "super_admin";
-  const canManage = isSuper && u.id !== me.id && u.platformRole !== "super_admin";
+  const canManage = isSuper && !u.deletedAt && u.id !== me.id && u.platformRole !== "super_admin";
+  const canEdit = isSuper && !u.deletedAt && (u.platformRole !== "super_admin" || u.id === me.id);
 
   return (
     <>
@@ -29,7 +30,7 @@ export default async function UserDetail({ params, searchParams }: { params: Pro
         <section className="card flex min-w-0 flex-[999_1_520px] flex-col gap-4 p-6">
           <dl className="grid grid-cols-[170px_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-[15px]">
             <dt className="text-muted">Status</dt>
-            <dd>{u.suspendedAt ? <><Badge status="suspended" /> <span className="text-sm text-muted">since {when(u.suspendedAt)}: {u.suspendedReason}</span></> : <Badge status="active" />}</dd>
+            <dd>{u.deletedAt ? <><Badge status="removed" /> <span className="text-sm text-muted">on {when(u.deletedAt)}</span></> : u.suspendedAt ? <><Badge status="suspended" /> <span className="text-sm text-muted">since {when(u.suspendedAt)}: {u.suspendedReason}</span></> : <Badge status="active" />}</dd>
             <dt className="text-muted">Platform role</dt><dd>{roleLabel[u.platformRole]}</dd>
             <dt className="text-muted">Email verified</dt><dd>{u.emailVerified ? "Yes" : "No"}</dd>
             <dt className="text-muted">Two-factor</dt><dd>{u.twoFactorEnabled ? "On" : "Off"}</dd>
@@ -59,6 +60,12 @@ export default async function UserDetail({ params, searchParams }: { params: Pro
         </section>
 
         <aside className="flex flex-[1_1_300px] flex-col gap-4">
+          {canEdit && (
+            <div className="card flex flex-col gap-3 p-5">
+              <h2 className="font-bold">Details</h2>
+              <Link href={`/admin/users/${u.id}/edit`} className="btn-outline">Edit name or email</Link>
+            </div>
+          )}
           {canManage ? (
             <>
               <form action={setRoleAction} className="card flex flex-col gap-3 p-5">
@@ -78,7 +85,7 @@ export default async function UserDetail({ params, searchParams }: { params: Pro
                   <button className="btn-outline">Lift suspension</button>
                 </form>
               ) : (
-                <form action={suspendAction} className="card flex flex-col gap-3 p-5">
+                <form id="suspend" action={suspendAction} className="card flex scroll-mt-24 flex-col gap-3 p-5">
                   <h2 className="font-bold">Suspend account</h2>
                   <input type="hidden" name="userId" value={u.id} />
                   <label htmlFor="reason" className="label">Reason (kept in the audit log)</label>
@@ -86,7 +93,14 @@ export default async function UserDetail({ params, searchParams }: { params: Pro
                   <button className="btn-outline text-[#9b2c1f]">Suspend and sign out everywhere</button>
                 </form>
               )}
+              <div className="card flex flex-col gap-3 p-5">
+                <h2 className="font-bold">Remove account</h2>
+                <p className="text-[13px] text-muted">Erases their personal details and stops sign-in for good. Records of bookings and payments are kept anonymously.</p>
+                <Link href={`/admin/users/${u.id}/remove`} className="btn-outline text-[#9b2c1f]">Remove account…</Link>
+              </div>
             </>
+          ) : u.deletedAt ? (
+            <p className="card p-5 text-sm text-muted">This account was removed. Nothing more can be changed.</p>
           ) : (
             <p className="card p-5 text-sm text-muted">
               {u.id === me.id ? "This is you." : u.platformRole === "super_admin" ? "Super admins can't be changed here." : "Only a super admin can change roles or suspend accounts."}

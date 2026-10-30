@@ -17,9 +17,4 @@ export async function getStaffOrExit() {
 export const when = (d: Date | null | undefined) =>
   d ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(d) : "—";
 
-/** Build a URL back to a page with a one-line message. */
-export const withMessage = (path: string, kind: "msg" | "error", text: string) => {
-  const url = new URL(path, "http://x");
-  url.searchParams.set(kind, text);
-  return url.pathname + url.search;
-};
+export { withMessage } from "@/lib/flash";

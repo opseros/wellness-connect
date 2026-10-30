@@ -34,6 +34,11 @@ Read README.md for the product and setup. These rules are not optional.
 - Admin features live in `src/modules/admin/service.ts`; every function takes the acting
   staff member and calls `assertStaff` / `assertSuperAdmin` itself, and audits changes.
   Admin pages use `getStaffOrExit()` (404 for non-staff). Don't add admin logic elsewhere.
+- Files: use `src/lib/storage.ts` (private Vercel Blob, local folder in development). Never
+  make an upload public; staff open documents through an audited route.
+- Users are never hard-deleted: `removeUser` anonymises the row (`deleted_at`) so bookings,
+  payments and the audit trail keep their references. Suspended or removed users can't
+  sign in, aren't matched and have no public profile.
 - Don't collect individual employee health information. Referrals and messages carry
   the minimum needed. Keep the "no health details" copy in the UI.
 

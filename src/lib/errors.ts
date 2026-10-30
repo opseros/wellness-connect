@@ -13,3 +13,9 @@ export const forbidden = (msg = "You don't have access to this") => new AppError
 export const notFound = (msg = "Not found") => new AppError(404, "not_found", msg);
 export const badRequest = (msg: string) => new AppError(400, "bad_request", msg);
 export const conflict = (msg: string) => new AppError(409, "conflict", msg);
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Ids in URLs are user input: a malformed one is simply "not found", not a database error. */
+export function assertUuid(id: string, what = "Item") {
+  if (!UUID.test(id)) throw notFound(`${what} not found`);
+}

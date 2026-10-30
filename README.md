@@ -36,7 +36,7 @@ Without Resend configured, verification and reset links appear in the terminal r
 Google/Microsoft buttons appear only when their keys are set.
 
 ```bash
-npm test          # 41 tests: matching, tenant isolation, auth rules, marketplace flow, Connect
+npm test          # 49 tests: matching, tenant isolation, auth, marketplace, professionals, admin, Connect
 npm run typecheck && npm run lint && npm run build
 ```
 
@@ -83,10 +83,11 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
 - Email/password with required email verification, 10-character minimum, breached-password check (production), rate limits, password reset that signs out every session; Google and Microsoft with safe account linking; optional TOTP two-factor (required for platform staff).
 - Every account gets a Connect profile. Verified work emails request to join the company that owns the domain (public mail domains never do); owners and admins approve and assign roles.
 - Marketplace: requirements → rule-based matching with hard filters and explained scores → enquiries to eligible professionals only → proposals → acceptance creating an idempotent booking, all inside row-level security.
-- Credential upload to private storage and staff review with an audit trail.
+- Credential upload to private storage and staff review with an audit trail. Without `BLOB_READ_WRITE_TOKEN` (local development only) files are kept in `./.data/uploads`.
+- Professional workspace (`/pro`): overview with a "get discovered" checklist, profile editor and search visibility, services (add, edit, pause; price ranges in rupees), credentials (upload, see review notes, resubmit), enquiry inbox (opening marks it viewed; decline), proposal form, proposals, bookings and earnings (agreed fees until payments go live). Public profile page `/p/<profileId>` with a Connect button; only verified, visible professionals in good standing are shown to others.
 - Connect: connection requests, feed (own + connections + groups), likes, connection-gated messages, blocking.
 - Append-only finance ledger and the payment table, ready for Razorpay.
-- Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, Connect feed and profile setup.
+- Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect feed and profile setup.
 
 ## Admin portal (`/admin`)
 
@@ -97,6 +98,8 @@ Only `super_admin` and `ops` users with two-factor on can open it; everyone else
 | Verification queue: view documents, approve, request info, reject (professional is emailed) | ✓ | ✓ |
 | Users: search and view | ✓ | ✓ |
 | Users: grant/remove ops, suspend/unsuspend (signs out everywhere, blocks sign-in) | | ✓ |
+| Users: edit name/email (an email change must be re-verified and signs them out) | | ✓ |
+| Users: remove an account (typed confirmation; personal details erased, sign-in blocked, bookings/payments/audit kept anonymously) | | ✓ |
 | Organizations: view; link and verify company email domains | view | ✓ |
 | Reports: remove reported posts/comments or dismiss | ✓ | ✓ |
 | Audit log | ✓ | ✓ |
@@ -108,8 +111,7 @@ In production (`VERCEL_ENV=production`) the app refuses to start if `DATABASE_UR
 
 ## Next steps
 
-1. Screens for the company flow (requirement form, matches, proposals, booking) from the prototype; the APIs exist.
-2. Professional screens: profile editor, services, credential upload, enquiry inbox.
-4. Razorpay orders + signed webhooks writing ledger entries.
-5. Connect: network page, messages UI, groups, referrals.
-6. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).
+1. M3: screens for the company flow (requirement form, matches, sending enquiries, comparing and accepting proposals); the APIs exist.
+2. Razorpay orders + signed webhooks writing ledger entries.
+3. Connect: network page, messages UI, groups, referrals.
+4. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).

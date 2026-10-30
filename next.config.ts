@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
     },
   },
   serverExternalPackages: ["@electric-sql/pglite"],
+  experimental: {
+    // Credential uploads go through server actions. Vercel caps request
+    // bodies at 4.5 MB, so files are limited to 4 MB (src/lib/storage.ts).
+    serverActions: { bodySizeLimit: "4.5mb" },
+  },
 };
 
 export default nextConfig;

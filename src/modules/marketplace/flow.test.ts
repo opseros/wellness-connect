@@ -72,10 +72,10 @@ describe("requirement → match → enquiry → proposal → booking", () => {
     expect(all.bookings).toHaveLength(1);
     expect(all.proposals.find((p) => p.id === pa.id)?.status).toBe("accepted");
     expect(all.proposals.find((p) => p.id !== pa.id)?.status).toBe("rejected");
-    expect(all.events.map((e) => e.type).sort()).toEqual(["booking.created", "enquiry.sent", "enquiry.sent"]);
+    expect(all.events.map((e) => e.type).sort()).toEqual(["booking.created", "enquiry.sent", "enquiry.sent", "proposal.submitted", "proposal.submitted"]);
 
     const run = await processOutbox();
-    expect(run).toEqual({ processed: 3, failed: 0 });
+    expect(run).toEqual({ processed: 5, failed: 0 });
     expect(sentEmails.filter((e) => e.to === ananya.user.email).map((e) => e.subject)).toContain("Your proposal was accepted");
     expect((await processOutbox()).processed).toBe(0);
   });
