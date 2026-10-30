@@ -1,0 +1,81 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { AppHeader } from "@/components/brand";
+import { getCurrentUser } from "@/modules/identity/session";
+import { listMemberships } from "@/modules/organizations/service";
+import { getOwnProfile } from "@/modules/professionals/service";
+
+const roleLabel: Record<string, string> = { owner: "Owner", admin: "Admin", wellness_manager: "Wellness manager", member: "Member" };
+
+export default async function AppHome() {
+  const me = await getCurrentUser();
+  if (!me) redirect("/");
+  if (!me.emailVerified) redirect(`/check-email?email=${encodeURIComponent(me.email)}`);
+  const [memberships, pro] = await Promise.all([listMemberships(me.id), getOwnProfile(me.id)]);
+  const firstName = me.name.split(" ")[0];
+  const nothingYet = memberships.length === 0 && !pro;
+
+  return (
+    <div>
+      <AppHeader name={me.name} nav={[{ href: "/app", label: "Home", active: true }, { href: "/connect", label: "Connect" }]} />
+      <main className="mx-auto flex max-w-[1120px] flex-col gap-7 px-6 py-8">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-[28px] font-bold">Welcome, {firstName}</h1>
+          <p className="text-[15px] text-muted">Every account includes Connect. Add a company or professional profile any time.</p>
+        </div>
+
+        {nothingYet && (
+          <div className="rounded-xl bg-brand-soft px-5 py-4 text-[15px] text-brand-dark">
+            Choose how you&apos;ll use Wellness Connect to get started.{" "}
+            <Link href="/app/onboarding" className="font-semibold underline">Set up my account</Link>
+          </div>
+        )}
+
+        <section className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
+          <div className="card flex flex-col gap-3 p-5">
+            <h2 className="text-lg font-bold">Companies</h2>
+            {memberships.length === 0 ? (
+              <p className="text-sm text-muted">You don&apos;t belong to a company yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {memberships.map(({ membership: m, organization: o }) => (
+                  <li key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-ground px-3.5 py-3 text-sm">
+                    <span className="font-semibold">{o.name}</span>
+                    <span className={m.status === "pending" ? "font-semibold text-[#7a4b00]" : "text-muted"}>
+                      {m.status === "pending" ? "Waiting for approval" : roleLabel[m.role]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Link href="/app/onboarding#company" className="text-sm font-semibold text-brand hover:underline">+ Create a company</Link>
+          </div>
+
+          <div className="card flex flex-col gap-3 p-5">
+            <h2 className="text-lg font-bold">Professional profile</h2>
+            {pro ? (
+              <>
+                <p className="text-sm text-muted">{pro.headline || "No headline yet"} · {pro.city || "No city"}</p>
+                <span className="self-start rounded-full bg-brand-soft px-3 py-1 text-[13px] font-semibold text-brand-dark">
+                  Verification: {pro.verificationStatus}
+                </span>
+                <p className="text-sm text-muted">Upload credentials and add services through the API for now; screens come next.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted">Offer workshops and programs to companies once your credentials are verified.</p>
+                <Link href="/app/onboarding#professional" className="text-sm font-semibold text-brand hover:underline">+ Become a wellness professional</Link>
+              </>
+            )}
+          </div>
+
+          <div className="card flex flex-col gap-3 p-5">
+            <h2 className="text-lg font-bold">Connect</h2>
+            <p className="text-sm text-muted">Your free professional network: posts, connections and messages.</p>
+            <Link href="/connect" className="text-sm font-semibold text-brand hover:underline">Open Connect →</Link>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
+}

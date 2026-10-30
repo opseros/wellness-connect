@@ -1,0 +1,15 @@
+# Optional local Postgres that behaves like Neon (the app connects as the
+# table owner, so FORCE ROW LEVEL SECURITY applies).
+#   docker compose up -d
+#   DATABASE_URL=postgres://neondb_owner:localdev@localhost:5432/neondb npm run db:migrate
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: neondb_owner
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: neondb
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+volumes:
+  pgdata:
