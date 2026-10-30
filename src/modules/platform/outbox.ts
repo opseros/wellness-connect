@@ -1,4 +1,5 @@
 import { sql, eq } from "drizzle-orm";
+import { after } from "next/server";
 import { outbox, auditLog } from "@/db/schema";
 import type { Executor, Tx } from "@/db/client";
 import { withScope } from "@/db/client";
@@ -9,9 +10,26 @@ export type OutboxEvent =
   | { type: "booking.created"; payload: { bookingId: string; orgId: string; professionalUserId: string } }
   | { type: "connection.requested"; payload: { connectionId: string; fromUserId: string; toUserId: string } };
 
-/** Call inside the same transaction as the business change. */
+/**
+ * Call inside the same transaction as the business change. Delivery starts
+ * right after the response is sent (Next.js `after`, which runs once the
+ * transaction has committed); the scheduled cron only retries failures.
+ */
 export async function enqueue(tx: Executor, event: OutboxEvent) {
   await tx.insert(outbox).values({ type: event.type, payload: event.payload });
+  scheduleDelivery();
+}
+
+// Several calls in one request are harmless: rows are claimed with SKIP LOCKED.
+function scheduleDelivery() {
+  try {
+    after(async () => {
+      await import("./handlers");
+      await processOutbox();
+    });
+  } catch {
+    // Outside a request (tests, scripts): the cron or an explicit processOutbox() call delivers.
+  }
 }
 
 export async function audit(
