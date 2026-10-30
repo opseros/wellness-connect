@@ -2,7 +2,8 @@
 
 @AGENTS.md
 
-Wellness Connect: corporate wellness marketplace + free professional network ("Connect").
+Moosam (tagline "Wellness Connect"): corporate wellness marketplace + free professional network ("Connect").
+The product name and tagline live in `src/lib/brand.ts`; never hard-code them.
 One Next.js 16 app on Vercel, Postgres on Neon (Singapore), Drizzle ORM, Better Auth.
 Read README.md for the product and setup. These rules are not optional.
 

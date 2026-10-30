@@ -5,6 +5,7 @@ import { mainNav } from "@/components/nav";
 import { getCurrentUser } from "@/modules/identity/session";
 import { listMemberships } from "@/modules/organizations/service";
 import { getOwnProfile } from "@/modules/professionals/service";
+import { BRAND } from "@/lib/brand";
 
 const roleLabel: Record<string, string> = { owner: "Owner", admin: "Admin", wellness_manager: "Wellness manager", member: "Member" };
 
@@ -27,7 +28,7 @@ export default async function AppHome() {
 
         {nothingYet && (
           <div className="rounded-xl bg-brand-soft px-5 py-4 text-[15px] text-brand-dark">
-            Choose how you&apos;ll use Wellness Connect to get started.{" "}
+            Choose how you&apos;ll use {BRAND.name} to get started.{" "}
             <Link href="/app/onboarding" className="font-semibold underline">Set up my account</Link>
           </div>
         )}

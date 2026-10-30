@@ -8,6 +8,7 @@ import * as schema from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { onUserCreated, onEmailVerified, assertNotSuspended, onSessionCreated } from "@/modules/identity/hooks";
 import { APIError } from "better-auth/api";
+import { BRAND } from "@/lib/brand";
 
 function socialProviders(): BetterAuthOptions["socialProviders"] {
   const providers: NonNullable<BetterAuthOptions["socialProviders"]> = {};
@@ -39,7 +40,7 @@ function trustedOrigins(): string[] {
 function buildAuth() {
   const isProd = process.env.NODE_ENV === "production";
   return betterAuth({
-    appName: "Wellness Connect",
+    appName: BRAND.name,
     baseURL: process.env.BETTER_AUTH_URL,
     secret: process.env.BETTER_AUTH_SECRET,
     trustedOrigins: trustedOrigins(),
@@ -72,7 +73,7 @@ function buildAuth() {
       sendResetPassword: async ({ user, url }) => {
         await sendEmail({
           to: user.email,
-          subject: "Reset your Wellness Connect password",
+          subject: `Reset your ${BRAND.name} password`,
           text: `Use this link to choose a new password. It works once and expires in 1 hour:\n\n${url}\n\nIf you didn't ask for this, ignore this email.`,
         });
       },
@@ -85,7 +86,7 @@ function buildAuth() {
       sendVerificationEmail: async ({ user, url }) => {
         await sendEmail({
           to: user.email,
-          subject: "Verify your email for Wellness Connect",
+          subject: `Verify your email for ${BRAND.name}`,
           text: `Confirm your email address to finish setting up your account:\n\n${url}`,
         });
       },
@@ -140,7 +141,7 @@ function buildAuth() {
       },
     },
     plugins: [
-      twoFactor({ issuer: "Wellness Connect" }),
+      twoFactor({ issuer: BRAND.name }),
       ...(isProd && process.env.DISABLE_PWNED_CHECK !== "1" ? [haveIBeenPwned()] : []),
       nextCookies(), // must stay last
     ],

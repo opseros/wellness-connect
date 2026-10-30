@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/modules/identity/session";
 import { getOwnProfile, getPublicProfile } from "@/modules/professionals/service";
 import { connectionState } from "@/modules/connect/service";
 import { connectAction } from "@/app/pro/actions";
+import { BRAND } from "@/lib/brand";
 
 const MODE: Record<string, string> = { in_person: "In person", virtual: "Virtual", hybrid: "Hybrid" };
 
@@ -108,7 +109,7 @@ export default async function PublicProfile({ params, searchParams }: { params: 
                 <li key={i}>✓ {c.name}{c.issuer ? <span className="text-muted"> · {c.issuer}</span> : null}</li>
               ))}
             </ul>
-            <p className="text-[13px] text-muted">Checked by the Wellness Connect team. Documents are never shown publicly.</p>
+            <p className="text-[13px] text-muted">Checked by the {BRAND.name} team. Documents are never shown publicly.</p>
           </section>
         )}
       </main>

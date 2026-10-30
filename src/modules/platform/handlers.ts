@@ -4,6 +4,7 @@ import { credential, professionalProfile, user } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { registerOutboxHandler } from "./outbox";
 import { orgAdminEmails } from "@/modules/organizations/service";
+import { BRAND } from "@/lib/brand";
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
@@ -13,7 +14,7 @@ registerOutboxHandler("membership.requested", async (tx, p) => {
     await sendEmail({
       to,
       subject: "New request to join your organization",
-      text: `${p.email} asked to join your organization on Wellness Connect.\nReview it: ${appUrl()}/app/organization`,
+      text: `${p.email} asked to join your organization on ${BRAND.name}.\nReview it: ${appUrl()}/app/organization`,
     });
   }
 });

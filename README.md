@@ -1,4 +1,4 @@
-# Wellness Connect
+# Moosam · Wellness Connect
 
 Corporate wellness marketplace + free professional network.
 

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/modules/identity/session";
 import { Logo } from "@/components/brand";
 import { CompanyForm, ProfessionalForm } from "./forms";
+import { BRAND } from "@/lib/brand";
 
 export default async function OnboardingPage() {
   const me = await getCurrentUser();
@@ -12,7 +13,7 @@ export default async function OnboardingPage() {
     <div className="flex min-h-screen flex-col items-center gap-8 px-6 py-12">
       <Logo href="/app" />
       <div className="flex max-w-[1180px] flex-col gap-2 text-center">
-        <h1 className="text-[32px] font-bold">How will you use Wellness Connect?</h1>
+        <h1 className="text-[32px] font-bold">How will you use {BRAND.name}?</h1>
         <p className="text-muted">Signed in as {me.email}. Every account includes Connect; you can add another role later.</p>
       </div>
       <div className="grid w-full max-w-[1180px] grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-5">
