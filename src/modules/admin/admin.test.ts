@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
 import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import type { DB } from "@/db/client";
-import { account, auditLog, credential, membership, memberProfile, organization, post, professionalProfile, report, session, user } from "@/db/schema";
+import { account, auditLog, credential, group, membership, memberProfile, organization, post, professionalProfile, report, session, user } from "@/db/schema";
 import { getAuth } from "@/lib/auth";
 import { sentEmails } from "@/lib/email";
 import { processOutbox } from "@/modules/platform/outbox";
@@ -16,6 +16,7 @@ import {
   editUser,
   listAuditLog,
   listCredentialQueue,
+  listReports,
   resolveReport,
   setOrganizationDomain,
   removeUser,
@@ -162,6 +163,22 @@ describe("organizations and moderation", () => {
     await expect(resolveReport(ops, r.id, { action: "dismiss" })).rejects.toMatchObject({ status: 404 });
     const audited = await db.select().from(auditLog).where(eq(auditLog.action, "report.remove_content"));
     expect(audited).toHaveLength(1);
+  });
+
+  it("archives a reported community but never a space, and labels non-content targets", async () => {
+    const reporter = await makeUser(db);
+    const owner = await makeUser(db);
+    const [c] = await db.insert(group).values({ name: "Bad club", slug: "bad-club", createdBy: owner.id }).returning();
+    const [s] = await db.insert(group).values({ name: "Travel", slug: "travel-x", kind: "space", spaceKey: "travel" }).returning();
+    const [rc] = await db.insert(report).values({ reporterId: reporter.id, targetType: "group", targetId: c.id, reason: "Spam" }).returning();
+    const [rs] = await db.insert(report).values({ reporterId: reporter.id, targetType: "group", targetId: s.id, reason: "Spam" }).returning();
+    await db.insert(report).values({ reporterId: reporter.id, targetType: "user", targetId: owner.id, reason: "Harassment" });
+    const open = await listReports(ops, "open");
+    expect(open.find((x) => x.targetType === "user")?.target?.text).toContain(owner.name);
+    expect(open.find((x) => x.id === rc.id)?.target?.text).toBe("Group: Bad club");
+    await resolveReport(ops, rc.id, { action: "remove_content" });
+    expect((await db.query.group.findFirst({ where: eq(group.id, c.id) }))?.archivedAt).toBeTruthy();
+    await expect(resolveReport(ops, rs.id, { action: "remove_content" })).rejects.toMatchObject({ status: 400 });
   });
 });
 

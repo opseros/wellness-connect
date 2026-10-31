@@ -64,6 +64,20 @@
       "when": 1793419808292,
       "tag": "0008_finance_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793424284628,
+      "tag": "0009_connect_complete",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793424285659,
+      "tag": "0010_seed_spaces",
+      "breakpoints": true
     }
   ]
 }

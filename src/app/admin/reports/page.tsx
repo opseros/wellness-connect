@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getStaffOrExit, when } from "../staff";
 import { listReports } from "@/modules/admin/service";
 import { resolveReportAction } from "../actions";
@@ -24,8 +25,15 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <tr key={r.id}>
             <td className="max-w-[360px]">
               <Badge status="open" label={r.targetType} />
-              <p className="mt-1.5 line-clamp-3 whitespace-pre-line">{r.content?.body ?? <span className="text-muted">Content not shown for this type</span>}</p>
-              {r.content?.deletedAt && <span className="text-xs text-muted">Removed</span>}
+              {r.content ? (
+                <p className="mt-1.5 line-clamp-3 whitespace-pre-line">{r.content.body}</p>
+              ) : r.target ? (
+                <p className="mt-1.5">{r.target.href ? <Link href={r.target.href} className="text-brand underline">{r.target.text}</Link> : r.target.text}</p>
+              ) : (
+                <p className="mt-1.5 text-muted">No longer available</p>
+              )}
+              {(r.content?.deletedAt || r.target?.archived) && <span className="text-xs text-muted">Removed</span>}
+              {r.targetType === "message" && <span className="block text-xs text-muted">Messages stay private; talk to the reporter or suspend a member if needed.</span>}
             </td>
             <td>{r.reason}</td>
             <td>
@@ -37,8 +45,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               {status === "open" && (
                 <form action={resolveReportAction} className="flex flex-col items-end gap-2">
                   <input type="hidden" name="reportId" value={r.id} />
-                  {(r.targetType === "post" || r.targetType === "comment") && (
-                    <button name="action" value="remove_content" className="btn-outline min-h-9 px-3 text-sm text-[#9b2c1f]">Remove {r.targetType}</button>
+                  {(r.targetType === "post" || r.targetType === "comment" || r.targetType === "group") && (
+                    <button name="action" value="remove_content" className="btn-outline min-h-9 px-3 text-sm text-[#9b2c1f]">{r.targetType === "group" ? "Archive group" : `Remove ${r.targetType}`}</button>
                   )}
                   <button name="action" value="dismiss" className="btn-outline min-h-9 px-3 text-sm">Dismiss</button>
                 </form>

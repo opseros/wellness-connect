@@ -1,4 +1,4 @@
-# Mosam · Wellness Connect
+# Moosam · Wellness Connect
 
 Corporate wellness marketplace + free professional network.
 
@@ -36,7 +36,7 @@ Without Resend configured, verification and reset links appear in the terminal r
 Google/Microsoft buttons appear only when their keys are set.
 
 ```bash
-npm test          # 67 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
+npm test          # 77 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
 npm run typecheck && npm run lint && npm run build
 ```
 
@@ -95,9 +95,17 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
 - Credential upload to private storage and staff review with an audit trail. Without `BLOB_READ_WRITE_TOKEN` (local development only) files are kept in `./.data/uploads`.
 - Company workspace (`/company/<orgId>`): dashboard (open requirements, proposals to review, upcoming sessions); requirement form with drafts and publishing; matches with a score breakdown, "why excluded" counts and a shortlist to send enquiries; enquiry tracking with reminders (once a day); side-by-side proposal comparison with accept and request-revision; bookings with location, reschedule (outside the free-cancellation window, at most twice), cancel (marked late inside the window) and mark completed; settings with company details (city, address, billing email, GSTIN), members and roles, join-request approval and email invitations (`/invite/<token>`, 14-day links, only a hash is stored). Requirements are private to the company and the professionals it contacts.
 - Professional workspace (`/pro`): overview with a "get discovered" checklist, profile editor and search visibility, services (add, edit, pause; price ranges in rupees), credentials (upload, see review notes, resubmit), enquiry inbox (opening marks it viewed; decline), proposal form, proposals, bookings and earnings (agreed fees until payments go live). Public profile page `/p/<profileId>` with a Connect button; only verified, visible professionals in good standing are shown to others.
-- Connect: connection requests, feed (own + connections + groups), likes, connection-gated messages, blocking.
+- Connect (`/connect`):
+  - Network: invitations (accept/ignore), suggestions (shared topics and city), connections, sent requests, blocked members.
+  - Member pages: limited view for non-connections, connect, follow, message, remove connection, block, report.
+  - Feed: own posts, connections, people you follow and your groups; likes, comments (author or post owner can delete), reports.
+  - Messages: conversation list with unread counts, threads that refresh every few seconds, nav badges. Only connections (or members who opened messages to everyone) can message; blocking hides the conversation and stops replies both ways.
+  - Six spaces (wellness, travel, meet-ups, fitness, food, careers) as real groups, plus member-created communities (open or moderator-approved) with moderators who approve, decline, remove and promote.
+  - Meet-ups: date, time (IST), place and city, with RSVP; listed for your network, your groups and your city.
+  - Referrals between connected professionals with minimum information (phone numbers and emails are rejected), a status trail (sent → accepted/declined → completed, or withdrawn) and email notifications.
+  - REST under `/api/v1/connect/*` for all of the above (members, follow, blocks, suggestions, conversations, comments, RSVP, meet-ups, groups and membership, referrals, reports, badges).
 - Payments (`src/modules/marketplace/payments.ts`): each booking's price is fixed when it's accepted (session fee + 18% GST on the fee; 10% commission from the professional's share, overridable per category). Companies pay online with Razorpay Checkout (UPI, cards, net banking) or by invoice (bank transfer, marked paid by staff). Signed, idempotent webhooks; GST tax invoices and credit notes with financial-year numbering and PDFs; refunds by the cancellation policy (sent to Razorpay through the outbox with an idempotency key, or by bank transfer for invoice payments); manual payouts to professionals. An append-only ledger reconciles to the paisa: collected − refunded = GST + commission + professionals' share; `/admin/finance` checks it on every load.
-- Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect feed and profile setup.
+- Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect (feed, network, member pages, messages, groups and spaces, meet-ups, referrals) and profile setup.
 
 ## Admin portal (`/admin`)
 
@@ -111,7 +119,7 @@ Only `super_admin` and `ops` users with two-factor on can open it; everyone else
 | Users: edit name/email (an email change must be re-verified and signs them out) | | ✓ |
 | Users: remove an account (typed confirmation; personal details erased, sign-in blocked, bookings/payments/audit kept anonymously) | | ✓ |
 | Organizations: view; link and verify company email domains | view | ✓ |
-| Reports: remove reported posts/comments or dismiss | ✓ | ✓ |
+| Reports: remove reported posts/comments, archive reported communities, or dismiss (reported members and conversations are named, messages stay private) | ✓ | ✓ |
 | Finance: reconciliation, invoices, refunds, payments, amounts owed | view | ✓ |
 | Finance: mark invoices paid, record bank refunds and payouts, settings and commission | | ✓ |
 | Audit log | ✓ | ✓ |
@@ -124,5 +132,5 @@ In production (`VERCEL_ENV=production`) the app refuses to start if `DATABASE_UR
 ## Next steps
 
 1. Before real payments: have your CA confirm the GST treatment (GST on the full session fee, SAC code, place of supply for companies without a GSTIN, TDS on payouts) and complete Razorpay KYC.
-2. M5 Connect: network page, messages UI, groups, referrals.
+2. M6 account types and directories (Users, Professionals, Homestays, Companies, Hospitals); then M7 Homestays and M8 Care & Travel (see the Build Plan).
 3. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).

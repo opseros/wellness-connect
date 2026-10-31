@@ -21,7 +21,9 @@ export type OutboxEvent =
   | { type: "invoice.issued"; payload: { invoiceId: string; orgId: string; bookingId: string; requestedBy: string } }
   | { type: "refund.requested"; payload: { refundId: string } }
   | { type: "refund.processed"; payload: { refundId: string; bookingId: string; orgId: string; amountPaise: number } }
-  | { type: "payout.recorded"; payload: { payoutId: string; professionalUserId: string; amountPaise: number } };
+  | { type: "payout.recorded"; payload: { payoutId: string; professionalUserId: string; amountPaise: number } }
+  | { type: "group.join_requested"; payload: { groupId: string; userId: string } }
+  | { type: "referral.updated"; payload: { referralId: string; toUserId: string; status: string } };
 
 /**
  * Call inside the same transaction as the business change. Delivery starts

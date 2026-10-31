@@ -18,7 +18,7 @@ import {
 } from "@/modules/marketplace/payments";
 import { listCategories, setCategoryCommission } from "@/modules/professionals/service";
 import { z } from "zod";
-import { account, auditLog, comment, connection, credential, memberProfile, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
+import { account, auditLog, comment, connection, conversationParticipant, credential, group, memberProfile, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
 import { getDb } from "@/db/client";
 import { badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit } from "@/modules/platform/outbox";
@@ -323,12 +323,26 @@ export async function listReports(actor: StaffActor, status: "open" | "actioned"
     .limit(200);
   const postIds = rows.filter((x) => x.r.targetType === "post").map((x) => x.r.targetId);
   const commentIds = rows.filter((x) => x.r.targetType === "comment").map((x) => x.r.targetId);
-  const [posts, comments] = await Promise.all([
+  const ids = (t: string) => rows.filter((x) => x.r.targetType === t).map((x) => x.r.targetId);
+  const userIds = ids("user");
+  const groupIds = ids("group");
+  const convIds = ids("message");
+  const [posts, comments, users, groups, parts] = await Promise.all([
     postIds.length ? db.select({ id: post.id, body: post.body, deletedAt: post.deletedAt }).from(post).where(inArray(post.id, postIds)) : [],
     commentIds.length ? db.select({ id: comment.id, body: comment.body, deletedAt: comment.deletedAt }).from(comment).where(inArray(comment.id, commentIds)) : [],
+    userIds.length ? db.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, userIds)) : [],
+    groupIds.length ? db.select({ id: group.id, name: group.name, slug: group.slug, archivedAt: group.archivedAt }).from(group).where(inArray(group.id, groupIds)) : [],
+    convIds.length
+      ? db.select({ id: conversationParticipant.conversationId, name: user.name }).from(conversationParticipant).innerJoin(user, eq(user.id, conversationParticipant.userId)).where(inArray(conversationParticipant.conversationId, convIds))
+      : [],
   ]);
   const content = new Map([...posts, ...comments].map((c) => [c.id, c]));
-  return rows.map((x) => ({ ...x.r, reporterName: x.reporterName, reporterEmail: x.reporterEmail, content: content.get(x.r.targetId) ?? null }));
+  // Staff see who a reported conversation is between, never the messages themselves.
+  const label = new Map<string, { text: string; href?: string; archived?: boolean }>();
+  for (const u of users) label.set(u.id, { text: `Member: ${u.name}`, href: `/admin/users/${u.id}` });
+  for (const g of groups) label.set(g.id, { text: `Group: ${g.name}`, href: `/connect/groups/${g.slug}`, archived: Boolean(g.archivedAt) });
+  for (const id of convIds) label.set(id, { text: `Conversation between ${parts.filter((p) => p.id === id).map((p) => p.name).join(" and ")}` });
+  return rows.map((x) => ({ ...x.r, reporterName: x.reporterName, reporterEmail: x.reporterEmail, content: content.get(x.r.targetId) ?? null, target: label.get(x.r.targetId) ?? null }));
 }
 
 export const resolveInput = z.object({ action: z.enum(["dismiss", "remove_content"]) });
@@ -342,7 +356,12 @@ export async function resolveReport(actor: StaffActor, reportId: string, input: 
     if (action === "remove_content") {
       if (r.targetType === "post") await tx.update(post).set({ deletedAt: new Date() }).where(and(eq(post.id, r.targetId), isNull(post.deletedAt)));
       else if (r.targetType === "comment") await tx.update(comment).set({ deletedAt: new Date() }).where(and(eq(comment.id, r.targetId), isNull(comment.deletedAt)));
-      else throw badRequest("Only posts and comments can be removed here; suspend the member instead");
+      else if (r.targetType === "group") {
+        const g = await tx.query.group.findFirst({ where: eq(group.id, r.targetId) });
+        if (g?.kind === "space") throw badRequest("Spaces can't be archived; remove the posts instead");
+        await tx.update(group).set({ archivedAt: new Date() }).where(and(eq(group.id, r.targetId), isNull(group.archivedAt)));
+      }
+      else throw badRequest("Only posts, comments and communities can be removed here; suspend the member instead");
     }
     await tx.update(report).set({ status: action === "dismiss" ? "dismissed" : "actioned" }).where(eq(report.id, r.id));
     await audit(tx, { actorId: actor.id, action: `report.${action}`, targetType: r.targetType, targetId: r.targetId, metadata: { reportId: r.id } });

@@ -1,5 +1,6 @@
 // Connect: the free professional network open to every account.
 import { pgTable, uuid, text, timestamp, boolean, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
+import { category } from "./professionals";
 import { sql } from "drizzle-orm";
 import { user } from "./auth";
 
@@ -46,13 +47,34 @@ export const block = pgTable(
   (t) => [primaryKey({ columns: [t.blockerId, t.blockedId] })],
 );
 
+/** People you follow see in your feed without connecting (one way). */
+export const follow = pgTable(
+  "follow",
+  {
+    followerId: uuid("follower_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    followeeId: uuid("followee_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.followerId, t.followeeId] }), index("follow_followee_idx").on(t.followeeId)],
+);
+
+export const SPACE_KEYS = ["wellness", "travel", "meetup", "move", "food", "career"] as const;
+
+/**
+ * Groups. The six home-page spaces are groups with kind "space" (seeded, no
+ * creator, open to all); members start "community" groups themselves.
+ */
 export const group = pgTable("group", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   about: text("about").notNull().default(""),
   privacy: text("privacy", { enum: ["public", "approval"] }).notNull().default("public"),
-  createdBy: uuid("created_by").notNull().references(() => user.id),
+  kind: text("kind", { enum: ["space", "community"] }).notNull().default("community"),
+  spaceKey: text("space_key", { enum: SPACE_KEYS }),
+  city: text("city").notNull().default(""),
+  createdBy: uuid("created_by").references(() => user.id),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -76,10 +98,30 @@ export const post = pgTable(
     groupId: uuid("group_id").references(() => group.id, { onDelete: "cascade" }),
     title: text("title"),
     body: text("body").notNull(),
+    // A meet-up is a post with a time and a place; people say "I'm going".
+    kind: text("kind", { enum: ["post", "meetup"] }).notNull().default("post"),
+    eventAt: timestamp("event_at", { withTimezone: true }),
+    eventPlace: text("event_place"),
+    eventCity: text("event_city"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
-  (t) => [index("post_author_idx").on(t.authorId), index("post_group_idx").on(t.groupId), index("post_created_idx").on(t.createdAt)],
+  (t) => [
+    index("post_author_idx").on(t.authorId),
+    index("post_group_idx").on(t.groupId),
+    index("post_created_idx").on(t.createdAt),
+    index("post_event_idx").on(t.eventAt),
+  ],
+);
+
+export const meetupRsvp = pgTable(
+  "meetup_rsvp",
+  {
+    postId: uuid("post_id").notNull().references(() => post.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] })],
 );
 
 export const postReaction = pgTable(
@@ -132,15 +174,39 @@ export const message = pgTable(
   (t) => [index("message_conversation_idx").on(t.conversationId, t.createdAt)],
 );
 
-export const referral = pgTable("referral", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  fromUserId: uuid("from_user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  toUserId: uuid("to_user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
-  // Minimum necessary information only. Never client health details.
-  note: text("note").notNull(),
-  status: text("status", { enum: ["pending", "accepted", "declined"] }).notNull().default("pending"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const REFERRAL_STATUSES = ["pending", "accepted", "declined", "completed", "withdrawn"] as const;
+
+export const referral = pgTable(
+  "referral",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    fromUserId: uuid("from_user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    toUserId: uuid("to_user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id").references(() => category.id),
+    // Who is being referred, in the fewest words: e.g. "HR team at a 200-person company". Never names or health details.
+    clientLabel: text("client_label").notNull().default(""),
+    // Minimum necessary information only. Never client health details.
+    note: text("note").notNull(),
+    status: text("status", { enum: REFERRAL_STATUSES }).notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("referral_to_idx").on(t.toUserId), index("referral_from_idx").on(t.fromUserId)],
+);
+
+/** Every status change on a referral, so both sides see the trail. */
+export const referralEvent = pgTable(
+  "referral_event",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    referralId: uuid("referral_id").notNull().references(() => referral.id, { onDelete: "cascade" }),
+    actorId: uuid("actor_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    status: text("status", { enum: REFERRAL_STATUSES }).notNull(),
+    note: text("note").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("referral_event_idx").on(t.referralId)],
+);
 
 export const report = pgTable("report", {
   id: uuid("id").primaryKey().defaultRandom(),

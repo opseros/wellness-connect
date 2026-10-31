@@ -1,6 +1,6 @@
 // Outbox event handlers. Imported once by the cron route.
 import { and, eq } from "drizzle-orm";
-import { credential, enquiry, invoice, organization, professionalProfile, proposal, user } from "@/db/schema";
+import { credential, enquiry, group, groupMember, invoice, organization, professionalProfile, proposal, user } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { registerOutboxHandler } from "./outbox";
 import { orgAdminEmails } from "@/modules/organizations/service";
@@ -168,6 +168,31 @@ registerOutboxHandler("refund.processed", async (tx, p) => {
 
 registerOutboxHandler("payout.recorded", async (tx, p) => {
   await emailPro(tx, p.professionalUserId, `Payout of ${rupees(p.amountPaise)} sent`, `We've sent ${rupees(p.amountPaise)} to your bank account. It can take a working day to appear.\n\n${appUrl()}/pro/proposals`);
+});
+
+registerOutboxHandler("group.join_requested", async (tx, p) => {
+  const g = await tx.query.group.findFirst({ where: eq(group.id, String(p.groupId)) });
+  if (!g) return;
+  const mods = await tx
+    .select({ email: user.email })
+    .from(groupMember)
+    .innerJoin(user, eq(user.id, groupMember.userId))
+    .where(and(eq(groupMember.groupId, g.id), eq(groupMember.role, "moderator"), eq(groupMember.status, "active")));
+  for (const m of mods) {
+    await sendEmail({ to: m.email, subject: `New request to join ${g.name}`, text: `Someone asked to join ${g.name}. Approve or decline: ${appUrl()}/connect/groups/${g.slug}` });
+  }
+});
+
+const REFERRAL_SUBJECT: Record<string, string> = {
+  pending: "You've received a referral",
+  accepted: "Your referral was accepted",
+  declined: "Your referral was declined",
+  completed: "A referral was completed",
+  withdrawn: "A referral was withdrawn",
+};
+
+registerOutboxHandler("referral.updated", async (tx, p) => {
+  await emailPro(tx, p.toUserId, REFERRAL_SUBJECT[String(p.status)] ?? "Referral update", `See the details and the full history: ${appUrl()}/connect/referrals`);
 });
 
 export {};

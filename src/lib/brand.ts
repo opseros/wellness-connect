@@ -1,6 +1,6 @@
 /** Product name and tagline. Change them here; everything else reads from this. */
 export const BRAND = {
-  name: "Mosam",
+  name: "Moosam",
   tagline: "Wellness Connect",
 } as const;
 
