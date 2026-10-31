@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/modules/identity/session";
 import { AudienceTabs, type Audience } from "@/components/audience-tabs";
 import { listDirectory } from "@/modules/listings/service";
 import { countVerifiedProfessionals } from "@/modules/professionals/service";
+import { careTravelEnabled } from "@/modules/care/service";
 
 const join = (as: string) => `/sign-up?next=${encodeURIComponent(`/app/onboarding?as=${as}`)}`;
 const white = "bg-white border border-line text-ink";
@@ -83,7 +84,7 @@ async function audiences(): Promise<Audience[]> {
       who: "For hospitals and clinics",
       title: "Welcome patients who travel to you for care.",
       body: "Show your specialties, accreditations and international patient desk. Patients will ask for quotes without sharing records, and share them only with you if they choose.",
-      points: ["Verified profile: registration and NABH or JCI accreditation", "Specialties, languages and visa-letter support", "Quote requests and recovery stays nearby (coming with Care & Travel)"],
+      points: ["Verified profile: registration and NABH or JCI accreditation", "Specialties, languages and visa-letter support", careTravelEnabled() ? "Treatment packages, quote requests and recovery stays nearby" : "Quote requests and recovery stays nearby (coming with Care & Travel)"],
       cta: { label: "Register your hospital", href: join("hospital") },
       more: { label: "Browse hospitals", href: "/hospitals" },
       verify: "Needs the hospital registration and an authorisation letter; accreditations are shown once we've seen the certificate.",
@@ -219,7 +220,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
         <div className="flex flex-wrap items-center justify-between gap-6 rounded-[28px] bg-travel p-8 text-travel-ink sm:p-10">
           <div className="flex max-w-[620px] flex-col gap-2">
             <h2 className="font-display text-[28px] leading-tight font-bold tracking-tight">Travelling for treatment or to recover?</h2>
-            <p className="text-[16px] leading-relaxed opacity-90">Browse verified hospitals and quiet, step-free homestays close by. Quote requests and care trip planning are coming soon.</p>
+            <p className="text-[16px] leading-relaxed opacity-90">Browse verified hospitals and quiet, step-free homestays close by. {careTravelEnabled() ? "Ask up to three hospitals for a quote without sharing your records, then plan the trip and your recovery stay." : "Quote requests and care trip planning are coming soon."}</p>
           </div>
           <span className="flex flex-wrap gap-3">
             <Link href="/hospitals" className="btn bg-travel-ink px-6 text-white hover:opacity-90">Browse hospitals</Link>

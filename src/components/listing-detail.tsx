@@ -6,6 +6,7 @@ import { FEATURE_LABEL, getPublicListing, SERVES_LABEL } from "@/modules/listing
 import { DirectoryShell, rupees } from "./directory";
 import { StayBooking, type StaySearch } from "./stay-booking";
 import { POLICY_TEXT, type CancellationPolicy } from "@/modules/stays/policy";
+import { careTravelEnabled, listPublicPackages } from "@/modules/care/service";
 
 /** Public page for one verified homestay or hospital (team members can preview before verification). */
 export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" | "hospital"; slug: string; sp?: StaySearch }) {
@@ -16,6 +17,8 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
   });
   const l = d.listing;
   const homestay = kind === "homestay";
+  const packages = homestay ? [] : await listPublicPackages(d.orgId);
+  const quoteHref = `/care/request?hospital=${d.orgId}`;
   const back = homestay ? "/homestays" : "/hospitals";
   const facts: [string, string][] = homestay
     ? [
@@ -73,6 +76,22 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
               </ul>
             </>
           )}
+          {!homestay && packages.length > 0 && (
+            <>
+              <h2 className="text-lg font-bold">Treatment packages</h2>
+              <ul className="flex flex-col gap-3">
+                {packages.map((p) => (
+                  <li key={p.id} className="flex flex-col gap-1.5 rounded-xl border border-line p-4">
+                    <span className="flex flex-wrap items-baseline justify-between gap-2"><span className="font-semibold">{p.title}</span><span className="font-bold">{rupees(p.priceMinPaise)}–{rupees(p.priceMaxPaise)}</span></span>
+                    <span className="text-[13.5px] text-muted">{p.specialty}{p.hospitalNights ? ` · ${p.hospitalNights} nights in hospital` : ""}{p.recoveryNights ? ` · about ${p.recoveryNights} nights' recovery nearby` : ""}{p.forCompanies ? " · for company teams" : ""}</span>
+                    {p.includes.length > 0 && <span className="text-[14px]">Includes {p.includes.join(", ")}</span>}
+                    {p.description && <span className="text-[14px] text-[#3d4842]">{p.description}</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12.5px] text-muted">Indicative prices. The hospital confirms the final price after your consultation; you pay the hospital directly.</p>
+            </>
+          )}
           {homestay && l.houseRules && (
             <>
               <h2 className="text-lg font-bold">House rules</h2>
@@ -91,7 +110,14 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
               <div className="border-t border-line pt-4"><StayBooking orgId={d.orgId} slug={d.slug} sp={sp} minNights={l.minNights} maxRooms={l.rooms ?? 1} /></div>
             ) : null
           ) : (
-            <p className="rounded-xl bg-ground px-4 py-3 text-[13.5px] text-[#3d4842]">Quote requests open soon. You&apos;ll be able to ask for a quote without sharing medical records.</p>
+            careTravelEnabled() && d.isPublic ? (
+              <div className="flex flex-col gap-2 border-t border-line pt-4">
+                <Link href={quoteHref} className="btn-primary">Request a quote</Link>
+                <p className="text-[12.5px] text-muted">Free. Ask up to three hospitals; they don&apos;t see your name until you accept a quote, and you don&apos;t need to share reports.</p>
+              </div>
+            ) : (
+              <p className="rounded-xl bg-ground px-4 py-3 text-[13.5px] text-[#3d4842]">Quote requests open soon. You&apos;ll be able to ask for a quote without sharing medical records.</p>
+            )
           )}
           {!homestay && <p className="text-[12.5px] text-muted">Not medical advice. Talk to a qualified doctor about your treatment.</p>}
         </aside>

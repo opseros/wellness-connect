@@ -36,7 +36,7 @@ Without Resend configured, verification and reset links appear in the terminal r
 Google/Microsoft buttons appear only when their keys are set.
 
 ```bash
-npm test          # 100 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
+npm test          # 109 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
 npm run typecheck && npm run lint && npm run build
 ```
 
@@ -117,6 +117,15 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
   - Timing: hosts answer within 48 hours; accepting holds the rooms for 48 hours (or until check-in) for the guest to pay; lapsed requests and holds expire (daily cron and on every view).
   - Money: room charges + GST by tariff per room per night (5% up to ₹7,500, 18% above, editable in Admin → Finance); place of supply is the property's state; invoices in their own series (`<prefix>S/2026-27/0001`); 12% commission from the host's share; refunds through Razorpay by policy; payouts to hosts after check-in, recorded by staff. A separate stay ledger reconciles to the paisa and is checked on Admin → Finance.
   - REST: `/api/v1/homestays/<orgId>/quote`, `/api/v1/homestays/<orgId>/stays`, `/api/v1/stays` (+ `/<id>`, `/cancel`, `/payment/order`, `/payment/verify`), `/api/v1/organizations/<orgId>/stays` (+ `/respond`, `/cancel`), `/api/v1/organizations/<orgId>/calendar`, `/api/v1/admin/stays/<stayId>/payouts`; `/api/v1/directory/homestays` takes `checkIn`, `checkOut`, `rooms`.
+- Care & Travel (M8, `src/modules/care`):
+  - Hospitals: treatment packages with indicative price ranges, what's included, nights in hospital and suggested recovery nights (`/listing/<orgId>/packages`); a quote-request desk (`/listing/<orgId>/requests`) to quote, ask for reports or decline. The patient stays anonymous to the hospital until they accept its quote.
+  - Travellers: packages on hospital pages, "Request a quote" to up to three verified hospitals with only treatment, age range, country, month, companions, practical needs and a note (no phone numbers or emails); compare quotes side by side; accept one (the others are closed); optional reports.
+  - Reports: encrypted with AES-256-GCM before storage (`REPORTS_ENCRYPTION_KEY`), shared per hospital only with recorded consent, every opening logged and shown to the traveller, unshared automatically from hospitals not chosen or that decline, deleted 90 days after the trip (180 days after upload without a trip) unless kept; the daily cron deletes them.
+  - Care trip plan: travel dates, a day-by-day timeline from the quote, a checklist, the hospital desk's contact (after acceptance only), and a recovery stay: suggestions near the hospital and linking a homestay stay. Hosts never see anything medical.
+  - Companies: Health check-ups page (`/company/<orgId>/health-checks`) to ask hospitals for quotes by headcount only; such requests can never carry reports.
+  - Treatment is paid to the hospital directly; no money moves through the platform for it.
+  - Switch: patient-facing requests and uploads are OFF in production until `CARE_TRAVEL=on` (after the M10 privacy work). Previews and development have it on.
+  - REST: `/api/v1/care/requests` (+ `/<id>`, `/accept`, `/withdraw`, `/reports`), `/api/v1/care/reports/<id>` (+ `/shares`, `/keep`), `/api/v1/care/trips/<id>` (+ `/checklist`, `/stay`), `/api/v1/hospitals/<orgId>/packages`, `/api/v1/organizations/<orgId>/packages`, `/api/v1/organizations/<orgId>/care-quotes`, `/api/v1/organizations/<orgId>/health-checks`.
 - Payments (`src/modules/marketplace/payments.ts`): each booking's price is fixed when it's accepted (session fee + 18% GST on the fee; 10% commission from the professional's share, overridable per category). Companies pay online with Razorpay Checkout (UPI, cards, net banking) or by invoice (bank transfer, marked paid by staff). Signed, idempotent webhooks; GST tax invoices and credit notes with financial-year numbering and PDFs; refunds by the cancellation policy (sent to Razorpay through the outbox with an idempotency key, or by bank transfer for invoice payments); manual payouts to professionals. An append-only ledger reconciles to the paisa: collected − refunded = GST + commission + professionals' share; `/admin/finance` checks it on every load.
 - Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect (feed, network, member pages, messages, groups and spaces, meet-ups, referrals) and profile setup, Join as, homestay/hospital workspace, directories.
 
@@ -146,5 +155,5 @@ In production (`VERCEL_ENV=production`) the app refuses to start if `DATABASE_UR
 ## Next steps
 
 1. Before real payments: have your CA confirm the GST treatment (GST on the full session fee, SAC code, place of supply for companies without a GSTIN, TDS on payouts; for stays, the accommodation rates, SAC 996311 and whether the platform pays GST as an e-commerce operator under section 9(5)) and complete Razorpay KYC.
-2. M8 Care & Travel: hospital packages, quote requests, consented report sharing, care trip plans with a recovery stay (see the Build Plan).
+2. M9 notifications, installable app (PWA) and polish; then M10 privacy, security and launch readiness, after which Care & Travel can be switched on (see the Build Plan).
 3. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).

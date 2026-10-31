@@ -6,3 +6,4 @@ export * from "./connect";
 export * from "./platform";
 export * from "./listings";
 export * from "./stays";
+export * from "./care";

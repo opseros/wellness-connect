@@ -26,7 +26,9 @@ Read README.md for the product and setup. These rules are not optional.
 ## Security: tenant isolation and auth
 - Marketplace tables (`requirement`, `enquiry`, `proposal`, `booking`, `payment`,
   `ledger_entry`), `org_document` and the stay tables (`stay`, `stay_payment`, `stay_invoice`,
-  `stay_refund`, `stay_payout`, `stay_ledger_entry`) have Postgres row-level security with FORCE.
+  `stay_refund`, `stay_payout`, `stay_ledger_entry`) and the Care & Travel tables (`care_request`,
+  `care_quote`, `care_report`, `care_report_share`, `care_report_access`, `care_trip`) have Postgres
+  row-level security with FORCE.
   Every query on them MUST run inside `withScope({ userId, orgId }, tx => ...)` from
   `@/db/client`. Never call `getDb()` directly for those tables. Guests reach their stays with
   `withScope({ userId })`; hosts with `{ userId, orgId }`. (`stay_night`, room counts, and
@@ -50,6 +52,10 @@ Read README.md for the product and setup. These rules are not optional.
   sign in, aren't matched and have no public profile.
 - Don't collect individual employee health information. Referrals and messages carry
   the minimum needed. Keep the "no health details" copy in the UI.
+- Care & Travel is the only place health data lives: minimum fields, reports encrypted with
+  `src/lib/file-crypto.ts`, shared per hospital with consent, every open logged, retention
+  enforced by `purgeExpiredReports`. Never put treatment details in emails, in stays, or in
+  anything a homestay host can see. Patient-facing features check `careTravelEnabled()`.
 
 ## Money
 - Integer paise + ISO currency code. Never floats for stored money.

@@ -108,6 +108,15 @@ export default async function AppHome() {
           </div>
 
           <div className="card flex flex-col gap-3 p-5">
+            <h2 className="text-lg font-bold">Care &amp; Travel</h2>
+            <p className="text-sm text-muted">Compare verified hospitals, ask up to three for a quote without sharing your records, and plan the trip with a recovery stay.</p>
+            <span className="flex flex-wrap gap-x-4 gap-y-1">
+              <Link href="/care/requests" className="text-sm font-semibold text-brand hover:underline">My care requests →</Link>
+              <Link href="/hospitals" className="text-sm font-semibold text-brand hover:underline">Browse hospitals</Link>
+            </span>
+          </div>
+
+          <div className="card flex flex-col gap-3 p-5">
             <h2 className="text-lg font-bold">Connect</h2>
             <p className="text-sm text-muted">Your free professional network: posts, connections and messages.</p>
             <Link href="/connect" className="text-sm font-semibold text-brand hover:underline">Open Connect →</Link>

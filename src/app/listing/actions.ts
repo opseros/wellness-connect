@@ -8,6 +8,7 @@ import { requireUser } from "@/modules/identity/session";
 import { inviteMember, removeMember } from "@/modules/organizations/service";
 import { addPhoto, removeDocument, removePhoto, submitListing, updateListing, uploadDocument } from "@/modules/listings/service";
 import { hostCancelStay, respondToStay, updateCalendar } from "@/modules/stays/service";
+import { createPackage, replyToQuote, setPackageActive, updatePackage } from "@/modules/care/service";
 
 // Every action re-checks the session; the services check the role again.
 
@@ -152,4 +153,49 @@ async function runAt(path: string, ok: string, fn: () => Promise<unknown>) {
     target = withMessage(path, "error", text);
   }
   redirect(target);
+}
+
+// ---------- Care & Travel: hospital desk (M8) ----------
+
+const pkg = (form: FormData) => ({
+  title: str(form, "title"),
+  specialty: str(form, "specialty"),
+  description: str(form, "description"),
+  includes: str(form, "includes"),
+  hospitalNights: str(form, "hospitalNights") || 0,
+  recoveryNights: str(form, "recoveryNights") || 0,
+  priceMinRupees: str(form, "priceMinRupees"),
+  priceMaxRupees: str(form, "priceMaxRupees"),
+  forCompanies: form.get("forCompanies") === "on",
+});
+
+export async function savePackageAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = orgOf(form);
+  const id = str(form, "packageId");
+  await runAt(`/listing/${orgId}/packages`, id ? "Package saved." : "Package added.", () => (id ? updatePackage(me.id, orgId, id, pkg(form)) : createPackage(me.id, orgId, pkg(form))));
+}
+
+export async function togglePackageAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = orgOf(form);
+  const active = str(form, "active") === "1";
+  await runAt(`/listing/${orgId}/packages`, active ? "Package shown." : "Package hidden.", () => setPackageActive(me.id, orgId, str(form, "packageId"), active));
+}
+
+export async function replyQuoteAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = orgOf(form);
+  const action = str(form, "action") as "quote" | "decline" | "ask_reports";
+  const label = action === "quote" ? "Quote sent. The traveller has been emailed." : action === "decline" ? "Declined. The traveller has been told." : "Asked for reports. The traveller decides whether to share them.";
+  await runAt(`/listing/${orgId}/requests`, label, () =>
+    replyToQuote(
+      me.id,
+      orgId,
+      str(form, "quoteId"),
+      action === "quote"
+        ? { action, packageId: str(form, "packageId"), priceMinRupees: str(form, "priceMinRupees"), priceMaxRupees: str(form, "priceMaxRupees"), hospitalNights: str(form, "hospitalNights") || 0, earliestDate: str(form, "earliestDate"), validUntil: str(form, "validUntil"), message: str(form, "message") }
+        : { action, message: str(form, "message") },
+    ),
+  );
 }

@@ -2,15 +2,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function ListingNav({ base, pending }: { base: string; pending: number }) {
+export function ListingNav({ base, pending, kind = "homestay" }: { base: string; pending: number; kind?: "homestay" | "hospital" }) {
   const path = usePathname();
-  const items = [
-    { href: base, label: "Listing", match: (p: string) => p === base },
-    { href: `${base}/calendar`, label: "Calendar & prices", match: (p: string) => p.startsWith(`${base}/calendar`) },
-    { href: `${base}/bookings`, label: "Bookings", badge: pending, match: (p: string) => p.startsWith(`${base}/bookings`) },
-  ];
+  const items =
+    kind === "hospital"
+      ? [
+          { href: base, label: "Profile", match: (p: string) => p === base },
+          { href: `${base}/packages`, label: "Packages", match: (p: string) => p.startsWith(`${base}/packages`) },
+          { href: `${base}/requests`, label: "Quote requests", badge: pending, match: (p: string) => p.startsWith(`${base}/requests`) },
+        ]
+      : [
+          { href: base, label: "Listing", match: (p: string) => p === base },
+          { href: `${base}/calendar`, label: "Calendar & prices", match: (p: string) => p.startsWith(`${base}/calendar`) },
+          { href: `${base}/bookings`, label: "Bookings", badge: pending, match: (p: string) => p.startsWith(`${base}/bookings`) },
+        ];
   return (
-    <nav aria-label="Homestay" className="flex flex-wrap gap-1 text-sm font-semibold">
+    <nav aria-label={kind === "hospital" ? "Hospital" : "Homestay"} className="flex flex-wrap gap-1 text-sm font-semibold">
       {items.map((i) => {
         const on = i.match(path);
         return (

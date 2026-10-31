@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
 import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import { withScope, type DB } from "@/db/client";
-import { membership, organization, orgDocument, proposal, requirement, stay, stayLedgerEntry } from "@/db/schema";
+import { careQuote, careRequest, membership, organization, orgDocument, proposal, requirement, stay, stayLedgerEntry } from "@/db/schema";
 import { createRequirement, listOrgRequirements, getMatches, sendEnquiries } from "./service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -125,5 +125,19 @@ describe("tenant isolation (row-level security)", () => {
     expect(await withScope({ userId: g.id }, (tx) => tx.select().from(stay))).toHaveLength(1);
     expect(await withScope({ userId: g.id }, (tx) => tx.select().from(stayLedgerEntry))).toHaveLength(0);
     expect(await withScope({ userId: alice.id, orgId: orgA }, (tx) => tx.select().from(stayLedgerEntry))).toHaveLength(1);
+  });
+
+  it("care requests are visible to the traveller and the chosen hospitals only", async () => {
+    const g = await makeUser(db);
+    const r = await withScope({ userId: g.id }, async (tx) => {
+      const [req] = await tx.insert(careRequest).values({ requesterUserId: g.id, treatment: "Knee replacement", ageRange: "60-69" }).returning();
+      await tx.insert(careQuote).values({ requestId: req.id, orgId: orgA, requesterUserId: g.id });
+      return req;
+    });
+    expect(await withScope({ userId: alice.id, orgId: orgA }, (tx) => tx.select().from(careRequest).where(eq(careRequest.id, r.id)))).toHaveLength(1);
+    expect(await withScope({ userId: bob.id, orgId: orgB }, (tx) => tx.select().from(careRequest).where(eq(careRequest.id, r.id)))).toHaveLength(0);
+    expect(await withScope({ userId: bob.id, orgId: orgB }, (tx) => tx.select().from(careQuote))).toHaveLength(0);
+    // A hospital can't create a request in someone else's name.
+    await expect(withScope({ userId: alice.id, orgId: orgA }, (tx) => tx.insert(careRequest).values({ requesterUserId: g.id, treatment: "x" }))).rejects.toThrow();
   });
 });

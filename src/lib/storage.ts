@@ -1,7 +1,7 @@
 import "server-only";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { badRequest } from "@/lib/errors";
 
 /**
@@ -83,4 +83,21 @@ export async function storeListingPhoto(orgId: string, file: unknown): Promise<s
   const ext = IMAGES[file.type];
   if (!ext) throw badRequest("Upload a JPG, PNG or WebP photo");
   return putPrivateFile(`listing-photos/${orgId}/${crypto.randomUUID()}.${ext}`, file, file.type);
+}
+
+/** Permanently deletes a private file (used by retention jobs). Missing files are fine. */
+export async function deletePrivateFile(pathname: string) {
+  assertConfigured();
+  if (blobConfigured()) return del(pathname);
+  const full = localPath(pathname);
+  await rm(full, { force: true });
+  await rm(`${full}.type`, { force: true });
+}
+
+/** Reads a whole private file into memory (small files only, e.g. encrypted reports). */
+export async function readPrivateFile(pathname: string): Promise<Buffer | null> {
+  const f = await getPrivateFile(pathname);
+  if (!f) return null;
+  if (f.body instanceof Uint8Array) return Buffer.from(f.body);
+  return Buffer.from(await new Response(f.body).arrayBuffer());
 }

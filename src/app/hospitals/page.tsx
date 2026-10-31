@@ -41,7 +41,7 @@ export default async function HospitalDirectory({ searchParams }: { searchParams
           ))}
         </ul>
       )}
-      <p className="text-[13px] text-muted">Quote requests and care trip planning are coming soon. This directory is not medical advice; talk to a qualified doctor about your treatment.</p>
+      <p className="text-[13px] text-muted">Open a hospital to see its treatment packages and ask for a quote. This directory is not medical advice; talk to a qualified doctor about your treatment.</p>
     </DirectoryShell>
   );
 }

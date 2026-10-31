@@ -535,3 +535,22 @@ export async function homestayNames(orgIds: string[]) {
     .where(inArray(listing.orgId, [...new Set(orgIds)]));
   return new Map(rows.map((r) => [r.orgId, r]));
 }
+
+/**
+ * Hospitals by id, for Care & Travel. `contact` (the desk email and phone) is
+ * only for travellers whose quote the hospital has accepted; callers decide.
+ */
+export async function hospitalsByIds(orgIds: string[]) {
+  if (!orgIds.length) return new Map<string, { orgId: string; name: string; slug: string; city: string; verified: boolean; contact: { email: string; phone: string; website: string } }>();
+  const rows = await getDb()
+    .select({ listing, name: organization.name, slug: organization.slug })
+    .from(listing)
+    .innerJoin(organization, eq(organization.id, listing.orgId))
+    .where(and(inArray(listing.orgId, [...new Set(orgIds)]), eq(listing.kind, "hospital")));
+  return new Map(
+    rows.map((r) => [
+      r.listing.orgId,
+      { orgId: r.listing.orgId, name: r.name, slug: r.slug, city: r.listing.city, verified: r.listing.status === "verified", contact: { email: r.listing.contactEmail, phone: r.listing.contactPhone, website: r.listing.website } },
+    ]),
+  );
+}

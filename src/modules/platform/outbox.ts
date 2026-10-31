@@ -33,7 +33,14 @@ export type OutboxEvent =
   | { type: "stay.cancelled"; payload: { stayId: string; orgId: string; guestUserId: string; byHost: boolean; refundPaise: number } }
   | { type: "stay_refund.requested"; payload: { refundId: string } }
   | { type: "stay_refund.processed"; payload: { refundId: string; stayId: string; guestUserId: string; amountPaise: number } }
-  | { type: "stay_payout.recorded"; payload: { payoutId: string; orgId: string; amountPaise: number } };
+  | { type: "stay_payout.recorded"; payload: { payoutId: string; orgId: string; amountPaise: number } }
+  | { type: "care.requested"; payload: { quoteId: string; orgId: string } }
+  | { type: "care.quoted"; payload: { quoteId: string; requesterUserId: string; requestId: string } }
+  | { type: "care.declined"; payload: { quoteId: string; requesterUserId: string; requestId: string } }
+  | { type: "care.reports_requested"; payload: { quoteId: string; requesterUserId: string; requestId: string } }
+  | { type: "care.accepted"; payload: { quoteId: string; orgId: string } }
+  | { type: "care.not_selected"; payload: { quoteId: string; orgId: string } }
+  | { type: "care.report_shared"; payload: { quoteId: string; orgId: string } };
 
 /**
  * Call inside the same transaction as the business change. Delivery starts

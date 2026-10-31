@@ -1,6 +1,6 @@
 // Outbox event handlers. Imported once by the cron route.
 import { and, eq } from "drizzle-orm";
-import { credential, enquiry, group, groupMember, invoice, listing, organization, stay, stayInvoice, professionalProfile, proposal, user } from "@/db/schema";
+import { careQuote, credential, enquiry, group, groupMember, invoice, listing, organization, stay, stayInvoice, professionalProfile, proposal, user } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { registerOutboxHandler } from "./outbox";
 import { orgAdminEmails } from "@/modules/organizations/service";
@@ -316,3 +316,41 @@ registerOutboxHandler("stay_payout.recorded", async (tx, p) => {
     await sendEmail({ to, subject: "Payout sent", text: `We've sent ${rs(Number(p.amountPaise))} to your bank account for a recent stay.\n${appUrl()}/listing/${p.orgId}/bookings` });
   }
 });
+
+// ---------- Care & Travel (M8) ----------
+// Emails never carry medical details: they say something happened and link to the page.
+
+async function hospitalDesk(tx: Parameters<Parameters<typeof registerOutboxHandler>[1]>[0], orgId: string) {
+  const org = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
+  return { name: org?.name ?? "the hospital", to: await orgAdminEmails(orgId, tx) };
+}
+
+registerOutboxHandler("care.requested", async (tx, p) => {
+  const d = await hospitalDesk(tx, String(p.orgId));
+  for (const to of d.to) await sendEmail({ to, subject: "New quote request", text: `${d.name} has a new quote request from a traveller.\n${appUrl()}/listing/${p.orgId}/requests` });
+});
+registerOutboxHandler("care.report_shared", async (tx, p) => {
+  const d = await hospitalDesk(tx, String(p.orgId));
+  for (const to of d.to) await sendEmail({ to, subject: "A traveller shared a report with you", text: `A traveller shared a report with ${d.name}. Opening it is logged and shown to them.\n${appUrl()}/listing/${p.orgId}/requests` });
+});
+registerOutboxHandler("care.accepted", async (tx, p) => {
+  const d = await hospitalDesk(tx, String(p.orgId));
+  for (const to of d.to) await sendEmail({ to, subject: "Your quote was accepted", text: `A traveller accepted ${d.name}'s quote. Their name and email are now on the request; please contact them to plan the visit.\n${appUrl()}/listing/${p.orgId}/requests` });
+});
+registerOutboxHandler("care.not_selected", async (tx, p) => {
+  const d = await hospitalDesk(tx, String(p.orgId));
+  for (const to of d.to) await sendEmail({ to, subject: "Quote request closed", text: `The traveller chose another hospital this time. Thank you for replying.\n${appUrl()}/listing/${p.orgId}/requests` });
+});
+for (const [type, subject, line] of [
+  ["care.quoted", "You have a new quote", "sent you a quote. Compare it with the others"],
+  ["care.declined", "A hospital can't take your request", "can't take your request. See their note"],
+  ["care.reports_requested", "A hospital asked for your reports", "asked to see reports before quoting. You choose whether to share them"],
+] as const) {
+  registerOutboxHandler(type, async (tx, p) => {
+    const q = await tx.query.careQuote.findFirst({ where: eq(careQuote.id, String(p.quoteId)) });
+    const guest = await tx.query.user.findFirst({ where: eq(user.id, String(p.requesterUserId)) });
+    if (!q || !guest) return;
+    const d = await hospitalDesk(tx, q.orgId);
+    await sendEmail({ to: guest.email, subject, text: `${d.name} ${line}: ${appUrl()}/care/requests/${p.requestId}` });
+  });
+}

@@ -144,7 +144,7 @@ export default async function ListingWorkspace({ params, searchParams }: { param
             )}
 
             <div className="col-span-full mt-2 border-t border-line pt-4">
-              <p className="mb-3 text-sm text-muted">For our verification team only; never shown publicly.</p>
+              <p className="mb-3 text-sm text-muted">{homestay ? "For our verification team only; never shown publicly." : "Your international desk contact: for our verification team and, once they accept your quote, your patients. Never shown publicly."}</p>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
                 <label className={field}>Contact email<input name="contactEmail" type="email" defaultValue={l.contactEmail} className="input" /></label>
                 <label className={field}>Contact phone<input name="contactPhone" type="tel" defaultValue={l.contactPhone} className="input" /></label>
