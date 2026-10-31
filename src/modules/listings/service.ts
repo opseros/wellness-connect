@@ -28,7 +28,7 @@ import { getDb, withScope } from "@/db/client";
 import { assertUuid, badRequest, notFound } from "@/lib/errors";
 import { storeListingPhoto, storeOrgDocument } from "@/lib/storage";
 import { audit, enqueue } from "@/modules/platform/outbox";
-import { createOrganization, isActiveMember, listMemberships, ORG_ADMINS, ORG_ALL, renameOrganization, requireOrgRole } from "@/modules/organizations/service";
+import { createOrganization, isActiveMember, listMemberships, ORG_ADMINS, ORG_ALL, renameOrganization, requireOrgRole, orgIsLive, isOrgSuspendedError } from "@/modules/organizations/service";
 
 // ---------- Reference data ----------
 
@@ -126,7 +126,8 @@ function readiness(l: typeof listing.$inferSelect, docs: { docType: string; stat
 export async function getListingWorkspace(userId: string, orgId: string) {
   assertUuid(orgId, "Organization");
   return withScope({ userId, orgId }, async (tx) => {
-    const m = await requireOrgRole(userId, orgId, ORG_ALL, tx).catch(() => {
+    const m = await requireOrgRole(userId, orgId, ORG_ALL, tx).catch((e) => {
+      if (isOrgSuspendedError(e)) throw e;
       throw notFound("Organization not found");
     });
     const org = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
@@ -397,7 +398,9 @@ export async function reviewListing(reviewerId: string, orgId: string, input: z.
 
 // ---------- Directory (public) ----------
 
-const visible = (kind: ListingKind) => and(eq(listing.kind, kind), eq(listing.status, "verified"));
+// Public = verified by our team AND the organisation isn't suspended or removed (queries join organization).
+const visible = (kind: ListingKind) => and(eq(listing.kind, kind), eq(listing.status, "verified"), orgIsLive());
+const live = (o: { suspendedAt: Date | null; removedAt: Date | null }) => !o.suspendedAt && !o.removedAt;
 
 export const directoryInput = z.object({
   city: z.string().trim().max(80).optional(),
@@ -450,7 +453,8 @@ export async function getPublicListing(viewerId: string | null, kind: ListingKin
     .where(and(eq(organization.slug, slug), eq(listing.kind, kind)));
   if (!row) throw notFound("Not found");
   const isMember = await isActiveMember(viewerId, row.org.id);
-  const isPublic = row.listing.status === "verified";
+  if (row.org.removedAt) throw notFound("Not found");
+  const isPublic = row.listing.status === "verified" && live(row.org);
   if (!isPublic && !isMember) throw notFound("Not found");
   const photos = await db
     .select({ id: listingPhoto.id, caption: listingPhoto.caption })
@@ -465,12 +469,13 @@ export async function openListingPhoto(viewerId: string | null, photoId: string,
   assertUuid(photoId, "Photo");
   const db = getDb();
   const [row] = await db
-    .select({ blobPath: listingPhoto.blobPath, orgId: listingPhoto.orgId, status: listing.status })
+    .select({ blobPath: listingPhoto.blobPath, orgId: listingPhoto.orgId, status: listing.status, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
     .from(listingPhoto)
     .innerJoin(listing, eq(listing.orgId, listingPhoto.orgId))
+    .innerJoin(organization, eq(organization.id, listingPhoto.orgId))
     .where(eq(listingPhoto.id, photoId));
   if (!row) throw notFound("Photo not found");
-  const isPublic = row.status === "verified";
+  const isPublic = row.status === "verified" && live(row);
   if (!isPublic && !isStaff && !(await isActiveMember(viewerId, row.orgId))) throw notFound("Photo not found");
   return { blobPath: row.blobPath, isPublic };
 }
@@ -480,7 +485,8 @@ export async function directoryCounts() {
   const rows = await getDb()
     .select({ kind: listing.kind, n: sql<number>`count(*)::int` })
     .from(listing)
-    .where(eq(listing.status, "verified"))
+    .innerJoin(organization, eq(organization.id, listing.orgId))
+    .where(and(eq(listing.status, "verified"), orgIsLive()))
     .groupBy(listing.kind);
   const get = (k: string) => rows.find((r) => r.kind === k)?.n ?? 0;
   return { homestays: get("homestay"), hospitals: get("hospital") };
@@ -493,7 +499,7 @@ export async function listingsForUser(userId: string) {
   const rows = await getDb().select({ orgId: listing.orgId, status: listing.status, kind: listing.kind }).from(listing).where(inArray(listing.orgId, mine.map((m) => m.organization.id)));
   return mine.flatMap((m) => {
     const l = rows.find((r) => r.orgId === m.organization.id);
-    return l ? [{ orgId: m.organization.id, name: m.organization.name, slug: m.organization.slug, kind: l.kind, status: l.status, role: m.membership.role }] : [];
+    return l ? [{ orgId: m.organization.id, name: m.organization.name, slug: m.organization.slug, kind: l.kind, status: l.status, role: m.membership.role, suspended: Boolean(m.organization.suspendedAt) }] : [];
   });
 }
 
@@ -503,7 +509,7 @@ export const ACCREDITATIONS_LIST = ACCREDITATIONS;
 export async function getBookableHomestay(orgId: string) {
   assertUuid(orgId, "Homestay");
   const [row] = await getDb()
-    .select({ listing, name: organization.name, slug: organization.slug })
+    .select({ listing, name: organization.name, slug: organization.slug, org: organization })
     .from(listing)
     .innerJoin(organization, eq(organization.id, listing.orgId))
     .where(and(eq(listing.orgId, orgId), eq(listing.kind, "homestay")));
@@ -513,7 +519,7 @@ export async function getBookableHomestay(orgId: string) {
     orgId: l.orgId,
     name: row.name,
     slug: row.slug,
-    verified: l.status === "verified",
+    verified: l.status === "verified" && live(row.org),
     city: l.city,
     rooms: l.rooms ?? 0,
     maxGuests: l.maxGuests,
@@ -543,14 +549,14 @@ export async function homestayNames(orgIds: string[]) {
 export async function hospitalsByIds(orgIds: string[]) {
   if (!orgIds.length) return new Map<string, { orgId: string; name: string; slug: string; city: string; verified: boolean; contact: { email: string; phone: string; website: string } }>();
   const rows = await getDb()
-    .select({ listing, name: organization.name, slug: organization.slug })
+    .select({ listing, name: organization.name, slug: organization.slug, org: organization })
     .from(listing)
     .innerJoin(organization, eq(organization.id, listing.orgId))
     .where(and(inArray(listing.orgId, [...new Set(orgIds)]), eq(listing.kind, "hospital")));
   return new Map(
     rows.map((r) => [
       r.listing.orgId,
-      { orgId: r.listing.orgId, name: r.name, slug: r.slug, city: r.listing.city, verified: r.listing.status === "verified", contact: { email: r.listing.contactEmail, phone: r.listing.contactPhone, website: r.listing.website } },
+      { orgId: r.listing.orgId, name: r.name, slug: r.slug, city: r.listing.city, verified: r.listing.status === "verified" && live(r.org), contact: { email: r.listing.contactEmail, phone: r.listing.contactPhone, website: r.listing.website } },
     ]),
   );
 }

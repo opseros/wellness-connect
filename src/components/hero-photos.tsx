@@ -11,8 +11,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const PHOTOS = [
   { src: "https://images.unsplash.com/photo-1758599668780-60d53c35135d", alt: "Friends laughing together on a forest trek", caption: "Weekend treks" },
   { src: "https://images.unsplash.com/photo-1758274525946-2d3a5be67b5d", alt: "A small group doing yoga together in a park", caption: "Yoga in the park" },
-  { src: "https://images.unsplash.com/photo-1758519288551-e22d8425d512", alt: "Two colleagues laughing over coffee at a café", caption: "Coffee with colleagues" },
+  { src: "https://images.unsplash.com/photo-1582298538104-fe2e74c27f59", alt: "Four friends in casual clothes laughing and high-fiving over coffee at a café", caption: "Coffee with friends" },
   { src: "https://images.unsplash.com/photo-1625463006115-09f08489f591", alt: "Two friends laughing at something on a phone outdoors", caption: "Old friends, new plans" },
+  { src: "https://images.unsplash.com/photo-1720531294753-d9e3494a9460", alt: "A group of people walking up a grassy hill together", caption: "Sunday hill walks" },
+  { src: "https://images.unsplash.com/photo-1758275557275-eeec6a1e654e", alt: "Friends on a picnic blanket in a park taking a selfie", caption: "Picnics in the park" },
+  { src: "https://images.unsplash.com/photo-1758525225676-329ddcedf78f", alt: "Two friends chatting over coffee at a street café", caption: "Catching up after work" },
+  { src: "https://images.unsplash.com/photo-1511632765486-a01980e01a18", alt: "Four friends with arms around each other watching the sunset", caption: "Sunsets with your people" },
 ] as const;
 
 const INTERVAL_MS = 5000;

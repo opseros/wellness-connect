@@ -18,7 +18,11 @@ Read README.md for the product and setup. These rules are not optional.
   checks go through the organizations service).
 - Organisations have a `kind`: company, homestay or hospital. Only companies use the
   marketplace (`assertCompanyOrg`); homestays/hospitals have a `listing` that is public
-  only when `status = verified`. Never show a listing's contact email/phone publicly.
+  only when `status = verified` AND the organisation isn't suspended or removed (`orgIsLive()`).
+  Never show a listing's contact email/phone publicly.
+- Staff can suspend or remove an organisation (`organization.suspended_at` / `removed_at`).
+  `requireOrgRole` refuses suspended/removed orgs with `ORG_SUSPENDED`; workspace layouts turn
+  that into a notice on /app. Public listing queries must join `organization` and use `orgIsLive()`.
 - REST under `/api/v1` is the contract the Phase 2 Flutter app will reuse. Don't put
   business rules only in server actions or only in the UI. Don't break `/api/v1` shapes;
   add `/api/v2` if you must.

@@ -2,11 +2,12 @@
 import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
-export function AdminNav({ pending, listings = 0, reports, finance = 0 }: { pending: number; listings?: number; reports: number; finance?: number }) {
+export function AdminNav({ pending, homestays = 0, hospitals = 0, reports, finance = 0 }: { pending: number; homestays?: number; hospitals?: number; reports: number; finance?: number }) {
   const path = usePathname();
   const items = [
-    { href: "/admin", label: "Verification", badge: pending, match: (p: string) => p === "/admin" || p.startsWith("/admin/credentials") },
-    { href: "/admin/listings", label: "Homestays & hospitals", badge: listings, match: (p: string) => p.startsWith("/admin/listings") },
+    { href: "/admin", label: "Professionals", badge: pending, match: (p: string) => p === "/admin" || p.startsWith("/admin/credentials") },
+    { href: "/admin/homestays", label: "Homestays", badge: homestays, match: (p: string) => p.startsWith("/admin/homestays") },
+    { href: "/admin/hospitals", label: "Hospitals", badge: hospitals, match: (p: string) => p.startsWith("/admin/hospitals") },
     { href: "/admin/users", label: "Users", match: (p: string) => p.startsWith("/admin/users") },
     { href: "/admin/organizations", label: "Organizations", match: (p: string) => p.startsWith("/admin/organizations") },
     { href: "/admin/finance", label: "Finance", badge: finance, match: (p: string) => p.startsWith("/admin/finance") },

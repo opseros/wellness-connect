@@ -3,7 +3,7 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { AppError } from "@/lib/errors";
 import { getCurrentUser } from "@/modules/identity/session";
-import { getOrgForMember, ORG_ADMINS, ORG_BUYERS } from "@/modules/organizations/service";
+import { getOrgForMember, isOrgSuspendedError, ORG_ADMINS, ORG_BUYERS } from "@/modules/organizations/service";
 
 /**
  * Signed in, verified and an ACTIVE member of this company; anything else is a
@@ -15,6 +15,7 @@ export const getCompanyOrExit = cache(async (orgId: string) => {
   if (!me.emailVerified) redirect(`/check-email?email=${encodeURIComponent(me.email)}`);
   const { org, role } = await getOrgForMember(me.id, orgId).catch((e) => {
     if (e instanceof AppError && e.status === 404) notFound();
+    if (isOrgSuspendedError(e)) redirect("/app?notice=suspended");
     throw e;
   });
   if (org.kind === "homestay" || org.kind === "hospital") redirect(`/listing/${org.id}`);

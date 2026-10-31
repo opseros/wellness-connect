@@ -3,18 +3,32 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
 import { makeUser } from "@/test/factories";
 import { withScope, type DB } from "@/db/client";
-import { auditLog, membership, orgDocument } from "@/db/schema";
+import { auditLog, membership, orgDocument, stay } from "@/db/schema";
 import { processOutbox } from "@/modules/platform/outbox";
 import "@/modules/platform/handlers";
 import { sentEmails } from "@/lib/email";
 import { listBuyerOrgs } from "@/modules/organizations/service";
 import { createRequirement } from "@/modules/marketplace/service";
 import { categoryBySlug } from "@/test/factories";
-import { decideListing, getListingForReview, listListingQueue, openOrgDocument, type StaffActor } from "@/modules/admin/service";
+import {
+  decideListing,
+  editOrganization,
+  getListingForReview,
+  getOrganizationDetail,
+  listListingQueue,
+  listOrganizations,
+  openOrgDocument,
+  removeOrganization,
+  suspendOrganization,
+  unsuspendOrganization,
+  type StaffActor,
+} from "@/modules/admin/service";
+import { ORG_SUSPENDED } from "@/modules/organizations/service";
 import {
   addPhoto,
   createListingOrg,
   directoryCounts,
+  getBookableHomestay,
   getListingWorkspace,
   getPublicListing,
   listDirectory,
@@ -198,5 +212,79 @@ describe("hospital: accreditation shown only once checked", () => {
     await decideListing(ops, hospId, { decision: "rejected", note: "Registration expired." });
     expect(await listDirectory("hospital")).toHaveLength(0);
     await expect(submitListing(hospitalAdmin.id, hospId)).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("staff: edit, suspend and remove an organisation", () => {
+  let superAdmin: StaffActor;
+  beforeAll(async () => {
+    const s = await makeUser(db, "boss@opseros.com");
+    superAdmin = { id: s.id, platformRole: "super_admin", twoFactorEnabled: true };
+  });
+
+  it("queues and the organisations list keep homestays and hospitals apart", async () => {
+    expect(new Set((await listListingQueue(ops, "all", "homestay")).map((r) => r.kind))).toEqual(new Set(["homestay"]));
+    expect(new Set((await listListingQueue(ops, "all", "hospital")).map((r) => r.kind))).toEqual(new Set(["hospital"]));
+    const kinds = (await listOrganizations(ops)).map((o) => o.kind);
+    expect(kinds).toEqual(expect.arrayContaining(["homestay", "hospital"]));
+  });
+
+  it("only super admins can change an organisation", async () => {
+    await expect(suspendOrganization(ops, stayId, { reason: "Guest complaints" })).rejects.toMatchObject({ status: 403 });
+    await expect(editOrganization(ops, stayId, { name: "Hacked" })).rejects.toMatchObject({ status: 403 });
+    await expect(removeOrganization(ops, stayId, "Aranya Garden Stay")).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("edits details without touching verification, and logs which fields changed", async () => {
+    await expect(editOrganization(superAdmin, stayId, { name: "Aranya Garden Stay", contactEmail: "not-an-email" })).rejects.toThrow(/valid contact email/);
+    await editOrganization(superAdmin, stayId, { name: "Aranya Garden Homestay", contactEmail: "stay@aranya.test", area: "Gokulam" });
+    const d = await getOrganizationDetail(ops, stayId);
+    expect(d.org.name).toBe("Aranya Garden Homestay");
+    expect(d.listing).toMatchObject({ status: "verified", contactEmail: "stay@aranya.test", area: "Gokulam" });
+    const [log] = await db.select().from(auditLog).where(eq(auditLog.action, "organization.edit"));
+    expect(log.metadata).toMatchObject({ fields: ["name", "area", "contactEmail"] });
+  });
+
+  it("suspension hides the listing, stops bookings and closes the workspace until lifted", async () => {
+    await expect(suspendOrganization(superAdmin, stayId, { reason: "no" })).rejects.toThrow(/at least 5/);
+    await suspendOrganization(superAdmin, stayId, { reason: "Safety complaint under review" });
+    await expect(suspendOrganization(superAdmin, stayId, { reason: "Safety complaint under review" })).rejects.toMatchObject({ status: 400 });
+    expect(await listDirectory("homestay")).toHaveLength(0);
+    expect((await directoryCounts()).homestays).toBe(0);
+    await expect(getPublicListing(null, "homestay", stayslug)).rejects.toMatchObject({ status: 404 });
+    expect((await getBookableHomestay(stayId))?.verified).toBe(false);
+    await expect(getListingWorkspace(host.id, stayId)).rejects.toThrow(ORG_SUSPENDED);
+    await expect(updateListing(host.id, stayId, { name: "Back again", city: "Mysuru" })).rejects.toThrow(ORG_SUSPENDED);
+    expect(await listingsForUser(host.id)).toMatchObject([{ orgId: stayId, suspended: true }]);
+    expect((await listOrganizations(ops, "", "suspended")).map((o) => o.id)).toEqual([stayId]);
+
+    await unsuspendOrganization(superAdmin, stayId);
+    expect((await listDirectory("homestay")).map((d) => d.name)).toEqual(["Aranya Garden Homestay"]);
+    expect((await getListingWorkspace(host.id, stayId)).listing.status).toBe("verified");
+  });
+
+  it("removal waits for open stays, needs the exact name, then closes it for good", async () => {
+    const guest = await makeUser(db);
+    const [s] = await withScope({ bypass: true, userId: superAdmin.id }, (tx) =>
+      tx
+        .insert(stay)
+        .values({ orgId: stayId, guestUserId: guest.id, checkIn: "2030-01-10", checkOut: "2030-01-12", nights: 2, purpose: "rest", respondBy: new Date(Date.now() + 86400000), nightly: [], gstParts: [], subtotalPaise: 0, gstPaise: 0, totalPaise: 0, commissionPaise: 0, payablePaise: 0, cancellationPolicy: "moderate", idempotencyKey: "rm-test" })
+        .returning(),
+    );
+    expect((await getOrganizationDetail(superAdmin, stayId)).openWork).toBe("1 open stay");
+    await expect(removeOrganization(superAdmin, stayId, "Aranya Garden Homestay")).rejects.toThrow(/1 open stay/);
+    await withScope({ bypass: true, userId: superAdmin.id }, (tx) => tx.update(stay).set({ status: "declined" }).where(eq(stay.id, s.id)));
+
+    await expect(removeOrganization(superAdmin, stayId, "aranya")).rejects.toThrow(/exactly/);
+    await removeOrganization(superAdmin, stayId, "Aranya Garden Homestay");
+    expect(await db.select().from(membership).where(eq(membership.orgId, stayId))).toHaveLength(0);
+    await expect(getListingWorkspace(host.id, stayId)).rejects.toMatchObject({ status: 404 });
+    await expect(getPublicListing(host.id, "homestay", stayslug)).rejects.toMatchObject({ status: 404 });
+    expect(await listingsForUser(host.id)).toHaveLength(0);
+    expect((await listOrganizations(ops, "", "removed")).map((o) => o.id)).toEqual([stayId]);
+    expect((await listOrganizations(ops, "", "active")).map((o) => o.id)).not.toContain(stayId);
+    await expect(editOrganization(superAdmin, stayId, { name: "Revived" })).rejects.toMatchObject({ status: 404 });
+    // The stay record is kept.
+    expect(await withScope({ bypass: true, userId: superAdmin.id }, (tx) => tx.select().from(stay).where(eq(stay.id, s.id)))).toHaveLength(1);
   });
 });

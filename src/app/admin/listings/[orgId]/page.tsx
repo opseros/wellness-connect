@@ -48,8 +48,16 @@ export default async function ListingReview({ params, searchParams }: { params: 
 
   return (
     <>
-      <Link href="/admin/listings" className="text-sm font-semibold text-brand hover:underline">← Homestays &amp; hospitals</Link>
-      <PageTitle title={d.org.name} subtitle={homestay ? "Homestay" : "Hospital"} />
+      <span className="flex flex-wrap justify-between gap-3">
+        <Link href={homestay ? "/admin/homestays" : "/admin/hospitals"} className="text-sm font-semibold text-brand hover:underline">← {homestay ? "Homestays" : "Hospitals"}</Link>
+        <Link href={`/admin/organizations/${orgId}`} className="text-sm font-semibold text-brand hover:underline">Edit, suspend or remove →</Link>
+      </span>
+      <PageTitle title={d.org.name} subtitle={homestay ? "Homestay" : "Hospital · Care & Travel"} />
+      {d.org.removedAt ? (
+        <p className="rounded-xl bg-[#fbe9e7] px-4 py-3 text-sm text-[#9b2c1f]">Removed {when(d.org.removedAt)}. Kept for records only.</p>
+      ) : d.org.suspendedAt ? (
+        <p className="rounded-xl bg-[#fbe9e7] px-4 py-3 text-sm text-[#9b2c1f]">Suspended {when(d.org.suspendedAt)}: {d.org.suspendedReason}. Hidden from the directory while suspended.</p>
+      ) : null}
       <Flash msg={sp.msg} error={sp.error} />
       <div className="flex flex-wrap items-start gap-5">
         <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
@@ -92,6 +100,7 @@ export default async function ListingReview({ params, searchParams }: { params: 
             <form action={decideListingAction} className="card flex flex-col gap-3 p-5">
               <h2 className="font-bold">Checklist and decision</h2>
               <input type="hidden" name="orgId" value={orgId} />
+              <input type="hidden" name="kind" value={l.kind} />
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-1 text-sm text-muted">Tick each check you&apos;ve done. All required checks are needed to approve.</legend>
                 {d.checks.map((c) => (

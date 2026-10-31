@@ -6,6 +6,7 @@ import { navOptions } from "@/components/nav-options";
 import { AppError } from "@/lib/errors";
 import { getCurrentUser } from "@/modules/identity/session";
 import { getListingWorkspace } from "@/modules/listings/service";
+import { isOrgSuspendedError } from "@/modules/organizations/service";
 import { hostPendingCount } from "@/modules/stays/service";
 import { hospitalOpenRequestCount } from "@/modules/care/service";
 import { ListingNav } from "../listing-nav";
@@ -19,6 +20,7 @@ export default async function ListingLayout({ children, params }: { children: Re
   const { orgId } = await params;
   const w = await getListingWorkspace(me.id, orgId).catch((e) => {
     if (e instanceof AppError && (e.status === 404 || e.status === 400)) notFound();
+    if (isOrgSuspendedError(e)) redirect("/app?notice=suspended");
     throw e;
   });
   const nav = await navOptions(me.id);

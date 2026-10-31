@@ -13,6 +13,10 @@ import {
   adminSetCategoryCommission,
   adminUpdateFinanceSettings,
   decideCredential,
+  editOrganization,
+  removeOrganization,
+  suspendOrganization,
+  unsuspendOrganization,
   editUser,
   removeUser,
   resolveReport,
@@ -115,7 +119,7 @@ export async function setDomainAction(form: FormData) {
   const staff = await requirePlatformStaff();
   const id = String(form.get("orgId"));
   const domain = String(form.get("domain") ?? "");
-  await run("/admin/organizations", domain ? `Domain ${domain} linked and verified.` : "Domain removed.", () => setOrganizationDomain(staff, id, { domain }));
+  await run(`/admin/organizations/${id}`, domain ? `Domain ${domain} linked and verified.` : "Domain removed.", () => setOrganizationDomain(staff, id, { domain }));
 }
 
 export async function resolveReportAction(form: FormData) {
@@ -193,7 +197,46 @@ export async function decideListingAction(form: FormData) {
   const orgId = String(form.get("orgId"));
   const decision = String(form.get("decision")) as "approved" | "changes_requested" | "rejected";
   const label = decision === "approved" ? "Verified. It's now in the directory and the owners have been emailed." : decision === "changes_requested" ? "Changes requested. The owners have been emailed." : "Not approved. The owners have been emailed.";
-  await run(`/admin/listings/${orgId}`, label, () =>
+  const base = String(form.get("kind")) === "hospital" ? "/admin/hospitals" : "/admin/homestays";
+  await run(`${base}/${orgId}`, label, () =>
     decideListing(staff, orgId, { decision, note: String(form.get("note") ?? ""), checked: form.getAll("checked").map(String) }),
   );
+}
+
+// ---------- Organisations: companies, homestays, hospitals ----------
+
+const str = (form: FormData, k: string) => {
+  const v = form.get(k);
+  return v === null ? undefined : String(v);
+};
+
+export async function editOrganizationAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const id = String(form.get("orgId"));
+  await run(`/admin/organizations/${id}`, "Details saved.", () =>
+    editOrganization(staff, id, {
+      name: String(form.get("name") ?? ""),
+      ...Object.fromEntries(["city", "address", "billingEmail", "gstin", "tagline", "area", "state", "contactEmail", "contactPhone", "website"].map((k) => [k, str(form, k)])),
+    }),
+  );
+}
+
+export async function suspendOrganizationAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const id = String(form.get("orgId"));
+  await run(`/admin/organizations/${id}`, "Suspended. It's hidden from directories and its team can't use the workspace.", () =>
+    suspendOrganization(staff, id, { reason: String(form.get("reason") ?? "") }),
+  );
+}
+
+export async function unsuspendOrganizationAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const id = String(form.get("orgId"));
+  await run(`/admin/organizations/${id}`, "Suspension lifted.", () => unsuspendOrganization(staff, id));
+}
+
+export async function removeOrganizationAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const id = String(form.get("orgId"));
+  await run(`/admin/organizations/${id}`, "Removed. Its team no longer has access; records are kept.", () => removeOrganization(staff, id, String(form.get("confirm") ?? "")));
 }

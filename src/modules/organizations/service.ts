@@ -107,12 +107,21 @@ async function queryMemberships(userId: string, db: Executor) {
 /** Throws unless the user is an ACTIVE member of the org with one of the roles. */
 export async function requireOrgRole(userId: string, orgId: string, roles: readonly OrgRole[], db: Executor = getDb()) {
   assertUuid(orgId, "Organization");
-  const m = await db.query.membership.findFirst({
-    where: and(eq(membership.orgId, orgId), eq(membership.userId, userId), eq(membership.status, "active")),
-  });
-  if (!m || !roles.includes(m.role)) throw forbidden();
-  return m;
+  const [row] = await db
+    .select({ m: membership, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
+    .from(membership)
+    .innerJoin(organization, eq(organization.id, membership.orgId))
+    .where(and(eq(membership.orgId, orgId), eq(membership.userId, userId), eq(membership.status, "active")));
+  if (!row || !roles.includes(row.m.role)) throw forbidden();
+  if (row.suspendedAt || row.removedAt) throw forbidden(ORG_SUSPENDED);
+  return row.m;
 }
+
+/** Message used when staff have suspended an organisation; layouts look for it to show a notice. */
+export const ORG_SUSPENDED = `This organisation is suspended by the ${BRAND.name} team. Contact support to find out more.`;
+export const isOrgSuspendedError = (e: unknown) => e instanceof Error && e.message === ORG_SUSPENDED;
+/** SQL condition: the organisation is neither suspended nor removed (use with a join on organization). */
+export const orgIsLive = () => and(isNull(organization.suspendedAt), isNull(organization.removedAt));
 
 export const ORG_ADMINS: readonly OrgRole[] = ["owner", "admin"];
 export const ORG_BUYERS: readonly OrgRole[] = ["owner", "admin", "wellness_manager"];
@@ -171,7 +180,8 @@ export async function getOrgForMember(userId: string, orgId: string) {
   });
   if (!m) throw notFound("Organization not found");
   const org = await db.query.organization.findFirst({ where: eq(organization.id, orgId) });
-  if (!org) throw notFound("Organization not found");
+  if (!org || org.removedAt) throw notFound("Organization not found");
+  if (org.suspendedAt) throw forbidden(ORG_SUSPENDED);
   return { org, role: m.role };
 }
 

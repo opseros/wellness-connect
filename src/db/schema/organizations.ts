@@ -21,6 +21,12 @@ export const organization = pgTable(
     address: text("address").notNull().default(""),
     billingEmail: text("billing_email").notNull().default(""),
     gstin: text("gstin").notNull().default(""),
+    // Set by platform staff. A suspended organisation is hidden from directories and its
+    // members can't use its workspace until the suspension is lifted. A removed one is
+    // closed for good: memberships are deleted, records (bookings, stays, invoices) stay.
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    suspendedReason: text("suspended_reason"),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("organization_domain_uq").on(t.domain)],

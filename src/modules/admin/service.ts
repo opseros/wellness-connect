@@ -2,7 +2,7 @@
 // checks permissions itself, so routes and pages can't forget to.
 //   ops          day-to-day: verification, moderation, read-only users/orgs/audit
 //   super_admin  everything ops can do + staff roles, suspensions, domain changes
-import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import {
   financeAttentionCount,
   financeOverview,
@@ -18,9 +18,9 @@ import {
 } from "@/modules/marketplace/payments";
 import { listCategories, setCategoryCommission } from "@/modules/professionals/service";
 import { z } from "zod";
-import { account, auditLog, comment, connection, conversationParticipant, credential, group, listing, listingPhoto, memberProfile, orgDocument, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
-import { getDb, withScope } from "@/db/client";
-import { badRequest, forbidden, notFound } from "@/lib/errors";
+import { booking, careQuote, invitation, stay, account, auditLog, comment, connection, conversationParticipant, credential, group, listing, listingPhoto, memberProfile, orgDocument, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
+import { getDb, withScope, type Tx } from "@/db/client";
+import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit } from "@/modules/platform/outbox";
 import { reviewCredential, reviewInput } from "@/modules/professionals/service";
 import { isCompanyDomain } from "@/modules/organizations/service";
@@ -97,13 +97,13 @@ export async function decideCredential(actor: StaffActor, credentialId: string, 
 
 export type ListingQueueStatus = "pending" | "changes_requested" | "verified" | "rejected" | "draft" | "all";
 
-export async function listListingQueue(actor: StaffActor, status: ListingQueueStatus = "pending") {
+export async function listListingQueue(actor: StaffActor, status: ListingQueueStatus = "pending", kind?: "homestay" | "hospital") {
   assertStaff(actor);
   return getDb()
-    .select({ orgId: listing.orgId, kind: listing.kind, status: listing.status, city: listing.city, submittedAt: listing.submittedAt, reviewedAt: listing.reviewedAt, name: organization.name })
+    .select({ orgId: listing.orgId, kind: listing.kind, status: listing.status, city: listing.city, submittedAt: listing.submittedAt, reviewedAt: listing.reviewedAt, name: organization.name, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
     .from(listing)
     .innerJoin(organization, eq(organization.id, listing.orgId))
-    .where(status === "all" ? undefined : eq(listing.status, status))
+    .where(and(status === "all" ? undefined : eq(listing.status, status), kind ? eq(listing.kind, kind) : undefined))
     .orderBy(status === "pending" ? asc(listing.submittedAt) : desc(listing.updatedAt))
     .limit(200);
 }
@@ -336,24 +336,177 @@ export async function removeUser(actor: StaffActor, userId: string, confirmEmail
 
 // ---------- Organizations ----------
 
-export async function listOrganizations(actor: StaffActor, q = "") {
+export type OrgFilter = "active" | "suspended" | "removed" | "all";
+
+/** Every organisation with its kind, listing status (homestays and hospitals) and standing. */
+export async function listOrganizations(actor: StaffActor, q = "", filter: OrgFilter = "active") {
   assertStaff(actor);
   const term = q.trim();
+  const standing =
+    filter === "active"
+      ? and(isNull(organization.suspendedAt), isNull(organization.removedAt))
+      : filter === "suspended"
+        ? and(isNotNull(organization.suspendedAt), isNull(organization.removedAt))
+        : filter === "removed"
+          ? isNotNull(organization.removedAt)
+          : undefined;
   return getDb()
     .select({
       id: organization.id,
       name: organization.name,
+      slug: organization.slug,
       kind: organization.kind,
+      city: sql<string>`coalesce(nullif(${listing.city}, ''), ${organization.city})`,
       domain: organization.domain,
       domainVerifiedAt: organization.domainVerifiedAt,
+      suspendedAt: organization.suspendedAt,
+      removedAt: organization.removedAt,
+      listingStatus: listing.status,
       createdAt: organization.createdAt,
       activeMembers: sql<number>`(select count(*)::int from ${membership} where ${membership.orgId} = ${organization.id} and ${membership.status} = 'active')`,
       pendingMembers: sql<number>`(select count(*)::int from ${membership} where ${membership.orgId} = ${organization.id} and ${membership.status} = 'pending')`,
     })
     .from(organization)
-    .where(term ? or(ilike(organization.name, like(term)), ilike(organization.domain, like(term))) : undefined)
+    .leftJoin(listing, eq(listing.orgId, organization.id))
+    .where(and(standing, term ? or(ilike(organization.name, like(term)), ilike(organization.domain, like(term)), ilike(listing.city, like(term))) : undefined))
     .orderBy(desc(organization.createdAt))
-    .limit(200);
+    .limit(300);
+}
+
+/** Work that must finish before an organisation can be removed (bookings, stays, open quotes). */
+async function openWork(tx: Tx, org: { id: string; kind: string }) {
+  if (org.kind === "company") {
+    const [b] = await tx.select({ n: count() }).from(booking).where(and(eq(booking.orgId, org.id), inArray(booking.status, ["pending", "confirmed", "in_progress"])));
+    return b.n ? `${b.n} open booking${b.n === 1 ? "" : "s"}` : null;
+  }
+  if (org.kind === "homestay") {
+    const [st] = await tx.select({ n: count() }).from(stay).where(and(eq(stay.orgId, org.id), inArray(stay.status, ["requested", "accepted", "confirmed"])));
+    return st.n ? `${st.n} open stay${st.n === 1 ? "" : "s"}` : null;
+  }
+  const [cq] = await tx.select({ n: count() }).from(careQuote).where(and(eq(careQuote.orgId, org.id), inArray(careQuote.status, ["requested", "reports_requested", "quoted"])));
+  return cq.n ? `${cq.n} open quote request${cq.n === 1 ? "" : "s"}` : null;
+}
+
+/** One organisation for the admin "manage" page. Read with audited-staff bypass (counts touch RLS tables). */
+export async function getOrganizationDetail(actor: StaffActor, orgId: string) {
+  assertStaff(actor);
+  assertUuid(orgId, "Organization");
+  return withScope({ bypass: true, userId: actor.id }, async (tx) => {
+    const org = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
+    if (!org) throw notFound("Organization not found");
+    const l = await tx.query.listing.findFirst({ where: eq(listing.orgId, orgId) });
+    const team = await tx
+      .select({ userId: user.id, name: user.name, email: user.email, role: membership.role, status: membership.status })
+      .from(membership)
+      .innerJoin(user, eq(user.id, membership.userId))
+      .where(eq(membership.orgId, orgId))
+      .orderBy(asc(membership.createdAt));
+    return { org, listing: l ?? null, team, openWork: org.removedAt ? null : await openWork(tx, org) };
+  });
+}
+
+const optionalText = (max: number) => z.string().trim().max(max).optional();
+export const editOrganizationInput = z.object({
+  name: z.string().trim().min(2, "Name is too short").max(120),
+  // Companies
+  city: optionalText(80),
+  address: optionalText(300),
+  billingEmail: z.union([z.literal(""), z.string().trim().toLowerCase().email("Enter a valid billing email")]).optional(),
+  gstin: z.union([z.literal(""), z.string().trim().toUpperCase().regex(/^[0-9A-Z]{15}$/, "GSTIN has 15 letters and digits")]).optional(),
+  // Homestays and hospitals
+  tagline: optionalText(160),
+  area: optionalText(80),
+  state: optionalText(80),
+  contactEmail: z.union([z.literal(""), z.string().trim().toLowerCase().email("Enter a valid contact email")]).optional(),
+  contactPhone: optionalText(30),
+  website: z.union([z.literal(""), z.string().trim().url("Website must start with https://")]).optional(),
+});
+
+/** Staff correction of an organisation's details. The listing keeps its verification status. */
+export async function editOrganization(actor: StaffActor, orgId: string, input: z.input<typeof editOrganizationInput>) {
+  assertSuperAdmin(actor);
+  assertUuid(orgId, "Organization");
+  const d = editOrganizationInput.parse(input);
+  return getDb().transaction(async (tx) => {
+    const org = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
+    if (!org || org.removedAt) throw notFound("Organization not found");
+    const changed: string[] = [];
+    const orgPatch: Partial<typeof organization.$inferInsert> = {};
+    if (d.name !== org.name) { orgPatch.name = d.name; changed.push("name"); }
+    if (org.kind === "company") {
+      for (const k of ["city", "address", "billingEmail", "gstin"] as const) {
+        if (d[k] !== undefined && d[k] !== org[k]) { orgPatch[k] = d[k]; changed.push(k); }
+      }
+    }
+    if (Object.keys(orgPatch).length) await tx.update(organization).set(orgPatch).where(eq(organization.id, orgId));
+    if (org.kind !== "company") {
+      const l = await tx.query.listing.findFirst({ where: eq(listing.orgId, orgId) });
+      if (l) {
+        const patch: Partial<typeof listing.$inferInsert> = {};
+        for (const k of ["tagline", "city", "area", "state", "contactEmail", "contactPhone", "website"] as const) {
+          if (d[k] !== undefined && d[k] !== l[k]) { patch[k] = d[k]; changed.push(k); }
+        }
+        if (Object.keys(patch).length) await tx.update(listing).set({ ...patch, updatedAt: new Date() }).where(eq(listing.orgId, orgId));
+      }
+    }
+    if (changed.length) await audit(tx, { actorId: actor.id, action: "organization.edit", targetType: "organization", targetId: orgId, metadata: { fields: changed } });
+    return { changed };
+  });
+}
+
+/**
+ * Suspends an organisation: hidden from directories, can't take new stays or quote
+ * requests, and its members can't use its workspace. Existing records are untouched.
+ */
+export async function suspendOrganization(actor: StaffActor, orgId: string, input: z.input<typeof suspendInput>) {
+  assertSuperAdmin(actor);
+  assertUuid(orgId, "Organization");
+  const { reason } = suspendInput.parse(input);
+  return getDb().transaction(async (tx) => {
+    const [row] = await tx
+      .update(organization)
+      .set({ suspendedAt: new Date(), suspendedReason: reason })
+      .where(and(eq(organization.id, orgId), isNull(organization.suspendedAt), isNull(organization.removedAt)))
+      .returning({ id: organization.id });
+    if (!row) throw badRequest("Already suspended, removed or not found");
+    await audit(tx, { actorId: actor.id, action: "organization.suspend", targetType: "organization", targetId: orgId, metadata: { reason } });
+  });
+}
+
+export async function unsuspendOrganization(actor: StaffActor, orgId: string) {
+  assertSuperAdmin(actor);
+  assertUuid(orgId, "Organization");
+  return getDb().transaction(async (tx) => {
+    const [row] = await tx
+      .update(organization)
+      .set({ suspendedAt: null, suspendedReason: null })
+      .where(and(eq(organization.id, orgId), isNotNull(organization.suspendedAt), isNull(organization.removedAt)))
+      .returning({ id: organization.id });
+    if (!row) throw badRequest("Not suspended");
+    await audit(tx, { actorId: actor.id, action: "organization.unsuspend", targetType: "organization", targetId: orgId });
+  });
+}
+
+/**
+ * Closes an organisation for good. Refused while it has open bookings, stays or quote
+ * requests. Memberships and invitations are deleted and the email domain is released;
+ * bookings, stays, invoices, payouts and the audit trail keep their references.
+ */
+export async function removeOrganization(actor: StaffActor, orgId: string, confirmName: string) {
+  assertSuperAdmin(actor);
+  assertUuid(orgId, "Organization");
+  return withScope({ bypass: true, userId: actor.id }, async (tx) => {
+    const org = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
+    if (!org || org.removedAt) throw notFound("Organization not found");
+    if (confirmName.trim() !== org.name) throw badRequest("Type the organisation's name exactly to confirm");
+    const open = await openWork(tx, org);
+    if (open) throw badRequest(`It still has ${open}. Finish or cancel them first.`);
+    const now = new Date();
+    await tx.update(organization).set({ removedAt: now, suspendedAt: org.suspendedAt ?? now, domain: null, domainVerifiedAt: null }).where(eq(organization.id, orgId));
+    await tx.delete(membership).where(eq(membership.orgId, orgId));
+    await tx.delete(invitation).where(eq(invitation.orgId, orgId));
+    await audit(tx, { actorId: actor.id, action: "organization.remove", targetType: "organization", targetId: orgId, metadata: { name: org.name, kind: org.kind } });
+  });
 }
 
 export const domainInput = z.object({ domain: z.string().trim().toLowerCase() });
@@ -471,8 +624,10 @@ export async function adminCounts(actor: StaffActor) {
     db.select({ n: count() }).from(credential).where(eq(credential.status, "pending")),
     db.select({ n: count() }).from(report).where(eq(report.status, "open")),
   ]);
-  const [listings] = await db.select({ n: count() }).from(listing).where(eq(listing.status, "pending"));
-  return { pendingCredentials: pending.n, pendingListings: listings.n, openReports: reports.n, financeAttention: await financeAttentionCount() };
+  const byKind = await db.select({ kind: listing.kind, n: count() }).from(listing).where(eq(listing.status, "pending")).groupBy(listing.kind);
+  const pendingHomestays = byKind.find((r) => r.kind === "homestay")?.n ?? 0;
+  const pendingHospitals = byKind.find((r) => r.kind === "hospital")?.n ?? 0;
+  return { pendingCredentials: pending.n, pendingListings: pendingHomestays + pendingHospitals, pendingHomestays, pendingHospitals, openReports: reports.n, financeAttention: await financeAttentionCount() };
 }
 
 
