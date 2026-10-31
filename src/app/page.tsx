@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { FeedCollage, LandingHeader, SpaceIcon, SPACES } from "@/components/landing";
 import { JoinHero } from "@/components/join-hero";
+import { HeroPhotos } from "@/components/hero-photos";
 import { BRAND } from "@/lib/brand";
 import { enabledProviders } from "@/lib/providers";
 import { getCurrentUser } from "@/modules/identity/session";
@@ -42,7 +43,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
     <div className="overflow-x-clip bg-ground">
       <LandingHeader />
       {reset && <p role="status" className="mx-auto max-w-[1200px] px-4 sm:px-8"><span className="block rounded-xl bg-brand-soft px-4 py-3 text-sm text-brand-dark">Password changed. Sign in with your new password.</span></p>}
-      <JoinHero providers={enabledProviders()} initialMode={returning ? "signin" : "join"} initialRole={as === "pro" ? "pro" : "member"} />
+      <JoinHero providers={enabledProviders()} initialMode={returning ? "signin" : "join"} initialRole={as === "pro" ? "pro" : "member"} photos={<HeroPhotos />} />
 
       <section aria-labelledby="inside-h" className="border-y border-line bg-white">
         <div className="mx-auto grid max-w-[1200px] items-center gap-12 px-4 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -166,7 +167,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
           <span>
             <span className="font-display font-bold text-ink">{BRAND.name}</span> {BRAND.tagline}
           </span>
-          <span className="text-[13px]">Connect is for everyday wellbeing, not medical advice.</span>
+          <span className="text-[13px]">Connect is for everyday wellbeing, not medical advice. Photos: Unsplash.</span>
           <span className="flex flex-wrap gap-5">
             <Link href="/professionals" className="hover:text-ink">Professionals</Link>
             <Link href="/homestays" className="hover:text-ink">Homestays</Link>

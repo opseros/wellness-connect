@@ -13,6 +13,11 @@ const nextConfig: NextConfig = {
     },
   },
   serverExternalPackages: ["@electric-sql/pglite"],
+  images: {
+    // Home page photos come from Unsplash (free Unsplash License) and are
+    // resized and served from our own domain by Next.js image optimisation.
+    remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com", pathname: "/photo-*" }],
+  },
   experimental: {
     // Credential uploads go through server actions. Vercel caps request
     // bodies at 4.5 MB, so files are limited to 4 MB (src/lib/storage.ts).
