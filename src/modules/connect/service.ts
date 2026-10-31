@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, asc, desc, eq, gte, inArray, isNull, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -40,8 +41,12 @@ export async function isBlockedEitherWay(a: string, b: string, db: Executor = ge
   return Boolean(row);
 }
 
-/** Everyone `userId` has blocked or been blocked by. */
-async function blockedIds(userId: string, db: Executor = getDb()) {
+/** Everyone `userId` has blocked or been blocked by (deduplicated per page render when no executor is given). */
+async function blockedIds(userId: string, db?: Executor) {
+  return db ? queryBlocked(userId, db) : blockedForRender(userId);
+}
+const blockedForRender = cache((userId: string) => queryBlocked(userId, getDb()));
+async function queryBlocked(userId: string, db: Executor) {
   const rows = await db
     .select({ a: block.blockerId, b: block.blockedId })
     .from(block)
@@ -85,9 +90,8 @@ export async function updateMemberProfile(userId: string, input: z.input<typeof 
   return row;
 }
 
-export async function getMemberProfile(userId: string) {
-  return getDb().query.memberProfile.findFirst({ where: eq(memberProfile.userId, userId) });
-}
+/** A member's Connect profile (deduplicated per page render). */
+export const getMemberProfile = cache(async (userId: string) => getDb().query.memberProfile.findFirst({ where: eq(memberProfile.userId, userId) }));
 
 /**
  * A member's page as `viewerId` may see it. Blocked either way, removed or
@@ -180,7 +184,9 @@ export async function removeConnection(userId: string, otherId: string) {
   await getDb().delete(connection).where(and(eq(connection.userLow, p.userLow), eq(connection.userHigh, p.userHigh)));
 }
 
-export async function listInvitations(userId: string) {
+/** Pending invitations to me (deduplicated per page render: the nav badge and the page both ask). */
+export const listInvitations = cache(async (userId: string) => queryInvitations(userId));
+async function queryInvitations(userId: string) {
   return getDb()
     .select({ id: connection.id, fromUserId: connection.requestedBy, name: user.name, headline: memberProfile.headline, createdAt: connection.createdAt })
     .from(connection)

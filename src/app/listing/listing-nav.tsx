@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
 export function ListingNav({ base, pending, kind = "homestay" }: { base: string; pending: number; kind?: "homestay" | "hospital" }) {
@@ -21,10 +21,10 @@ export function ListingNav({ base, pending, kind = "homestay" }: { base: string;
       {items.map((i) => {
         const on = i.match(path);
         return (
-          <Link key={i.href} href={i.href} aria-current={on ? "page" : undefined} className={`flex min-h-10 items-center gap-2 rounded-lg px-3.5 ${on ? "bg-ink text-white" : "text-[#3d4842] hover:bg-white"}`}>
+          <IntentLink key={i.href} href={i.href} aria-current={on ? "page" : undefined} className={`flex min-h-10 items-center gap-2 rounded-lg px-3.5 ${on ? "bg-ink text-white" : "text-[#3d4842] hover:bg-white"}`}>
             {i.label}
             {i.badge ? <span className={`rounded-full px-2 text-xs ${on ? "bg-white text-ink" : "bg-[#f2c46d] text-ink"}`}>{i.badge}</span> : null}
-          </Link>
+          </IntentLink>
         );
       })}
     </nav>

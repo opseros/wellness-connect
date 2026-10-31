@@ -95,3 +95,13 @@ Read README.md for the product and setup. These rules are not optional.
 - Middleware is now `proxy.ts`. Route params are Promises: `const { id } = await ctx.params`.
 - Cache Components is OFF (see next.config.ts). Pages are dynamic; `getCurrentUser()`
   reads headers first so builds never touch the database.
+
+## Performance (navigation should feel instant)
+- Every section has a `loading.tsx` (see `src/components/skeleton.tsx`): it lets Next prefetch dynamic
+  pages and shows feedback immediately. Add one when you add a section.
+- Menu links use `IntentLink` (full prefetch on hover, touch or focus). Use it for navigation menus.
+- `staleTimes` keeps visited pages for 30 seconds. Every server action that changes data MUST call
+  `revalidatePath(...)` (any path clears the browser's page cache) before redirecting.
+- Reads used by layouts and pages are deduplicated per request with React `cache()` (current user,
+  memberships, own professional profile, Connect profile, invitations, blocks). Services that
+  change data read fresh (e.g. `findOwnProfile`), never through the cached helpers.

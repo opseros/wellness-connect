@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
 export function ProNav({ openEnquiries, profileId }: { openEnquiries: number; profileId: string }) {
@@ -17,7 +17,7 @@ export function ProNav({ openEnquiries, profileId }: { openEnquiries: number; pr
       {items.map((i) => {
         const active = i.match(path);
         return (
-          <Link
+          <IntentLink
             key={i.href}
             href={i.href}
             aria-current={active ? "page" : undefined}
@@ -25,10 +25,10 @@ export function ProNav({ openEnquiries, profileId }: { openEnquiries: number; pr
           >
             {i.label}
             {i.badge ? <span className={`rounded-full px-1.5 text-xs ${active ? "bg-white text-brand-dark" : "bg-[#f2c46d] text-ink"}`}>{i.badge}</span> : null}
-          </Link>
+          </IntentLink>
         );
       })}
-      <Link href={`/p/${profileId}`} className="ml-auto rounded-lg px-3.5 py-2.5 text-brand hover:underline">View public profile →</Link>
+      <IntentLink href={`/p/${profileId}`} className="ml-auto rounded-lg px-3.5 py-2.5 text-brand hover:underline">View public profile →</IntentLink>
     </nav>
   );
 }

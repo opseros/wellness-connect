@@ -19,6 +19,7 @@ export async function createCompanyAction(_: string | null, form: FormData): Pro
   } catch (e) {
     return e instanceof AppError ? e.message : "Enter a company name of at least 2 characters.";
   }
+  revalidatePath("/", "layout");
   redirect(`/company/${orgId}`);
 }
 
@@ -33,6 +34,7 @@ export async function startProfessionalAction(_: string | null, form: FormData):
   } catch {
     return "Check the details and try again.";
   }
+  revalidatePath("/", "layout");
   redirect("/pro");
 }
 
@@ -44,6 +46,7 @@ export async function saveConnectProfileAction(form: FormData) {
     city: String(form.get("city") ?? ""),
     topics,
   });
+  revalidatePath("/", "layout");
   redirect("/connect");
 }
 
@@ -68,5 +71,6 @@ export async function createListingAction(_: string | null, form: FormData): Pro
   } catch (e) {
     return e instanceof AppError ? e.message : e instanceof ZodError ? (e.issues[0]?.message ?? "Check the form") : "Something went wrong. Please try again.";
   }
+  revalidatePath("/", "layout");
   redirect(`/listing/${orgId}`);
 }

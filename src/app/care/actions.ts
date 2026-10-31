@@ -55,6 +55,7 @@ export async function createCareRequestAction(form: FormData) {
       note: str(form, "note"),
       hospitalIds: form.getAll("hospitalIds").map(String),
     });
+    revalidatePath("/", "layout");
     target = withMessage(`/care/requests/${r.id}`, "msg", "Sent. Hospitals usually reply within 2 working days; we'll email you. They don't see your name until you accept a quote.");
   } catch (e) {
     const q = new URLSearchParams(form.getAll("hospitalIds").map((h) => ["hospital", String(h)]));
@@ -76,6 +77,7 @@ export async function healthCheckAction(form: FormData) {
       note: str(form, "note"),
       hospitalIds: form.getAll("hospitalIds").map(String),
     });
+    revalidatePath("/", "layout");
     target = withMessage(`/care/requests/${r.id}`, "msg", "Sent to the hospitals. We'll email you when they reply.");
   } catch (e) {
     target = withMessage(`/company/${orgId}/health-checks`, "error", msgOf(e));

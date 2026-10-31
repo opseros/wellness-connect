@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { cache } from "react";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { invitation, organization, membership, user, type OrgRole } from "@/db/schema";
@@ -89,7 +90,13 @@ export async function requestJoinByDomain(userId: string, email: string) {
   });
 }
 
-export async function listMemberships(userId: string, db: Executor = getDb()) {
+/** A user's memberships. Without an executor, deduplicated per request (header, page and nav all ask). */
+export async function listMemberships(userId: string, db?: Executor) {
+  return db ? queryMemberships(userId, db) : membershipsForRender(userId);
+}
+const membershipsForRender = cache((userId: string) => queryMemberships(userId, getDb()));
+
+async function queryMemberships(userId: string, db: Executor) {
   return db
     .select({ membership, organization })
     .from(membership)

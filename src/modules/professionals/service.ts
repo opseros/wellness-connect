@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { cache } from "react";
 import { z } from "zod";
 import { category, credential, professionalCategory, professionalProfile, service, user } from "@/db/schema";
 import { getDb } from "@/db/client";
@@ -31,9 +32,13 @@ export async function upsertProfessionalProfile(userId: string, input: z.input<t
   });
 }
 
-export async function getOwnProfile(userId: string) {
+/** Always reads the database; services use this so a save never sees a stale profile. */
+function findOwnProfile(userId: string) {
   return getDb().query.professionalProfile.findFirst({ where: eq(professionalProfile.userId, userId) });
 }
+
+/** The user's own professional profile, deduplicated per page render (navigation, layouts and pages all ask). */
+export const getOwnProfile = cache(findOwnProfile);
 
 export const serviceInput = z
   .object({
@@ -49,7 +54,7 @@ export const serviceInput = z
 
 export async function addService(userId: string, input: z.input<typeof serviceInput>) {
   const d = serviceInput.parse(input);
-  const p = await getOwnProfile(userId);
+  const p = await findOwnProfile(userId);
   if (!p) throw badRequest("Create your professional profile first");
   const [row] = await getDb()
     .insert(service)
@@ -77,7 +82,7 @@ export const credentialInput = z.object({
 /** Adds a credential for review and marks the profile as pending verification. */
 export async function submitCredential(userId: string, input: z.input<typeof credentialInput>) {
   const d = credentialInput.parse(input);
-  const p = await getOwnProfile(userId);
+  const p = await findOwnProfile(userId);
   if (!p) throw badRequest("Create your professional profile first");
   return getDb().transaction(async (tx) => {
     const [row] = await tx.insert(credential).values({ profileId: p.id, ...d }).returning();
@@ -121,7 +126,7 @@ export async function reviewCredential(reviewerId: string, credentialId: string,
 // ---------- M2: the professional's own workspace ----------
 
 async function requireOwnProfile(userId: string) {
-  const p = await getOwnProfile(userId);
+  const p = await findOwnProfile(userId);
   if (!p) throw badRequest("Create your professional profile first");
   return p;
 }
@@ -136,7 +141,7 @@ export async function getOwnCategoryIds(profileId: string) {
 }
 
 export async function listOwnServices(userId: string) {
-  const p = await getOwnProfile(userId);
+  const p = await findOwnProfile(userId);
   if (!p) return [];
   return getDb()
     .select({ service, categoryName: category.name })
@@ -192,7 +197,7 @@ export async function setDiscoverable(userId: string, discoverable: boolean) {
 }
 
 export async function listOwnCredentials(userId: string) {
-  const p = await getOwnProfile(userId);
+  const p = await findOwnProfile(userId);
   if (!p) return [];
   // The document path is internal; the professional sees status and notes.
   return getDb()
@@ -270,7 +275,7 @@ export function profileChecklist(input: {
 }
 
 export async function getProDashboard(userId: string) {
-  const p = await getOwnProfile(userId);
+  const p = await findOwnProfile(userId);
   if (!p) return null;
   const db = getDb();
   const [cats, services, creds] = await Promise.all([

@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
 export function ConnectNav({ badges, professional }: { badges: { invites: number; unread: number; referrals: number }; professional: boolean }) {
@@ -18,7 +18,7 @@ export function ConnectNav({ badges, professional }: { badges: { invites: number
       {items.map((i) => {
         const active = i.match(path);
         return (
-          <Link
+          <IntentLink
             key={i.href}
             href={i.href}
             aria-current={active ? "page" : undefined}
@@ -26,7 +26,7 @@ export function ConnectNav({ badges, professional }: { badges: { invites: number
           >
             {i.label}
             {i.badge ? <span className={`rounded-full px-2 text-xs ${active ? "bg-white text-brand-dark" : "bg-[#f2c46d] text-ink"}`}>{i.badge}</span> : null}
-          </Link>
+          </IntentLink>
         );
       })}
     </nav>

@@ -26,6 +26,7 @@ export async function requestStayAction(form: FormData) {
       billingName: str(form, "billingName"),
       billingGstin: str(form, "billingGstin"),
     });
+    revalidatePath("/", "layout");
     target = withMessage(`/stays/${s.id}`, "msg", "Request sent. The host has 48 hours to answer; you'll get an email. You won't be charged until they accept and you pay.");
   } catch (e) {
     if (!(e instanceof AppError) && !(e instanceof ZodError)) console.error(e);

@@ -131,6 +131,12 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
 - Signed-in home (`/app`): "Use" (Connect, book a stay, Care & Travel) and "Offer" (professional profile, company, homestay or hospital you run).
 - Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect (feed, network, member pages, messages, groups and spaces, meet-ups, referrals) and profile setup, Join as, homestay/hospital workspace, directories.
 
+## Performance
+
+- Loading screens in every section; menu links prefetch the full page on hover/touch/focus; recently visited pages are reused for 30 seconds (cleared by any save).
+- Repeated reads within one page load (session, memberships, profiles, invitations) run once.
+- Vercel functions run in `sin1`, next to Neon in Singapore (see `vercel.json`). On Neon's Free plan the database suspends after 5 idle minutes and takes a few hundred milliseconds to wake; a paid plan can turn scale to zero off.
+
 ## Admin portal (`/admin`)
 
 Only `super_admin` and `ops` users with two-factor on can open it; everyone else gets a 404.

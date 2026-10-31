@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { IntentLink } from "./intent-link";
 import { BRAND } from "@/lib/brand";
 
 export function Logo({ href = "/", light = false }: { href?: string; light?: boolean }) {
@@ -24,13 +25,13 @@ export function AppHeader({ name, nav }: { name: string; nav: { href: string; la
       <Logo href="/app" />
       <nav aria-label="Main" className="flex flex-wrap gap-1 text-sm font-semibold">
         {nav.map((n) => (
-          <Link
+          <IntentLink
             key={n.href}
             href={n.href}
             className={`rounded-lg px-3.5 py-2.5 ${n.active ? "bg-brand-soft text-brand-dark" : "text-[#3d4842] hover:bg-ground"}`}
           >
             {n.label}
-          </Link>
+          </IntentLink>
         ))}
       </nav>
       <div className="flex items-center gap-3 text-sm">

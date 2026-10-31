@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { headers } from "next/headers";
 import { getAuth } from "@/lib/auth";
 import { forbidden, unauthorized } from "@/lib/errors";
@@ -13,10 +14,19 @@ export type CurrentUser = {
   sessionId: string;
 };
 
+/**
+ * The signed-in user. Inside a page render the lookup runs once per request,
+ * however many layouts and components ask (React cache).
+ */
 export async function getCurrentUser(reqHeaders?: Headers): Promise<CurrentUser | null> {
-  // Read the request headers BEFORE touching auth/db: that marks the page as
-  // dynamic, so `next build` never tries to prerender it against a database.
-  const h = reqHeaders ?? (await headers());
+  return reqHeaders ? loadUser(reqHeaders) : currentUserForRender();
+}
+
+// Read the request headers BEFORE touching auth/db: that marks the page as
+// dynamic, so `next build` never tries to prerender it against a database.
+const currentUserForRender = cache(async () => loadUser(await headers()));
+
+async function loadUser(h: Headers): Promise<CurrentUser | null> {
   const session = await getAuth().api.getSession({ headers: h });
   if (!session) return null;
   const u = session.user as typeof session.user & { platformRole?: string; twoFactorEnabled?: boolean | null };
