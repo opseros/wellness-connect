@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { FeedCollage, LandingHeader, SpaceIcon, SPACES } from "@/components/landing";
 import { JoinHero } from "@/components/join-hero";
 import { HeroPhotos } from "@/components/hero-photos";
+import { AlsoOn } from "@/components/also-on";
 import { BRAND } from "@/lib/brand";
 import { enabledProviders } from "@/lib/providers";
 import { getCurrentUser } from "@/modules/identity/session";
 import { countVerifiedProfessionals } from "@/modules/professionals/service";
 import { careTravelEnabled } from "@/modules/care/service";
+import { directoryCounts } from "@/modules/listings/service";
 
 const tile: Record<string, string> = {
   wellness: "bg-wellness text-wellness-ink",
@@ -36,7 +38,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
   const { reset, next, as } = await searchParams;
   if (user) redirect(next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/app");
   const returning = Boolean(reset || next);
-  const verified = await countVerifiedProfessionals();
+  const [verified, counts] = await Promise.all([countVerifiedProfessionals(), directoryCounts()]);
   const care = careTravelEnabled();
 
   return (
@@ -125,29 +127,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
         </div>
       </section>
 
-      <section id="more" aria-labelledby="more-h" className="mx-auto max-w-[1200px] scroll-mt-6 px-4 py-16 sm:px-8 sm:py-20">
-        <h2 id="more-h" className="max-w-[640px] font-display text-[30px] leading-tight font-extrabold tracking-[-0.02em]">Also on {BRAND.name}</h2>
-        <p className="mt-2 max-w-[640px] text-[16px] text-[#3d4842]">Organisations that look after people join with the same account. Each is verified by our team before it appears.</p>
-        <div className="mt-8 grid gap-x-10 gap-y-8 md:grid-cols-3">
-          {[
-            { t: "Companies", d: "Post what your teams need, compare proposals from verified professionals, and book and pay with GST invoices.", links: [{ l: "Set up your company", h: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dcompany" }] },
-            { t: "Homestays", d: "Host guests who come to rest, recover or hold a team retreat. Calendar, booking requests and payouts included.", links: [{ l: "List your homestay", h: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dhomestay" }, { l: "Browse homestays", h: "/homestays" }] },
-            {
-              t: "Hospitals",
-              d: care ? "Welcome patients who travel for care: treatment packages, quote requests and recovery stays nearby." : "Welcome patients who travel for care. Treatment packages are live; quote requests open soon.",
-              links: [{ l: "Register your hospital", h: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dhospital" }, { l: "Browse hospitals", h: "/hospitals" }],
-            },
-          ].map((x) => (
-            <div key={x.t} className="flex flex-col gap-3 border-t-2 border-ink pt-5">
-              <h3 className="text-[19px] font-bold">{x.t}</h3>
-              <p className="text-[15px] leading-relaxed text-[#3d4842]">{x.d}</p>
-              <span className="mt-auto flex flex-wrap gap-x-5 gap-y-1 text-[14.5px] font-semibold">
-                {x.links.map((k) => <Link key={k.l} href={k.h} className="text-brand underline-offset-4 hover:underline">{k.l}</Link>)}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <AlsoOn care={care} counts={counts} />
 
       <section className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-8 sm:pb-20">
         <div className="flex flex-wrap items-center justify-between gap-6 rounded-[28px] bg-brand p-8 text-white sm:p-12">
