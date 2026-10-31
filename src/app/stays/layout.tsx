@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: { default: "My stays", template: "%s 
 
 export default async function StaysLayout({ children }: { children: React.ReactNode }) {
   const me = await getCurrentUser();
-  if (!me) redirect("/?next=/stays");
+  if (!me) redirect("/sign-in?next=/stays");
   if (!me.emailVerified) redirect(`/check-email?email=${encodeURIComponent(me.email)}`);
   return (
     <div>

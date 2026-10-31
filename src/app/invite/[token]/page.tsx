@@ -31,7 +31,7 @@ export default async function Invite({ params, searchParams }: { params: Promise
       <AuthShell title={title} subtitle={subtitle}>
         <p className="text-[15px]">This invitation is for <span className="font-semibold">{inv.email}</span>. Sign in or create an account with that email to accept it.</p>
         <div className="flex flex-col gap-2">
-          <Link href={`/?next=${encodeURIComponent(here)}`} className="btn-primary">Sign in</Link>
+          <Link href={`/sign-in?next=${encodeURIComponent(here)}`} className="btn-primary">Sign in</Link>
           <Link href={`/sign-up?email=${encodeURIComponent(inv.email)}&next=${encodeURIComponent(here)}`} className="btn-outline">Create an account</Link>
         </div>
       </AuthShell>

@@ -116,7 +116,7 @@ export function FeedCollage() {
 }
 
 export function LandingHeader({ home = true, signedIn = false }: { home?: boolean; signedIn?: boolean }) {
-  const dir = "rounded-lg px-3 py-2 text-ink hover:bg-white";
+  const link = "shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-ink hover:bg-white";
   return (
     <header className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 sm:px-8">
       <Link href="/" aria-label={`${BRAND.name}, ${BRAND.tagline}`} className="flex items-center gap-2.5">
@@ -126,18 +126,18 @@ export function LandingHeader({ home = true, signedIn = false }: { home?: boolea
           <span className="mt-1 text-[11px] font-semibold text-muted">{BRAND.tagline}</span>
         </span>
       </Link>
-      <nav aria-label="Directories" className="order-last flex w-full gap-1 overflow-x-auto text-sm font-semibold md:order-none md:w-auto">
-        <Link href="/professionals" className={dir}>Professionals</Link>
-        <Link href="/homestays" className={dir}>Homestays</Link>
-        <Link href="/hospitals" className={dir}>Hospitals</Link>
+      <nav aria-label="Explore" className="order-last flex w-full gap-1 overflow-x-auto text-sm font-semibold md:order-none md:w-auto">
+        <Link href="/professionals" className={link}>Find professionals</Link>
+        <a href={home ? "#spaces" : "/#spaces"} className={link}>Spaces</a>
+        <a href={home ? "#more" : "/#more"} className={link}>For organisations</a>
       </nav>
-      <nav aria-label="Get started" className="flex items-center gap-2 text-sm font-semibold">
+      <nav aria-label="Account" className="flex items-center gap-2 text-sm font-semibold">
         {signedIn ? (
           <Link href="/app" className="rounded-full bg-ink px-4 py-2.5 text-white hover:bg-brand-dark">Open {BRAND.name}</Link>
         ) : (
           <>
-            <a href={home ? "#sign-in" : "/#sign-in"} className="hidden rounded-lg px-3 py-2 text-ink hover:bg-white sm:inline-block">Sign in</a>
-            <Link href="/sign-up" className="rounded-full bg-ink px-4 py-2.5 text-white hover:bg-brand-dark">Join free</Link>
+            <Link href="/sign-in" className="rounded-lg px-3 py-2 text-ink hover:bg-white">Sign in</Link>
+            <Link href={home ? "#join" : "/sign-up"} className="rounded-full bg-ink px-4 py-2.5 text-white hover:bg-brand-dark">Join free</Link>
           </>
         )}
       </nav>

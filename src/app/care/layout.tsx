@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: { default: "Care & Travel", template:
 
 export default async function CareLayout({ children }: { children: React.ReactNode }) {
   const me = await getCurrentUser();
-  if (!me) redirect("/?next=/care/requests");
+  if (!me) redirect("/sign-in?next=/care/requests");
   if (!me.emailVerified) redirect(`/check-email?email=${encodeURIComponent(me.email)}`);
   return (
     <div>

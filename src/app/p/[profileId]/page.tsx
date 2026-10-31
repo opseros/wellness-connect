@@ -20,7 +20,7 @@ export const metadata: Metadata = { title: "Professional profile", robots: { ind
 export default async function PublicProfile({ params, searchParams }: { params: Promise<{ profileId: string }>; searchParams: Promise<{ msg?: string; error?: string }> }) {
   const me = await getCurrentUser();
   const { profileId } = await params;
-  if (!me) redirect(`/?next=/p/${profileId}`);
+  if (!me) redirect(`/sign-in?next=/p/${profileId}`);
   if (!me.emailVerified) redirect("/check-email");
   const sp = await searchParams;
   const d = await getPublicProfile(me.id, profileId).catch((e) => {

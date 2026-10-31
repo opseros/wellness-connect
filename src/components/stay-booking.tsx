@@ -70,7 +70,7 @@ export async function StayBooking({ orgId, slug, sp, minNights, maxRooms }: { or
               <p className="text-[12px] text-muted">You won&apos;t be charged now. If the host accepts, you&apos;ll have 48 hours to pay.</p>
             </form>
           ) : (
-            <Link href={`/?next=${encodeURIComponent(back)}`} className="btn-primary">Sign in to request</Link>
+            <Link href={`/sign-in?next=${encodeURIComponent(back)}`} className="btn-primary">Sign in to request</Link>
           )}
         </>
       )}

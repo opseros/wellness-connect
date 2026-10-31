@@ -7,14 +7,13 @@ import { authClient } from "@/lib/auth-client";
 export type Providers = { google: boolean; microsoft: boolean };
 
 /** Where to go after signing in: a same-site path from ?next=, otherwise /app. */
-function useNext() {
-  const n = useSearchParams().get("next") ?? "";
+function useNext(override?: string) {
+  const n = useSearchParams().get("next") ?? override ?? "";
   return n.startsWith("/") && !n.startsWith("//") && !n.startsWith("/\\") ? n : "/app";
 }
 
-function SocialButtons({ providers }: { providers: Providers }) {
+function SocialButtons({ providers, next }: { providers: Providers; next: string }) {
   const [busy, setBusy] = useState<string | null>(null);
-  const next = useNext();
   if (!providers.google && !providers.microsoft) return null;
   const go = async (provider: "google" | "microsoft") => {
     setBusy(provider);
@@ -51,9 +50,10 @@ function ErrorText({ message }: { message: string | null }) {
   );
 }
 
-export function SignInForm({ providers }: { providers: Providers }) {
+/** `next`: where to go afterwards (a ?next= in the URL wins). `onSwitch`: show "create an account" as a button (tabbed panels). */
+export function SignInForm({ providers, next: preferred, onSwitch }: { providers: Providers; next?: string; onSwitch?: () => void }) {
   const router = useRouter();
-  const next = useNext();
+  const next = useNext(preferred);
   const [error, setError] = useState<string | null>(null);
   const [unverified, setUnverified] = useState(false);
   const [pending, setPending] = useState(false);
@@ -81,7 +81,7 @@ export function SignInForm({ providers }: { providers: Providers }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <SocialButtons providers={providers} />
+      <SocialButtons providers={providers} next={next} />
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="email" className="label">Email</label>
@@ -99,15 +99,20 @@ export function SignInForm({ providers }: { providers: Providers }) {
         <button className="btn-primary w-full" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>
       </form>
       <p className="text-center text-sm text-muted">
-        New here? <Link href={next === "/app" ? "/sign-up" : `/sign-up?next=${encodeURIComponent(next)}`} className="font-semibold text-brand hover:underline">Create an account</Link>
+        New here?{" "}
+        {onSwitch ? (
+          <button type="button" onClick={onSwitch} className="font-semibold text-brand hover:underline">Create an account</button>
+        ) : (
+          <Link href={next === "/app" ? "/sign-up" : `/sign-up?next=${encodeURIComponent(next)}`} className="font-semibold text-brand hover:underline">Create an account</Link>
+        )}
       </p>
     </div>
   );
 }
 
-export function SignUpForm({ providers }: { providers: Providers }) {
+export function SignUpForm({ providers, next: preferred, onSwitch }: { providers: Providers; next?: string; onSwitch?: () => void }) {
   const router = useRouter();
-  const next = useNext();
+  const next = useNext(preferred);
   const presetEmail = useSearchParams().get("email") ?? "";
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -136,7 +141,7 @@ export function SignUpForm({ providers }: { providers: Providers }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <SocialButtons providers={providers} />
+      <SocialButtons providers={providers} next={next} />
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="name" className="label">Full name</label>
@@ -144,7 +149,8 @@ export function SignUpForm({ providers }: { providers: Providers }) {
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="email" className="label">Email</label>
-          <input id="email" name="email" type="email" autoComplete="email" required defaultValue={presetEmail} className="input" placeholder="Use your work email to join your company" />
+          <input id="email" name="email" type="email" autoComplete="email" required defaultValue={presetEmail} className="input" placeholder="you@company.com" />
+          <span className="text-[12.5px] text-muted">A work email links you to your company if it&apos;s on Moosam.</span>
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="password" className="label">Password</label>
@@ -154,7 +160,12 @@ export function SignUpForm({ providers }: { providers: Providers }) {
         <button className="btn-primary w-full" disabled={pending}>{pending ? "Creating account…" : "Create account"}</button>
       </form>
       <p className="text-center text-sm text-muted">
-        Already have an account? <Link href={next === "/app" ? "/" : `/?next=${encodeURIComponent(next)}`} className="font-semibold text-brand hover:underline">Sign in</Link>
+        Already have an account?{" "}
+        {onSwitch ? (
+          <button type="button" onClick={onSwitch} className="font-semibold text-brand hover:underline">Sign in</button>
+        ) : (
+          <Link href={next === "/app" ? "/sign-in" : `/sign-in?next=${encodeURIComponent(next)}`} className="font-semibold text-brand hover:underline">Sign in</Link>
+        )}
       </p>
     </div>
   );
@@ -200,7 +211,7 @@ export function ResetPasswordForm() {
     const { error } = await authClient.resetPassword({ newPassword, token });
     setPending(false);
     if (error) return setError("This link is invalid or has expired. Request a new one.");
-    router.push("/?reset=1");
+    router.push("/sign-in?reset=1");
   }
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">

@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: { default: "Connect", template: "%s Â
 
 export default async function ConnectLayout({ children }: { children: React.ReactNode }) {
   const me = await getCurrentUser();
-  if (!me) redirect("/?next=/connect");
+  if (!me) redirect("/sign-in?next=/connect");
   if (!me.emailVerified) redirect(`/check-email?email=${encodeURIComponent(me.email)}`);
   const [nav, badges] = await Promise.all([navOptions(me.id), connectBadges(me.id)]);
   return (
