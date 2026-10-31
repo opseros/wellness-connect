@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 
-type SpaceKey = "wellness" | "travel" | "meetup" | "move" | "food" | "career";
+export type SpaceKey = "wellness" | "travel" | "meetup" | "move" | "food" | "career";
 
 export const SPACES: { key: SpaceKey; name: string; line: string; prompt: string }[] = [
   { key: "wellness", name: "Wellness & mindfulness", line: "Breathwork, sleep, stress and the small habits that actually stick.", prompt: "What's your 5-minute reset between meetings?" },
@@ -14,6 +14,14 @@ export const SPACES: { key: SpaceKey; name: string; line: string; prompt: string
   { key: "career", name: "Careers & mentoring", line: "Burnout, boundaries, growth and finding a mentor.", prompt: "How do you say no to a meeting without guilt?" },
 ];
 
+export const SPACE_TINT: Record<SpaceKey, string> = {
+  wellness: "bg-wellness text-wellness-ink",
+  travel: "bg-travel text-travel-ink",
+  meetup: "bg-meetup text-meetup-ink",
+  move: "bg-move text-move-ink",
+  food: "bg-food text-food-ink",
+  career: "bg-career text-career-ink",
+};
 const tint: Record<SpaceKey, string> = {
   wellness: "bg-wellness text-wellness-ink",
   travel: "bg-travel text-travel-ink",

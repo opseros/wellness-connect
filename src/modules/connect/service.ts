@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, asc, desc, eq, gte, inArray, isNull, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, ne, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
   block,
@@ -376,6 +376,7 @@ function postColumns(viewerId: string) {
     groupId: post.groupId,
     groupName: sql<string | null>`(select g.name from ${group} g where g.id = ${post.groupId})`,
     groupSlug: sql<string | null>`(select g.slug from ${group} g where g.id = ${post.groupId})`,
+    spaceKey: sql<string | null>`(select g.space_key from ${group} g where g.id = ${post.groupId})`,
     eventAt: post.eventAt,
     eventPlace: post.eventPlace,
     eventCity: post.eventCity,
@@ -391,19 +392,100 @@ function postColumns(viewerId: string) {
   };
 }
 
-/** Yours, your connections', people you follow, and your groups' posts, newest first. */
-export async function getFeed(userId: string, limit = 30) {
+export const FEED_FILTERS = ["all", "connections", "spaces", "meetups"] as const;
+export type FeedFilter = (typeof FEED_FILTERS)[number];
+
+export const feedQuery = z.object({
+  show: z.enum(FEED_FILTERS).catch("all").default("all"),
+  // Cursor: only posts older than this (the last post's createdAt on the previous page).
+  before: z.string().datetime({ offset: true }).optional().catch(undefined),
+  limit: z.coerce.number().int().min(1).max(100).catch(30).default(30),
+});
+
+/**
+ * Yours, your connections', people you follow, and your groups' posts, newest first.
+ * `show` narrows it: people only (posts outside groups), your groups and spaces only,
+ * or meet-ups only. Page with `before`.
+ */
+export async function getFeed(userId: string, opts: number | z.input<typeof feedQuery> = {}) {
+  const q = feedQuery.parse(typeof opts === "number" ? { limit: opts } : opts);
   const ctx = await viewerContext(userId);
   const authors = [userId, ...ctx.friends, ...ctx.followed];
-  const scope = or(inArray(post.authorId, authors), ctx.groups.length ? inArray(post.groupId, ctx.groups) : sql`false`);
+  const inGroups = ctx.groups.length ? inArray(post.groupId, ctx.groups) : sql`false`;
+  const scope =
+    q.show === "connections"
+      ? and(inArray(post.authorId, authors), isNull(post.groupId))
+      : q.show === "spaces"
+        ? inGroups
+        : or(inArray(post.authorId, authors), inGroups);
   return getDb()
     .select(postColumns(userId))
     .from(post)
     .innerJoin(user, eq(user.id, post.authorId))
     .leftJoin(memberProfile, eq(memberProfile.userId, post.authorId))
-    .where(and(scope, visiblePostsFor(userId, ctx.blocked, ctx.friends, ctx.groups)))
+    .where(
+      and(
+        scope,
+        q.show === "meetups" ? eq(post.kind, "meetup") : undefined,
+        q.before ? lt(post.createdAt, new Date(q.before)) : undefined,
+        visiblePostsFor(userId, ctx.blocked, ctx.friends, ctx.groups),
+      ),
+    )
     .orderBy(desc(post.createdAt))
-    .limit(Math.min(limit, 100));
+    .limit(q.limit);
+}
+
+/** One post the viewer may see (its own page, for links and the full comment thread). */
+export async function getPost(viewerId: string, postId: string) {
+  await requireVisiblePost(viewerId, postId);
+  const [row] = await getDb()
+    .select(postColumns(viewerId))
+    .from(post)
+    .innerJoin(user, eq(user.id, post.authorId))
+    .leftJoin(memberProfile, eq(memberProfile.userId, post.authorId))
+    .where(eq(post.id, postId));
+  if (!row) throw notFound("Post not found");
+  return row;
+}
+
+/**
+ * Your Connect at a glance: counts for the profile card and the getting-started
+ * checklist (profile, interests, a space, three connections, a first post).
+ */
+export const connectSnapshot = cache(async (userId: string) => {
+  const db = getDb();
+  const [profile, friends, [groups], [posts]] = await Promise.all([
+    getMemberProfile(userId),
+    connectionIds(userId),
+    db.select({ n: count() }).from(groupMember).where(and(eq(groupMember.userId, userId), eq(groupMember.status, "active"))),
+    db.select({ n: count() }).from(post).where(and(eq(post.authorId, userId), isNull(post.deletedAt))),
+  ]);
+  const steps = [
+    { key: "profile", label: "Add a headline and your city", done: Boolean(profile?.headline && profile?.city), href: "/connect/setup" },
+    { key: "interests", label: "Pick a few interests", done: (profile?.topics.length ?? 0) > 0, href: "/connect/setup" },
+    { key: "space", label: "Join a space", done: groups.n > 0, href: "/connect/groups" },
+    { key: "people", label: "Connect with 3 people", done: friends.length >= 3, href: "/connect/network" },
+    { key: "post", label: "Say hello in your first post", done: posts.n > 0, href: "/connect#compose" },
+  ];
+  return {
+    headline: profile?.headline ?? "",
+    city: profile?.city ?? "",
+    connections: friends.length,
+    groups: groups.n,
+    posts: posts.n,
+    steps,
+    done: steps.filter((st) => st.done).length,
+  };
+});
+
+/** Groups you can post in (active member), for the composer's "Post to" choice. */
+export async function postableGroups(userId: string) {
+  return getDb()
+    .select({ id: group.id, name: group.name, kind: group.kind })
+    .from(groupMember)
+    .innerJoin(group, eq(group.id, groupMember.groupId))
+    .where(and(eq(groupMember.userId, userId), eq(groupMember.status, "active"), isNull(group.archivedAt)))
+    .orderBy(desc(sql`${group.kind} = 'space'`), asc(group.name));
 }
 
 async function listMemberPosts(viewerId: string, memberId: string) {

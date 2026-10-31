@@ -53,11 +53,6 @@ async function run(to: string, ok: string | null, fn: () => Promise<unknown>, su
   redirect(target);
 }
 
-export async function postAction(form: FormData) {
-  const me = await requireUser();
-  await run(back(form), null, () => createPost(me.id, { body: str(form, "body"), groupId: str(form, "groupId") || undefined }));
-}
-
 export async function meetupAction(form: FormData) {
   const me = await requireUser();
   const date = str(form, "date");
@@ -72,21 +67,6 @@ export async function meetupAction(form: FormData) {
       groupId: str(form, "groupId") || undefined,
     }),
   );
-}
-
-export async function likeAction(form: FormData) {
-  const me = await requireUser();
-  await run(back(form), null, () => toggleLike(me.id, str(form, "postId")));
-}
-
-export async function rsvpAction(form: FormData) {
-  const me = await requireUser();
-  await run(back(form), null, () => toggleRsvp(me.id, str(form, "postId")));
-}
-
-export async function commentAction(form: FormData) {
-  const me = await requireUser();
-  await run(back(form), null, () => addComment(me.id, str(form, "postId"), { body: str(form, "body") }));
 }
 
 export async function deletePostAction(form: FormData) {
@@ -196,4 +176,39 @@ export async function referralUpdateAction(form: FormData) {
   const status = str(form, "status") as "accepted" | "declined" | "completed" | "withdrawn";
   const labels = { accepted: "Accepted. Contact the professional to take it forward.", declined: "Declined.", completed: "Marked as completed.", withdrawn: "Referral withdrawn." };
   await run("/connect/referrals", labels[status] ?? "Updated.", () => updateReferral(me.id, str(form, "referralId"), { status, note: str(form, "note") }));
+}
+
+// ---------- In-place actions (no page reload or scroll jump) ----------
+// Used by the feed's buttons; they refresh the page data and return an error message if any.
+
+async function inline(fn: () => Promise<unknown>): Promise<{ error?: string }> {
+  try {
+    await fn();
+    revalidatePath("/connect", "layout");
+    return {};
+  } catch (e) {
+    if (!(e instanceof AppError) && !(e instanceof ZodError)) console.error(e);
+    return { error: e instanceof AppError ? e.message : e instanceof ZodError ? (e.issues[0]?.message ?? "Check the form") : "Something went wrong. Please try again." };
+  }
+}
+
+export async function toggleLikeInline(postId: string) {
+  const me = await requireUser();
+  return inline(() => toggleLike(me.id, postId));
+}
+
+export async function toggleRsvpInline(postId: string) {
+  const me = await requireUser();
+  return inline(() => toggleRsvp(me.id, postId));
+}
+
+export async function addCommentInline(postId: string, body: string) {
+  const me = await requireUser();
+  return inline(() => addComment(me.id, postId, { body }));
+}
+
+/** Composer: posts in place so the box can clear itself and show errors next to it. */
+export async function postInline(form: FormData) {
+  const me = await requireUser();
+  return inline(() => createPost(me.id, { body: str(form, "body"), groupId: str(form, "groupId") || undefined }));
 }
