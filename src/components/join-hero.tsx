@@ -27,6 +27,7 @@ export function JoinHero({ providers, initialMode, initialRole = "member", photo
           {c.title}
         </h1>
         <p className="max-w-[540px] text-[17.5px] leading-relaxed text-[#3d4842]">{c.body}</p>
+        {photos}
         <ul className="flex flex-wrap gap-2">
           {c.points.map((p) => (
             <li key={p} className="flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-[14px] font-semibold ring-1 ring-line">
@@ -35,7 +36,6 @@ export function JoinHero({ providers, initialMode, initialRole = "member", photo
             </li>
           ))}
         </ul>
-        {photos}
       </div>
       <div id="join" className={`scroll-mt-6 rounded-[28px] border border-line bg-white p-6 shadow-[0_30px_60px_-40px_rgba(24,33,29,0.35)] sm:p-8 ${initialMode === "signin" ? "order-first lg:order-none" : ""}`}>
         <JoinPanel providers={providers} initialMode={initialMode} initialRole={initialRole} onRoleChange={setRole} />
