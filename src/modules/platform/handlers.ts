@@ -1,9 +1,10 @@
 // Outbox event handlers. Imported once by the cron route.
 import { and, eq } from "drizzle-orm";
-import { credential, enquiry, professionalProfile, proposal, user } from "@/db/schema";
+import { credential, enquiry, invoice, organization, professionalProfile, proposal, user } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { registerOutboxHandler } from "./outbox";
 import { orgAdminEmails } from "@/modules/organizations/service";
+import { sendRefundToRazorpay } from "@/modules/marketplace/payments";
 import { BRAND } from "@/lib/brand";
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -111,6 +112,62 @@ registerOutboxHandler("booking.cancelled", async (tx, p) => {
     "A booking was cancelled",
     `A company cancelled your session${p.late ? " inside your free-cancellation window" : ""}.\n\nReason: ${p.reason}\n\n${appUrl()}/pro/proposals`,
   );
+});
+
+const rupees = (paise: unknown) => `₹${(Number(paise) / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** Company money emails go to owners/admins, the person who asked, and the billing address. */
+async function companyRecipients(tx: Parameters<Parameters<typeof registerOutboxHandler>[1]>[0], orgId: unknown, extraUserId?: unknown) {
+  const set = new Set(await orgAdminEmails(String(orgId), tx));
+  const org = await tx.query.organization.findFirst({ where: eq(organization.id, String(orgId)) });
+  if (org?.billingEmail) set.add(org.billingEmail);
+  if (extraUserId) {
+    const u = await tx.query.user.findFirst({ where: eq(user.id, String(extraUserId)) });
+    if (u && !u.deletedAt) set.add(u.email);
+  }
+  return [...set];
+}
+
+registerOutboxHandler("invoice.issued", async (tx, p) => {
+  const inv = await tx.query.invoice.findFirst({ where: eq(invoice.id, String(p.invoiceId)) });
+  if (!inv) return;
+  for (const to of await companyRecipients(tx, p.orgId, p.requestedBy)) {
+    await sendEmail({
+      to,
+      subject: `Invoice ${inv.number} for ${rupees(inv.totalPaise)}`,
+      text: `Your tax invoice ${inv.number} for ${rupees(inv.totalPaise)} is ready${inv.dueAt ? `, due ${new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(inv.dueAt)}` : ""}. The bank details are on the invoice.\n\n${appUrl()}/company/${p.orgId}/invoices/${inv.id}`,
+    });
+  }
+});
+
+registerOutboxHandler("payment.received", async (tx, p) => {
+  const inv = await tx.query.invoice.findFirst({ where: eq(invoice.id, String(p.invoiceId)) });
+  for (const to of await companyRecipients(tx, p.orgId)) {
+    await sendEmail({
+      to,
+      subject: `Payment received${inv ? ` (invoice ${inv.number})` : ""}`,
+      text: `Thank you. We've received ${inv ? rupees(inv.totalPaise) : "your payment"} and your booking is confirmed.\n\nInvoice: ${appUrl()}/company/${p.orgId}/invoices/${p.invoiceId}\nBooking: ${appUrl()}/company/${p.orgId}/bookings/${p.bookingId}`,
+    });
+  }
+  await emailPro(tx, p.professionalUserId, "Booking confirmed and paid", `The company has paid for your booking. Your share is now due to you and will be transferred after the session.\n\n${appUrl()}/pro/proposals`);
+});
+
+registerOutboxHandler("refund.requested", async (tx, p) => {
+  await sendRefundToRazorpay(tx, String(p.refundId));
+});
+
+registerOutboxHandler("refund.processed", async (tx, p) => {
+  for (const to of await companyRecipients(tx, p.orgId)) {
+    await sendEmail({
+      to,
+      subject: `Refund of ${rupees(p.amountPaise)} processed`,
+      text: `We've refunded ${rupees(p.amountPaise)} for your cancelled booking. Card and UPI refunds usually reach you in 5–7 working days. A credit note is in your invoices.\n\n${appUrl()}/company/${p.orgId}/bookings/${p.bookingId}`,
+    });
+  }
+});
+
+registerOutboxHandler("payout.recorded", async (tx, p) => {
+  await emailPro(tx, p.professionalUserId, `Payout of ${rupees(p.amountPaise)} sent`, `We've sent ${rupees(p.amountPaise)} to your bank account. It can take a working day to appear.\n\n${appUrl()}/pro/proposals`);
 });
 
 export {};

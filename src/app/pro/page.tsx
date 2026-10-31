@@ -26,8 +26,8 @@ export default async function ProOverview({ searchParams }: { searchParams: Prom
       <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
         <Stat label="Verification" value={<Badge status={dash.profile.verificationStatus} />} note={statusCopy[dash.profile.verificationStatus]} />
         <Stat label="Enquiries waiting" value={String(newEnquiries.length)} note={<Link href="/pro/enquiries" className="font-semibold text-brand hover:underline">Open inbox →</Link>} />
-        <Stat label="Upcoming bookings" value={formatPaise(earnings.upcomingPaise)} note={`${earnings.bookingCount} booking${earnings.bookingCount === 1 ? "" : "s"} in total`} />
-        <Stat label="Completed work" value={formatPaise(earnings.completedPaise)} note="Agreed fees. Payouts start when payments go live." />
+        <Stat label="Due to you" value={formatPaise(earnings.duePaise)} note={`${formatPaise(earnings.paidOutPaise)} paid out so far`} />
+        <Stat label="Awaiting company payment" value={formatPaise(earnings.awaitingPaymentPaise)} note={`${earnings.bookingCount} booking${earnings.bookingCount === 1 ? "" : "s"} in total`} />
       </div>
 
       <section className="card flex flex-col gap-4 p-6">

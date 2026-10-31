@@ -24,7 +24,8 @@ Read README.md for the product and setup. These rules are not optional.
   `ledger_entry`) have Postgres row-level security with FORCE. Every query on them MUST
   run inside `withScope({ userId, orgId }, tx => ...)` from `@/db/client`.
   Never call `getDb()` directly for those tables.
-- `bypass: true` is only for the outbox worker and audited platform-staff actions.
+- `bypass: true` is only for the outbox worker, verified payment webhooks and audited
+  platform-staff actions.
 - Always check roles with `requireOrgRole(...)` inside the same scoped transaction.
   RLS is the safety net, not the only check.
 - New tenant-owned table? Add `org_id`, enable + FORCE RLS with a policy in a migration,
@@ -49,6 +50,11 @@ Read README.md for the product and setup. These rules are not optional.
   reversal row.
 - Payment and booking operations take an idempotency key.
 - Verify Razorpay webhook signatures before trusting them. Never store card data.
+- All money movement lives in `src/modules/marketplace/payments.ts` (read its header for the
+  model and ledger sign conventions). Every change must keep the reconciliation true:
+  Σgross − Σrefund − Σreversal = Σtax + Σplatform_commission + Σprovider_payable.
+- Never call Razorpay inside a database transaction except from the outbox worker; refunds
+  go through the `refund.requested` outbox event with our refund id as idempotency key.
 
 ## Side effects
 - Emails/notifications go through the outbox: `enqueue(tx, event)` in the SAME

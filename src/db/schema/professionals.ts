@@ -10,6 +10,9 @@ export const category = pgTable("category", {
   name: text("name").notNull(),
   // When true, a professional needs at least one approved credential to be matched.
   requiresCredential: boolean("requires_credential").notNull().default(true),
+  // Platform commission for bookings in this category, in basis points (100 = 1%).
+  // Null = use the default in finance_settings.
+  commissionBps: integer("commission_bps"),
 });
 
 export const professionalProfile = pgTable(

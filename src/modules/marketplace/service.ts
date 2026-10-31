@@ -1,11 +1,14 @@
 import { and, asc, desc, eq, gte, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { booking, category, enquiry, organization, proposal, requirement, user } from "@/db/schema";
+import { booking, category, enquiry, organization, payout, proposal, requirement, user } from "@/db/schema";
 import { withScope } from "@/db/client";
 import { assertUuid, badRequest, conflict, forbidden, notFound } from "@/lib/errors";
 import { enqueue, audit } from "@/modules/platform/outbox";
 import { ORG_BUYERS, requireOrgRole } from "@/modules/organizations/service";
 import { profileIdsForUsers } from "@/modules/professionals/service";
+import { ensureQuote, onBookingCancelled } from "./payments";
+
+export * from "./payments";
 import { matchRequirement } from "@/modules/matching/service";
 
 const rupeesToPaise = (r: number) => Math.round(r * 100);
@@ -176,10 +179,12 @@ export async function acceptProposal(userId: string, orgId: string, proposalId: 
     const [req] = await tx.update(requirement).set({ status: "closed", updatedAt: new Date() }).where(eq(requirement.id, p.requirementId)).returning();
     const org = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
     const location = req.deliveryMode === "virtual" ? "Online (link to be shared)" : [org?.address, req.city || org?.city].filter(Boolean).join(", ");
-    const [b] = await tx
+    const [created] = await tx
       .insert(booking)
       .values({ proposalId: p.id, orgId, professionalUserId: p.professionalUserId, scheduledStart: p.proposedStart, idempotencyKey, location })
       .returning();
+    // Fix the price (fee, GST, commission) now, so later rate changes don't affect it.
+    const b = await ensureQuote(tx, created.id);
     await enqueue(tx, { type: "booking.created", payload: { bookingId: b.id, orgId, professionalUserId: p.professionalUserId } });
     await audit(tx, { actorId: userId, action: "proposal.accept", targetType: "proposal", targetId: p.id, metadata: { bookingId: b.id } });
     return b;
@@ -291,7 +296,7 @@ export async function listMyProposals(proUserId: string) {
 
 export async function listMyBookings(proUserId: string) {
   return withScope({ userId: proUserId }, async (tx) => {
-    return tx
+    const rows = await tx
       .select({ booking, title: requirement.title, orgName: organization.name, feePaise: proposal.feePaise, currency: proposal.currency, participants: proposal.maxParticipants })
       .from(booking)
       .innerJoin(proposal, eq(proposal.id, booking.proposalId))
@@ -299,21 +304,35 @@ export async function listMyBookings(proUserId: string) {
       .innerJoin(organization, eq(organization.id, booking.orgId))
       .where(eq(booking.professionalUserId, proUserId))
       .orderBy(desc(booking.scheduledStart));
+    const paid = await tx
+      .select({ bookingId: payout.bookingId, sum: sql<number>`sum(${payout.amountPaise})::int`, last: sql<Date>`max(${payout.paidAt})` })
+      .from(payout)
+      .where(eq(payout.professionalUserId, proUserId))
+      .groupBy(payout.bookingId);
+    const byBooking = new Map(paid.map((p) => [p.bookingId, p]));
+    return rows.map((r) => ({ ...r, paidOutPaise: byBooking.get(r.booking.id)?.sum ?? 0, lastPayoutAt: byBooking.get(r.booking.id)?.last ?? null }));
   });
 }
 
 /**
- * Earnings from agreed fees. Until payments go live (M4) this is the value of
- * booked work, not money paid out; the page says so.
+ * The professional's money, from their share (fee minus commission):
+ * - awaiting: booked, the company hasn't paid yet
+ * - earned: the company has paid (less any refunded share)
+ * - paidOut / due: what we've sent them, and what we still owe
  */
-export function summarizeEarnings(rows: { booking: { status: string }; feePaise: number }[]) {
-  const sum = (pred: (s: string) => boolean) => rows.filter((r) => pred(r.booking.status)).reduce((t, r) => t + r.feePaise, 0);
-  return {
-    completedPaise: sum((s) => s === "completed"),
-    upcomingPaise: sum((s) => s === "pending" || s === "confirmed" || s === "in_progress"),
-    cancelledPaise: sum((s) => s === "cancelled"),
-    bookingCount: rows.filter((r) => r.booking.status !== "cancelled").length,
-  };
+export function summarizeEarnings(
+  rows: { booking: { status: string; paymentStatus: string; payablePaise: number | null; payableReversedPaise: number }; paidOutPaise: number }[],
+) {
+  let awaiting = 0;
+  let earned = 0;
+  let paidOut = 0;
+  for (const r of rows) {
+    const share = r.booking.payablePaise ?? 0;
+    paidOut += r.paidOutPaise;
+    if (r.booking.paymentStatus === "paid" || r.booking.paymentStatus === "partially_refunded" || r.booking.paymentStatus === "refunded") earned += share - r.booking.payableReversedPaise;
+    else if (r.booking.status !== "cancelled") awaiting += share;
+  }
+  return { awaitingPaymentPaise: awaiting, earnedPaise: earned, paidOutPaise: paidOut, duePaise: earned - paidOut, bookingCount: rows.filter((r) => r.booking.status !== "cancelled").length };
 }
 
 // ---------- M3: the company side ----------
@@ -640,9 +659,10 @@ export async function cancelBooking(userId: string, orgId: string, bookingId: st
       .set({ status: "cancelled", cancelledAt: new Date(), cancelledBy: userId, cancelReason: reason, cancelledLate: policy.cancelIsLate })
       .where(eq(booking.id, b.id))
       .returning();
-    await audit(tx, { actorId: userId, action: "booking.cancel", targetType: "booking", targetId: b.id, metadata: { late: policy.cancelIsLate, reason } });
+    const { refundPaise } = await onBookingCancelled(tx, b.id, policy.cancelIsLate, userId);
+    await audit(tx, { actorId: userId, action: "booking.cancel", targetType: "booking", targetId: b.id, metadata: { late: policy.cancelIsLate, reason, refundPaise } });
     await enqueue(tx, { type: "booking.cancelled", payload: { bookingId: b.id, professionalUserId: b.professionalUserId, reason, late: policy.cancelIsLate } });
-    return row;
+    return { ...row, refundPaise };
   });
 }
 

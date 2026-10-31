@@ -50,6 +50,20 @@
       "when": 1793377105246,
       "tag": "0006_requirements_private_to_company",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793419807248,
+      "tag": "0007_payments_and_invoicing",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793419808292,
+      "tag": "0008_finance_rls",
+      "breakpoints": true
     }
   ]
 }

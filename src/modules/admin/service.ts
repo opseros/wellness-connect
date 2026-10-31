@@ -3,6 +3,20 @@
 //   ops          day-to-day: verification, moderation, read-only users/orgs/audit
 //   super_admin  everything ops can do + staff roles, suspensions, domain changes
 import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  financeAttentionCount,
+  financeOverview,
+  financeSettingsInput,
+  getInvoiceAsStaff,
+  listFinanceQueues,
+  markInvoicePaidAsStaff,
+  markRefundProcessedAsStaff,
+  payoutInput,
+  readFinanceSettings,
+  recordPayoutAsStaff,
+  updateFinanceSettings,
+} from "@/modules/marketplace/payments";
+import { listCategories, setCategoryCommission } from "@/modules/professionals/service";
 import { z } from "zod";
 import { account, auditLog, comment, connection, credential, memberProfile, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
 import { getDb } from "@/db/client";
@@ -368,6 +382,50 @@ export async function adminCounts(actor: StaffActor) {
     db.select({ n: count() }).from(credential).where(eq(credential.status, "pending")),
     db.select({ n: count() }).from(report).where(eq(report.status, "open")),
   ]);
-  return { pendingCredentials: pending.n, openReports: reports.n };
+  return { pendingCredentials: pending.n, openReports: reports.n, financeAttention: await financeAttentionCount() };
 }
 
+
+// ---------- Finance (M4) ----------
+// Everyone on staff can see finance; only super admins move money or change settings.
+
+export async function adminFinance(actor: StaffActor) {
+  assertStaff(actor);
+  const [overview, queues, settings, categories] = await Promise.all([financeOverview(), listFinanceQueues(), readFinanceSettings(), listCategories()]);
+  return { overview, queues, settings, categories };
+}
+
+export async function adminInvoice(actor: StaffActor, invoiceId: string) {
+  assertStaff(actor);
+  return getInvoiceAsStaff(invoiceId);
+}
+
+export async function adminMarkInvoicePaid(actor: StaffActor, invoiceId: string, reference: string) {
+  assertSuperAdmin(actor);
+  return markInvoicePaidAsStaff(actor.id, invoiceId, reference);
+}
+
+export async function adminMarkRefundProcessed(actor: StaffActor, refundId: string, reference: string) {
+  assertSuperAdmin(actor);
+  return markRefundProcessedAsStaff(actor.id, refundId, reference);
+}
+
+export async function adminRecordPayout(actor: StaffActor, bookingId: string, input: z.input<typeof payoutInput>) {
+  assertSuperAdmin(actor);
+  return recordPayoutAsStaff(actor.id, bookingId, input);
+}
+
+export async function adminUpdateFinanceSettings(actor: StaffActor, input: z.input<typeof financeSettingsInput>) {
+  assertSuperAdmin(actor);
+  return updateFinanceSettings(actor.id, input);
+}
+
+export const categoryCommissionInput = z.object({ categoryId: z.string().uuid(), percent: z.number().min(0).max(50).nullable() });
+
+export async function adminSetCategoryCommission(actor: StaffActor, input: z.input<typeof categoryCommissionInput>) {
+  assertSuperAdmin(actor);
+  const d = categoryCommissionInput.parse(input);
+  const row = await setCategoryCommission(d.categoryId, d.percent == null ? null : Math.round(d.percent * 100));
+  await audit(getDb(), { actorId: actor.id, action: "category.commission", targetType: "category", targetId: row.id, metadata: { commissionBps: row.commissionBps } });
+  return row;
+}

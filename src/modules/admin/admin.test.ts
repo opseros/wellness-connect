@@ -10,6 +10,8 @@ import { processOutbox } from "@/modules/platform/outbox";
 import "@/modules/platform/handlers";
 import { onSessionCreated, promoteBootstrapSuperAdmin } from "@/modules/identity/hooks";
 import {
+  adminMarkInvoicePaid,
+  adminRecordPayout,
   decideCredential,
   editUser,
   listAuditLog,
@@ -45,6 +47,13 @@ describe("admin permissions", () => {
     await expect(listCredentialQueue(opsNo2fa)).rejects.toMatchObject({ status: 403 });
     await expect(listCredentialQueue(regular)).rejects.toMatchObject({ status: 403 });
     await expect(listCredentialQueue(ops)).resolves.toEqual([]);
+  });
+
+  it("ops can view finance but only super admins move money", async () => {
+    const id = "00000000-0000-4000-8000-000000000000";
+    await expect(adminMarkInvoicePaid(ops, id, "UTR12345")).rejects.toMatchObject({ status: 403 });
+    await expect(adminRecordPayout(ops, id, { amountRupees: 1, reference: "UTR12345", paidOn: "2027-01-01" })).rejects.toMatchObject({ status: 403 });
+    await expect(adminMarkInvoicePaid(boss, id, "UTR12345")).rejects.toMatchObject({ status: 404 });
   });
 
   it("only super admins change roles; ops can't, nobody changes themselves", async () => {

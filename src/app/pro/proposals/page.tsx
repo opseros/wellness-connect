@@ -4,7 +4,15 @@ import { listMyBookings, listMyProposals, summarizeEarnings } from "@/modules/ma
 import { formatPaise } from "@/lib/money";
 import { Badge, Flash, PageTitle, Table } from "@/components/ui";
 import { withdrawProposalAction } from "../actions";
-import { dayTime, getProOrExit } from "../me";
+import { day, dayTime, getProOrExit } from "../me";
+
+const PAY: Record<string, [string, string]> = {
+  unpaid: ["pending", "Awaiting company payment"],
+  invoiced: ["pending", "Invoice sent to company"],
+  paid: ["active", "Paid by company"],
+  partially_refunded: ["active", "Partly refunded"],
+  refunded: ["closed", "Refunded"],
+};
 
 export const metadata: Metadata = { title: "Proposals & bookings" };
 
@@ -21,26 +29,34 @@ export default async function ProposalsAndBookings({ searchParams }: { searchPar
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-bold">Earnings</h2>
         <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
-          <Money label="Upcoming" value={e.upcomingPaise} />
-          <Money label="Completed" value={e.completedPaise} />
-          <Money label="Cancelled" value={e.cancelledPaise} />
+          <Money label="Due to you" value={e.duePaise} />
+          <Money label="Paid out" value={e.paidOutPaise} />
+          <Money label="Awaiting company payment" value={e.awaitingPaymentPaise} />
         </div>
         <p className="text-[13px] text-muted">
-          Based on agreed fees. Online payments and payouts (with platform commission and tax shown) arrive in a later release.
+          Your share is your fee minus the platform commission. It becomes due once the company pays, and we transfer it to you after the session.
         </p>
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-bold">Bookings</h2>
-        <Table head={["Engagement", "Company", "Scheduled", "Fee", "Status"]} empty={bookings.length === 0 && "No bookings yet. When a company accepts your proposal it appears here."}>
+        <Table head={["Engagement", "Company", "Scheduled", "Your fee", "Your share", "Payment"]} empty={bookings.length === 0 && "No bookings yet. When a company accepts your proposal it appears here."}>
           {bookings.map((b) => (
             <tr key={b.booking.id}>
               <td className="font-semibold">{b.title}<br /><span className="text-[13px] font-normal text-muted">Up to {b.participants} participants</span></td>
               <td>{b.orgName}</td>
               <td className="whitespace-nowrap">{dayTime(b.booking.scheduledStart)}</td>
               <td className="whitespace-nowrap">{formatPaise(b.feePaise)}</td>
+              <td className="whitespace-nowrap">
+                {b.booking.payablePaise != null ? formatPaise(b.booking.payablePaise - b.booking.payableReversedPaise) : "—"}
+                {b.paidOutPaise > 0 && <span className="block text-[13px] text-muted">{formatPaise(b.paidOutPaise)} paid out {day(b.lastPayoutAt)}</span>}
+              </td>
               <td>
-                <Badge status={b.booking.status === "pending" ? "active" : b.booking.status} label={b.booking.status === "pending" ? "Booked" : undefined} />
+                {b.booking.status === "cancelled" ? (
+                  <Badge status="cancelled" />
+                ) : (
+                  <Badge status={PAY[b.booking.paymentStatus]?.[0] ?? "pending"} label={PAY[b.booking.paymentStatus]?.[1]} />
+                )}
                 {b.booking.cancelReason && <span className="mt-1 block text-[13px] text-muted">{b.booking.cancelReason}</span>}
               </td>
             </tr>

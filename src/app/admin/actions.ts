@@ -5,6 +5,11 @@ import { ZodError } from "zod";
 import { AppError } from "@/lib/errors";
 import { requirePlatformStaff } from "@/modules/identity/session";
 import {
+  adminMarkInvoicePaid,
+  adminMarkRefundProcessed,
+  adminRecordPayout,
+  adminSetCategoryCommission,
+  adminUpdateFinanceSettings,
   decideCredential,
   editUser,
   removeUser,
@@ -116,5 +121,53 @@ export async function resolveReportAction(form: FormData) {
   const action = String(form.get("action")) as "dismiss" | "remove_content";
   await run("/admin/reports", action === "dismiss" ? "Report dismissed." : "Content removed and report closed.", () =>
     resolveReport(staff, String(form.get("reportId")), { action }),
+  );
+}
+
+// ---------- Finance ----------
+
+const f = (form: FormData, k: string) => String(form.get(k) ?? "").trim();
+
+export async function markInvoicePaidAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  await run("/admin/finance#invoices", "Marked paid. The booking is confirmed and the company emailed.", () => adminMarkInvoicePaid(staff, f(form, "invoiceId"), f(form, "reference")));
+}
+
+export async function markRefundSentAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  await run("/admin/finance#refunds", "Refund recorded and credit note issued.", () => adminMarkRefundProcessed(staff, f(form, "refundId"), f(form, "reference")));
+}
+
+export async function recordPayoutAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  await run("/admin/finance#payables", "Payout recorded. The professional has been emailed.", () =>
+    adminRecordPayout(staff, f(form, "bookingId"), { amountRupees: Number(f(form, "amount")), reference: f(form, "reference"), paidOn: f(form, "paidOn") }),
+  );
+}
+
+export async function financeSettingsAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  await run("/admin/finance#settings", "Finance settings saved. They apply to bookings priced from now on.", () =>
+    adminUpdateFinanceSettings(staff, {
+      commissionPercent: Number(f(form, "commission")),
+      gstPercent: Number(f(form, "gst")),
+      lateCancelRefundPercent: Number(f(form, "lateRefund")),
+      paymentTermsDays: Number(f(form, "terms")),
+      sellerName: f(form, "sellerName"),
+      sellerGstin: f(form, "sellerGstin"),
+      sellerAddress: f(form, "sellerAddress"),
+      sellerStateCode: f(form, "sellerStateCode"),
+      sacCode: f(form, "sacCode"),
+      invoicePrefix: f(form, "invoicePrefix").toUpperCase(),
+      bankDetails: String(form.get("bankDetails") ?? "").trim(),
+    }),
+  );
+}
+
+export async function categoryCommissionAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const raw = f(form, "percent");
+  await run("/admin/finance#settings", raw ? "Category commission saved." : "Category uses the default commission again.", () =>
+    adminSetCategoryCommission(staff, { categoryId: f(form, "categoryId"), percent: raw ? Number(raw) : null }),
   );
 }

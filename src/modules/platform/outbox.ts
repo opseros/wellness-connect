@@ -16,7 +16,12 @@ export type OutboxEvent =
   | { type: "requirement.withdrawn"; payload: { requirementId: string; professionalUserId: string } }
   | { type: "enquiry.reminder"; payload: { enquiryId: string; professionalUserId: string } }
   | { type: "booking.rescheduled"; payload: { bookingId: string; professionalUserId: string; from: string; to: string; reason: string } }
-  | { type: "booking.cancelled"; payload: { bookingId: string; professionalUserId: string; reason: string; late: boolean } };
+  | { type: "booking.cancelled"; payload: { bookingId: string; professionalUserId: string; reason: string; late: boolean } }
+  | { type: "payment.received"; payload: { bookingId: string; orgId: string; invoiceId: string; professionalUserId: string } }
+  | { type: "invoice.issued"; payload: { invoiceId: string; orgId: string; bookingId: string; requestedBy: string } }
+  | { type: "refund.requested"; payload: { refundId: string } }
+  | { type: "refund.processed"; payload: { refundId: string; bookingId: string; orgId: string; amountPaise: number } }
+  | { type: "payout.recorded"; payload: { payoutId: string; professionalUserId: string; amountPaise: number } };
 
 /**
  * Call inside the same transaction as the business change. Delivery starts

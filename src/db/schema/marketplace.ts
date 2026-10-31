@@ -91,27 +91,121 @@ export const booking = pgTable(
     // True when cancelled inside the free-cancellation window (a fee may apply, see M4).
     cancelledLate: boolean("cancelled_late").notNull().default(false),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    // Price snapshot, fixed when payment starts (integer paise). See payments.ts.
+    feePaise: integer("fee_paise"),
+    gstPaise: integer("gst_paise"),
+    totalPaise: integer("total_paise"),
+    commissionPaise: integer("commission_paise"),
+    payablePaise: integer("payable_paise"),
+    paymentStatus: text("payment_status", { enum: ["unpaid", "invoiced", "paid", "partially_refunded", "refunded"] }).notNull().default("unpaid"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    refundedPaise: integer("refunded_paise").notNull().default(0),
+    // The professional's share of refunds (so their earnings stay exact without reading the ledger).
+    payableReversedPaise: integer("payable_reversed_paise").notNull().default(0),
     idempotencyKey: text("idempotency_key").notNull().unique(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("booking_org_idx").on(t.orgId), index("booking_pro_idx").on(t.professionalUserId)],
 );
 
-export const payment = pgTable("payment", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  bookingId: uuid("booking_id").notNull().references(() => booking.id),
-  orgId: uuid("org_id").notNull().references(() => organization.id),
-  provider: text("provider").notNull().default("razorpay"),
-  providerOrderId: text("provider_order_id").unique(),
-  providerPaymentId: text("provider_payment_id").unique(),
-  amountPaise: integer("amount_paise").notNull(),
-  currency: text("currency").notNull().default("INR"),
-  status: text("status", { enum: ["pending", "authorized", "paid", "failed", "partially_refunded", "refunded"] })
-    .notNull()
-    .default("pending"),
-  idempotencyKey: text("idempotency_key").notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const payment = pgTable(
+  "payment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id").notNull().references(() => booking.id),
+    orgId: uuid("org_id").notNull().references(() => organization.id),
+    // "razorpay" = paid online; "invoice" = bank transfer against a tax invoice.
+    provider: text("provider", { enum: ["razorpay", "invoice"] }).notNull().default("razorpay"),
+    providerOrderId: text("provider_order_id").unique(),
+    providerPaymentId: text("provider_payment_id").unique(),
+    method: text("method"),
+    reference: text("reference"),
+    amountPaise: integer("amount_paise").notNull(),
+    currency: text("currency").notNull().default("INR"),
+    status: text("status", { enum: ["pending", "authorized", "paid", "failed", "cancelled", "partially_refunded", "refunded"] })
+      .notNull()
+      .default("pending"),
+    failureReason: text("failure_reason"),
+    invoiceId: uuid("invoice_id"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("payment_booking_idx").on(t.bookingId)],
+);
+
+export type InvoiceParty = { name: string; gstin: string; address: string; email?: string; stateCode: string };
+export type InvoiceLine = { description: string; sac: string; quantity: number; taxablePaise: number; gstRateBps: number };
+
+/** Tax invoices and credit notes. Numbers are sequential per financial year and never reused. */
+export const invoice = pgTable(
+  "invoice",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organization.id),
+    bookingId: uuid("booking_id").notNull().references(() => booking.id),
+    number: text("number").notNull().unique(),
+    kind: text("kind", { enum: ["invoice", "credit_note"] }).notNull().default("invoice"),
+    // invoice: unpaid → paid, or cancelled (by a credit note). credit_note: issued.
+    status: text("status", { enum: ["unpaid", "paid", "cancelled", "issued"] }).notNull(),
+    relatedInvoiceId: uuid("related_invoice_id"),
+    issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    seller: jsonb("seller").$type<InvoiceParty>().notNull(),
+    buyer: jsonb("buyer").$type<InvoiceParty>().notNull(),
+    lines: jsonb("lines").$type<InvoiceLine[]>().notNull(),
+    placeOfSupply: text("place_of_supply").notNull(),
+    taxablePaise: integer("taxable_paise").notNull(),
+    cgstPaise: integer("cgst_paise").notNull().default(0),
+    sgstPaise: integer("sgst_paise").notNull().default(0),
+    igstPaise: integer("igst_paise").notNull().default(0),
+    totalPaise: integer("total_paise").notNull(),
+    currency: text("currency").notNull().default("INR"),
+  },
+  (t) => [index("invoice_org_idx").on(t.orgId), index("invoice_booking_idx").on(t.bookingId)],
+);
+
+export const refund = pgTable(
+  "refund",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organization.id),
+    bookingId: uuid("booking_id").notNull().references(() => booking.id),
+    paymentId: uuid("payment_id").notNull().references(() => payment.id),
+    amountPaise: integer("amount_paise").notNull(),
+    // "razorpay" refunds go back automatically; "manual" ones are bank transfers recorded by staff.
+    provider: text("provider", { enum: ["razorpay", "manual"] }).notNull(),
+    providerRefundId: text("provider_refund_id").unique(),
+    status: text("status", { enum: ["pending", "processed", "failed"] }).notNull().default("pending"),
+    reason: text("reason").notNull().default(""),
+    reference: text("reference"),
+    failureReason: text("failure_reason"),
+    creditNoteId: uuid("credit_note_id"),
+    createdBy: uuid("created_by").references(() => user.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (t) => [index("refund_booking_idx").on(t.bookingId)],
+);
+
+/** Money sent to a professional for a booking. Recorded manually by staff for now. */
+export const payout = pgTable(
+  "payout",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organization.id),
+    bookingId: uuid("booking_id").notNull().references(() => booking.id),
+    professionalUserId: uuid("professional_user_id").notNull().references(() => user.id),
+    amountPaise: integer("amount_paise").notNull(),
+    reference: text("reference").notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true }).notNull(),
+    recordedBy: uuid("recorded_by").notNull().references(() => user.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("payout_pro_idx").on(t.professionalUserId), index("payout_booking_idx").on(t.bookingId)],
+);
 
 // Append-only. Corrections are new reversing rows; UPDATE/DELETE are blocked by a trigger.
 export const ledgerEntry = pgTable(
@@ -120,6 +214,8 @@ export const ledgerEntry = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     bookingId: uuid("booking_id").notNull().references(() => booking.id),
     paymentId: uuid("payment_id").references(() => payment.id),
+    refundId: uuid("refund_id").references(() => refund.id),
+    payoutId: uuid("payout_id").references(() => payout.id),
     orgId: uuid("org_id").notNull().references(() => organization.id),
     entryType: text("entry_type", {
       enum: ["gross", "tax", "platform_commission", "provider_payable", "refund", "settlement", "reversal"],
@@ -131,6 +227,38 @@ export const ledgerEntry = pgTable(
   },
   (t) => [index("ledger_booking_idx").on(t.bookingId)],
 );
+
+/** Platform-wide money settings (one row, id "default"). Edited by super admins. */
+export const financeSettings = pgTable("finance_settings", {
+  id: text("id").primaryKey().default("default"),
+  commissionBps: integer("commission_bps").notNull().default(1000),
+  gstBps: integer("gst_bps").notNull().default(1800),
+  // Share of the total refunded when a company cancels inside the free window (0 = none).
+  lateCancelRefundBps: integer("late_cancel_refund_bps").notNull().default(0),
+  paymentTermsDays: integer("payment_terms_days").notNull().default(7),
+  sellerName: text("seller_name").notNull().default(""),
+  sellerGstin: text("seller_gstin").notNull().default(""),
+  sellerAddress: text("seller_address").notNull().default(""),
+  sellerStateCode: text("seller_state_code").notNull().default("29"),
+  sacCode: text("sac_code").notNull().default("999799"),
+  invoicePrefix: text("invoice_prefix").notNull().default("MSM"),
+  bankDetails: text("bank_details").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Next invoice/credit-note number per series and financial year. */
+export const invoiceCounter = pgTable("invoice_counter", {
+  series: text("series").primaryKey(),
+  next: integer("next").notNull().default(1),
+});
+
+/** Razorpay webhook event ids already handled: a replayed event is a no-op. */
+export const webhookEvent = pgTable("webhook_event", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  type: text("type").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const matchingWeights = pgTable("matching_weights", {
   id: text("id").primaryKey().default("default"),

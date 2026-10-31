@@ -330,3 +330,10 @@ export async function profileIdsForUsers(userIds: string[]) {
     .where(inArray(professionalProfile.userId, [...new Set(userIds)]));
   return new Map(rows.map((r) => [r.userId, r.id]));
 }
+
+/** Per-category commission override (basis points); null = platform default. Staff only (checked by admin). */
+export async function setCategoryCommission(categoryId: string, commissionBps: number | null) {
+  const [row] = await getDb().update(category).set({ commissionBps }).where(eq(category.id, categoryId)).returning();
+  if (!row) throw notFound("Category not found");
+  return row;
+}

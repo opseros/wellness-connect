@@ -17,7 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Logo href="/admin" light />
           <span className="rounded-md bg-white/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">Admin</span>
         </span>
-        <AdminNav pending={counts.pendingCredentials} reports={counts.openReports} />
+        <AdminNav pending={counts.pendingCredentials} reports={counts.openReports} finance={counts.financeAttention} />
         <div className="flex items-center gap-3 text-sm">
           <span className="text-[#d5dcd8]">
             {me.name} · {me.platformRole === "super_admin" ? "Super admin" : "Ops"}

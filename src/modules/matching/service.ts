@@ -31,15 +31,14 @@ export async function loadCandidates(tx: Tx, categoryId: string): Promise<MatchC
   if (!profiles.length) return [];
   const ids = profiles.map((r) => r.p.id);
 
-  const [cats, services, creds] = await Promise.all([
-    tx.select().from(professionalCategory).where(inArray(professionalCategory.profileId, ids)),
-    tx.select().from(service).where(inArray(service.profileId, ids)),
-    tx
+  // Sequential on purpose: queries on one transaction's connection can't run in parallel.
+  const cats = await tx.select().from(professionalCategory).where(inArray(professionalCategory.profileId, ids));
+  const services = await tx.select().from(service).where(inArray(service.profileId, ids));
+  const creds = await tx
       .select({ profileId: credential.profileId, n: sql<number>`count(*)::int` })
       .from(credential)
       .where(and(inArray(credential.profileId, ids), eq(credential.status, "approved")))
-      .groupBy(credential.profileId),
-  ]);
+      .groupBy(credential.profileId);
 
   return profiles.map(({ p, name }) => ({
     userId: p.userId,
@@ -64,7 +63,8 @@ export async function matchRequirement(tx: Tx, requirementId: string) {
   const req = await tx.query.requirement.findFirst({ where: eq(requirement.id, requirementId) });
   if (!req) throw notFound("Requirement not found");
   const cat = await tx.query.category.findFirst({ where: eq(category.id, req.categoryId) });
-  const [candidates, weights] = await Promise.all([loadCandidates(tx, req.categoryId), loadWeights(tx)]);
+  const candidates = await loadCandidates(tx, req.categoryId);
+  const weights = await loadWeights(tx);
   const result = rankCandidates(
     {
       categoryId: req.categoryId,

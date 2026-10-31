@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function AdminNav({ pending, reports }: { pending: number; reports: number }) {
+export function AdminNav({ pending, reports, finance = 0 }: { pending: number; reports: number; finance?: number }) {
   const path = usePathname();
   const items = [
     { href: "/admin", label: "Verification", badge: pending, match: (p: string) => p === "/admin" || p.startsWith("/admin/credentials") },
     { href: "/admin/users", label: "Users", match: (p: string) => p.startsWith("/admin/users") },
     { href: "/admin/organizations", label: "Organizations", match: (p: string) => p.startsWith("/admin/organizations") },
+    { href: "/admin/finance", label: "Finance", badge: finance, match: (p: string) => p.startsWith("/admin/finance") },
     { href: "/admin/reports", label: "Reports", badge: reports, match: (p: string) => p.startsWith("/admin/reports") },
     { href: "/admin/audit", label: "Audit log", match: (p: string) => p.startsWith("/admin/audit") },
   ];

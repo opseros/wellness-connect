@@ -151,7 +151,7 @@ describe("a new professional, from sign-up to answering an enquiry", () => {
     expect(mine).toMatchObject({ title: "Team mindfulness series", orgName: "Zeta Labs", bookingStatus: "pending" });
     expect((await listMyEnquiries(pro.id))[0].requirementStatus).toBe("closed");
     const bookings = await listMyBookings(pro.id);
-    expect(summarizeEarnings(bookings)).toEqual({ completedPaise: 0, upcomingPaise: 4_200_000, cancelledPaise: 0, bookingCount: 1 });
+    expect(summarizeEarnings(bookings)).toEqual({ awaitingPaymentPaise: 3_780_000, earnedPaise: 0, paidOutPaise: 0, duePaise: 0, bookingCount: 1 }); // ₹42,000 less 10% commission
   });
 });
 

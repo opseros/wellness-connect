@@ -19,6 +19,7 @@ import {
   completeBooking,
   createRequirement,
   remindEnquiry,
+  requestInvoice,
   requestRevision,
   rescheduleBooking,
   sendEnquiries,
@@ -178,8 +179,20 @@ export async function cancelBookingAction(form: FormData) {
   const back = `/company/${orgId}/bookings/${id}`;
   await run(back, () => cancelBooking(me.id, orgId, id, { reason: str(form, "reason") }), (b) => ({
     to: back,
-    msg: b.cancelledLate ? "Cancelled inside the free-cancellation window; a fee may apply." : "Cancelled at no charge. The professional has been told.",
+    msg: b.cancelledLate
+      ? "Cancelled inside the free-cancellation window. The professional has been told."
+      : b.refundPaise > 0
+        ? `Cancelled. A refund of ₹${(b.refundPaise / 100).toLocaleString("en-IN")} is on its way.`
+        : "Cancelled at no charge. The professional has been told.",
   }));
+}
+
+export async function payByInvoiceAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = str(form, "orgId");
+  const id = str(form, "bookingId");
+  const back = `/company/${orgId}/bookings/${id}`;
+  await run(back, () => requestInvoice(me.id, orgId, id), (inv) => ({ to: back, msg: `Invoice ${inv.number} issued and emailed. Your booking is confirmed.` }));
 }
 
 export async function completeBookingAction(form: FormData) {
