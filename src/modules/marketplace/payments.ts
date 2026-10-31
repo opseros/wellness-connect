@@ -16,6 +16,7 @@
 //   Σgross − Σrefund = Σtax + Σplatform_commission + Σprovider_payable
 //   professional outstanding = Σprovider_payable − Σsettlement
 import { createHash } from "node:crypto";
+import { BRAND } from "@/lib/brand";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -149,7 +150,7 @@ async function issueDocument(
   const s = await getFinanceSettings(tx);
   const { booking: b, title, proName, org } = await bookingContext(tx, input.bookingId);
   const buyerState = /^\d{2}/.test(org.gstin) ? org.gstin.slice(0, 2) : s.sellerStateCode;
-  const seller: InvoiceParty = { name: s.sellerName || "Moosam", gstin: s.sellerGstin, address: s.sellerAddress, stateCode: s.sellerStateCode };
+  const seller: InvoiceParty = { name: s.sellerName || BRAND.name, gstin: s.sellerGstin, address: s.sellerAddress, stateCode: s.sellerStateCode };
   const buyer: InvoiceParty = { name: org.name, gstin: org.gstin, address: [org.address, org.city].filter(Boolean).join(", "), email: org.billingEmail || undefined, stateCode: buyerState };
   const when = new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(b.scheduledStart);
   const lines: InvoiceLine[] = [
