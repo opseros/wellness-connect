@@ -1,0 +1,1 @@
+export const tone: Record<string, string> = { requested: "pending", accepted: "info_requested", confirmed: "confirmed", completed: "completed", declined: "declined", expired: "closed", cancelled: "cancelled" };

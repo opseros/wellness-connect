@@ -18,12 +18,14 @@ import {
 } from "@/modules/marketplace/payments";
 import { listCategories, setCategoryCommission } from "@/modules/professionals/service";
 import { z } from "zod";
-import { account, auditLog, comment, connection, conversationParticipant, credential, group, memberProfile, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
-import { getDb } from "@/db/client";
+import { account, auditLog, comment, connection, conversationParticipant, credential, group, listing, listingPhoto, memberProfile, orgDocument, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
+import { getDb, withScope } from "@/db/client";
 import { badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit } from "@/modules/platform/outbox";
 import { reviewCredential, reviewInput } from "@/modules/professionals/service";
 import { isCompanyDomain } from "@/modules/organizations/service";
+import { getStayInvoice, listStayFinanceQueues, recordStayPayoutAsStaff, stayFinanceOverview, stayPayoutInput } from "@/modules/marketplace/stay-payments";
+import { listingReviewInput, openListingPhoto, reviewListing, staffChecklist } from "@/modules/listings/service";
 
 export type StaffActor = { id: string; platformRole: "user" | "ops" | "super_admin"; twoFactorEnabled: boolean };
 
@@ -89,6 +91,74 @@ export async function openCredentialDocument(actor: StaffActor, credentialId: st
 export async function decideCredential(actor: StaffActor, credentialId: string, input: z.input<typeof reviewInput>) {
   assertStaff(actor);
   return reviewCredential(actor.id, credentialId, input);
+}
+
+// ---------- Homestay and hospital verification (M6) ----------
+
+export type ListingQueueStatus = "pending" | "changes_requested" | "verified" | "rejected" | "draft" | "all";
+
+export async function listListingQueue(actor: StaffActor, status: ListingQueueStatus = "pending") {
+  assertStaff(actor);
+  return getDb()
+    .select({ orgId: listing.orgId, kind: listing.kind, status: listing.status, city: listing.city, submittedAt: listing.submittedAt, reviewedAt: listing.reviewedAt, name: organization.name })
+    .from(listing)
+    .innerJoin(organization, eq(organization.id, listing.orgId))
+    .where(status === "all" ? undefined : eq(listing.status, status))
+    .orderBy(status === "pending" ? asc(listing.submittedAt) : desc(listing.updatedAt))
+    .limit(200);
+}
+
+/** Everything staff need to verify a listing. Document rows are read with audited staff bypass. */
+export async function getListingForReview(actor: StaffActor, orgId: string) {
+  assertStaff(actor);
+  return withScope({ bypass: true, userId: actor.id }, async (tx) => {
+    const l = await tx.query.listing.findFirst({ where: eq(listing.orgId, orgId) });
+    const org = l && (await tx.query.organization.findFirst({ where: eq(organization.id, orgId) }));
+    if (!l || !org) throw notFound("Listing not found");
+    const docs = await tx
+      .select({ id: orgDocument.id, docType: orgDocument.docType, name: orgDocument.name, status: orgDocument.status, createdAt: orgDocument.createdAt, blobPath: orgDocument.blobPath, uploadedBy: user.name })
+      .from(orgDocument)
+      .innerJoin(user, eq(user.id, orgDocument.uploadedBy))
+      .where(eq(orgDocument.orgId, orgId))
+      .orderBy(desc(orgDocument.createdAt));
+    const photos = await tx.select({ id: listingPhoto.id, caption: listingPhoto.caption }).from(listingPhoto).where(eq(listingPhoto.orgId, orgId)).orderBy(asc(listingPhoto.position));
+    const team = await tx
+      .select({ name: user.name, email: user.email, role: membership.role })
+      .from(membership)
+      .innerJoin(user, eq(user.id, membership.userId))
+      .where(and(eq(membership.orgId, orgId), eq(membership.status, "active")));
+    const reviewer = l.reviewedBy ? await tx.query.user.findFirst({ where: eq(user.id, l.reviewedBy) }) : undefined;
+    return {
+      listing: l,
+      org,
+      docs: docs.map(({ blobPath, ...d }) => ({ ...d, isPdf: blobPath.endsWith(".pdf") })),
+      photos,
+      team,
+      checks: staffChecklist(l.kind, docs),
+      reviewerName: reviewer?.name,
+    };
+  });
+}
+
+/** Records who opened a homestay/hospital document. Returns the blob path to stream. */
+export async function openOrgDocument(actor: StaffActor, documentId: string) {
+  assertStaff(actor);
+  return withScope({ bypass: true, userId: actor.id }, async (tx) => {
+    const doc = await tx.query.orgDocument.findFirst({ where: eq(orgDocument.id, documentId) });
+    if (!doc) throw notFound("Document not found");
+    await audit(tx, { actorId: actor.id, action: "org_document.view", targetType: "organization", targetId: doc.orgId, metadata: { documentId, docType: doc.docType } });
+    return doc.blobPath;
+  });
+}
+
+export async function openListingPhotoAsStaff(actor: StaffActor, photoId: string) {
+  assertStaff(actor);
+  return openListingPhoto(actor.id, photoId, true);
+}
+
+export async function decideListing(actor: StaffActor, orgId: string, input: z.input<typeof listingReviewInput>) {
+  assertStaff(actor);
+  return reviewListing(actor.id, orgId, input);
 }
 
 // ---------- Users ----------
@@ -401,7 +471,8 @@ export async function adminCounts(actor: StaffActor) {
     db.select({ n: count() }).from(credential).where(eq(credential.status, "pending")),
     db.select({ n: count() }).from(report).where(eq(report.status, "open")),
   ]);
-  return { pendingCredentials: pending.n, openReports: reports.n, financeAttention: await financeAttentionCount() };
+  const [listings] = await db.select({ n: count() }).from(listing).where(eq(listing.status, "pending"));
+  return { pendingCredentials: pending.n, pendingListings: listings.n, openReports: reports.n, financeAttention: await financeAttentionCount() };
 }
 
 
@@ -432,6 +503,23 @@ export async function adminMarkRefundProcessed(actor: StaffActor, refundId: stri
 export async function adminRecordPayout(actor: StaffActor, bookingId: string, input: z.input<typeof payoutInput>) {
   assertSuperAdmin(actor);
   return recordPayoutAsStaff(actor.id, bookingId, input);
+}
+
+export async function adminRecordStayPayout(actor: StaffActor, stayId: string, input: z.input<typeof stayPayoutInput>) {
+  assertSuperAdmin(actor);
+  return recordStayPayoutAsStaff(actor.id, stayId, input);
+}
+
+/** Homestay stay money for the finance page (M7). */
+export async function adminStayFinance(actor: StaffActor) {
+  assertStaff(actor);
+  const [overview, queues] = [await stayFinanceOverview(), await listStayFinanceQueues()];
+  return { overview, queues };
+}
+
+export async function adminStayInvoice(actor: StaffActor, invoiceId: string) {
+  assertStaff(actor);
+  return getStayInvoice({ userId: actor.id, bypass: true }, invoiceId);
 }
 
 export async function adminUpdateFinanceSettings(actor: StaffActor, input: z.input<typeof financeSettingsInput>) {

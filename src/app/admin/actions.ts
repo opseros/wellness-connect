@@ -5,6 +5,8 @@ import { ZodError } from "zod";
 import { AppError } from "@/lib/errors";
 import { requirePlatformStaff } from "@/modules/identity/session";
 import {
+  adminRecordStayPayout,
+  decideListing,
   adminMarkInvoicePaid,
   adminMarkRefundProcessed,
   adminRecordPayout,
@@ -145,6 +147,13 @@ export async function recordPayoutAction(form: FormData) {
   );
 }
 
+export async function recordStayPayoutAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  await run("/admin/finance#stays", "Payout recorded. The host has been emailed.", () =>
+    adminRecordStayPayout(staff, f(form, "stayId"), { amountRupees: Number(f(form, "amount")), reference: f(form, "reference"), paidOn: f(form, "paidOn") }),
+  );
+}
+
 export async function financeSettingsAction(form: FormData) {
   const staff = await requirePlatformStaff();
   await run("/admin/finance#settings", "Finance settings saved. They apply to bookings priced from now on.", () =>
@@ -160,6 +169,11 @@ export async function financeSettingsAction(form: FormData) {
       sacCode: f(form, "sacCode"),
       invoicePrefix: f(form, "invoicePrefix").toUpperCase(),
       bankDetails: String(form.get("bankDetails") ?? "").trim(),
+      stayCommissionPercent: Number(f(form, "stayCommission")),
+      stayGstLowPercent: Number(f(form, "stayGstLow")),
+      stayGstHighPercent: Number(f(form, "stayGstHigh")),
+      stayGstThresholdRupees: Number(f(form, "stayThreshold")),
+      staySacCode: f(form, "staySac"),
     }),
   );
 }
@@ -169,5 +183,17 @@ export async function categoryCommissionAction(form: FormData) {
   const raw = f(form, "percent");
   await run("/admin/finance#settings", raw ? "Category commission saved." : "Category uses the default commission again.", () =>
     adminSetCategoryCommission(staff, { categoryId: f(form, "categoryId"), percent: raw ? Number(raw) : null }),
+  );
+}
+
+// ---------- Homestays and hospitals (M6) ----------
+
+export async function decideListingAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const orgId = String(form.get("orgId"));
+  const decision = String(form.get("decision")) as "approved" | "changes_requested" | "rejected";
+  const label = decision === "approved" ? "Verified. It's now in the directory and the owners have been emailed." : decision === "changes_requested" ? "Changes requested. The owners have been emailed." : "Not approved. The owners have been emailed.";
+  await run(`/admin/listings/${orgId}`, label, () =>
+    decideListing(staff, orgId, { decision, note: String(form.get("note") ?? ""), checked: form.getAll("checked").map(String) }),
   );
 }

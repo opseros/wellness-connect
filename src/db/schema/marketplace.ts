@@ -243,6 +243,13 @@ export const financeSettings = pgTable("finance_settings", {
   sacCode: text("sac_code").notNull().default("999799"),
   invoicePrefix: text("invoice_prefix").notNull().default("MSM"),
   bankDetails: text("bank_details").notNull().default(""),
+  // Homestay stays (M7): commission from the host's share; GST on accommodation by nightly tariff.
+  stayCommissionBps: integer("stay_commission_bps").notNull().default(1200),
+  stayGstLowBps: integer("stay_gst_low_bps").notNull().default(500),
+  stayGstHighBps: integer("stay_gst_high_bps").notNull().default(1800),
+  // Per room per night, inclusive: at or below this the low rate applies (₹7,500 from 22 Sep 2025).
+  stayGstThresholdPaise: integer("stay_gst_threshold_paise").notNull().default(750000),
+  staySacCode: text("stay_sac_code").notNull().default("996311"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

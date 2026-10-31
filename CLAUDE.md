@@ -14,16 +14,23 @@ Read README.md for the product and setup. These rules are not optional.
 - Pages never import `@/db/client` or `@/db/schema`. Ask a service.
 - A module may call another module's exported service functions, never its tables.
   Exceptions: everyone may read `user`; `matching` is a read model over professionals,
-  catalogue and requirements.
+  catalogue and requirements; `listings` reads `organization` for name and slug (membership
+  checks go through the organizations service).
+- Organisations have a `kind`: company, homestay or hospital. Only companies use the
+  marketplace (`assertCompanyOrg`); homestays/hospitals have a `listing` that is public
+  only when `status = verified`. Never show a listing's contact email/phone publicly.
 - REST under `/api/v1` is the contract the Phase 2 Flutter app will reuse. Don't put
   business rules only in server actions or only in the UI. Don't break `/api/v1` shapes;
   add `/api/v2` if you must.
 
 ## Security: tenant isolation and auth
 - Marketplace tables (`requirement`, `enquiry`, `proposal`, `booking`, `payment`,
-  `ledger_entry`) have Postgres row-level security with FORCE. Every query on them MUST
-  run inside `withScope({ userId, orgId }, tx => ...)` from `@/db/client`.
-  Never call `getDb()` directly for those tables.
+  `ledger_entry`), `org_document` and the stay tables (`stay`, `stay_payment`, `stay_invoice`,
+  `stay_refund`, `stay_payout`, `stay_ledger_entry`) have Postgres row-level security with FORCE.
+  Every query on them MUST run inside `withScope({ userId, orgId }, tx => ...)` from
+  `@/db/client`. Never call `getDb()` directly for those tables. Guests reach their stays with
+  `withScope({ userId })`; hosts with `{ userId, orgId }`. (`stay_night`, room counts, and
+  `stay_calendar`, public prices, hold no personal data and have no RLS.)
 - `bypass: true` is only for the outbox worker, verified payment webhooks and audited
   platform-staff actions.
 - Always check roles with `requireOrgRole(...)` inside the same scoped transaction.
@@ -50,8 +57,9 @@ Read README.md for the product and setup. These rules are not optional.
   reversal row.
 - Payment and booking operations take an idempotency key.
 - Verify Razorpay webhook signatures before trusting them. Never store card data.
-- All money movement lives in `src/modules/marketplace/payments.ts` (read its header for the
-  model and ledger sign conventions). Every change must keep the reconciliation true:
+- All money movement lives in `src/modules/marketplace/payments.ts` (sessions) and
+  `src/modules/marketplace/stay-payments.ts` (homestay stays); read their headers for the
+  model and ledger sign conventions. Each ledger reconciles on its own. Every change must keep the reconciliation true:
   Σgross − Σrefund − Σreversal = Σtax + Σplatform_commission + Σprovider_payable.
 - Never call Razorpay inside a database transaction except from the outbox worker; refunds
   go through the `refund.requested` outbox event with our refund id as idempotency key.

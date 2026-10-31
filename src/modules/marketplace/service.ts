@@ -4,7 +4,7 @@ import { booking, category, enquiry, organization, payout, proposal, requirement
 import { withScope } from "@/db/client";
 import { assertUuid, badRequest, conflict, forbidden, notFound } from "@/lib/errors";
 import { enqueue, audit } from "@/modules/platform/outbox";
-import { ORG_BUYERS, requireOrgRole } from "@/modules/organizations/service";
+import { ORG_BUYERS, requireOrgRole, assertCompanyOrg } from "@/modules/organizations/service";
 import { profileIdsForUsers } from "@/modules/professionals/service";
 import { ensureQuote, onBookingCancelled } from "./payments";
 
@@ -36,6 +36,7 @@ export async function createRequirement(userId: string, orgId: string, input: z.
   const d = requirementInput.parse(input);
   return withScope({ userId, orgId }, async (tx) => {
     await requireOrgRole(userId, orgId, ORG_BUYERS, tx);
+    await assertCompanyOrg(orgId, tx);
     const [row] = await tx
       .insert(requirement)
       .values({

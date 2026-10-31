@@ -270,6 +270,6 @@ export async function acceptInvitationAction(form: FormData) {
   const token = str(form, "token");
   await run(`/invite/${token}`, () => acceptInvitation(me, token), (r) => ({
     to: r.role === "member" ? "/app" : `/company/${r.orgId}`,
-    msg: "You've joined the company.",
+    msg: "You've joined the team.",
   }));
 }

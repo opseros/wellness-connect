@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { invitation, organization, membership, user, type OrgRole } from "@/db/schema";
-import { getDb, type Executor } from "@/db/client";
+import { getDb, type Executor, type Tx } from "@/db/client";
 import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { sendEmail } from "@/lib/email";
 import { BRAND } from "@/lib/brand";
@@ -28,7 +28,7 @@ const slugify = (s: string) =>
 
 export const createOrganizationInput = z.object({
   name: z.string().trim().min(2).max(120),
-  kind: z.enum(["company", "provider"]).default("company"),
+  kind: z.enum(["company", "provider", "homestay", "hospital"]).default("company"),
 });
 
 /**
@@ -39,6 +39,8 @@ export const createOrganizationInput = z.object({
 export async function createOrganization(
   actor: { id: string; email: string; emailVerified: boolean },
   input: z.input<typeof createOrganizationInput>,
+  /** Runs in the same transaction, e.g. to create a homestay or hospital listing. */
+  then?: (tx: Tx, org: typeof organization.$inferSelect) => Promise<void>,
 ) {
   const data = createOrganizationInput.parse(input);
   if (!actor.emailVerified) throw forbidden("Verify your email before creating an organization");
@@ -61,7 +63,8 @@ export async function createOrganization(
       })
       .returning();
     await tx.insert(membership).values({ orgId: org.id, userId: actor.id, role: "owner", status: "active" });
-    await audit(tx, { actorId: actor.id, action: "organization.create", targetType: "organization", targetId: org.id });
+    await audit(tx, { actorId: actor.id, action: "organization.create", targetType: "organization", targetId: org.id, metadata: { kind: org.kind } });
+    if (then) await then(tx, org);
     return org;
   });
 }
@@ -165,10 +168,32 @@ export async function getOrgForMember(userId: string, orgId: string) {
   return { org, role: m.role };
 }
 
-/** Active memberships where the user can run the marketplace (owner, admin, wellness manager). */
+/** Active memberships of COMPANIES where the user can run the marketplace (owner, admin, wellness manager). */
 export async function listBuyerOrgs(userId: string) {
   const rows = await listMemberships(userId);
-  return rows.filter((r) => r.membership.status === "active" && ORG_BUYERS.includes(r.membership.role));
+  return rows.filter((r) => r.organization.kind === "company" && r.membership.status === "active" && ORG_BUYERS.includes(r.membership.role));
+}
+
+/** True if the user is an active member of the org (any role). */
+export async function isActiveMember(userId: string | null, orgId: string, db: Executor = getDb()) {
+  if (!userId) return false;
+  const m = await db.query.membership.findFirst({
+    where: and(eq(membership.orgId, orgId), eq(membership.userId, userId), eq(membership.status, "active")),
+    columns: { id: true },
+  });
+  return Boolean(m);
+}
+
+/** Renames an organization; the caller has already checked the role in the same transaction. */
+export async function renameOrganization(orgId: string, name: string, db: Executor = getDb()) {
+  await db.update(organization).set({ name }).where(eq(organization.id, orgId));
+}
+
+/** Only companies post requirements and book; homestays and hospitals have their own workspaces. */
+export async function assertCompanyOrg(orgId: string, db: Executor = getDb()) {
+  const org = await db.query.organization.findFirst({ where: eq(organization.id, orgId), columns: { kind: true } });
+  if (!org) throw notFound("Organization not found");
+  if (org.kind !== "company") throw forbidden("Only companies can post requirements");
 }
 
 export const orgSettingsInput = z.object({
@@ -283,7 +308,7 @@ export async function inviteMember(actorId: string, orgId: string, input: z.inpu
   await sendEmail({
     to: d.email,
     subject: `${inviter.name} invited you to ${org.name} on ${BRAND.name}`,
-    text: `${inviter.name} invited you to join ${org.name} on ${BRAND.name}, where your team books verified wellness professionals.\n\nAccept the invitation (sign in or create an account with this email address):\n${appUrl()}/invite/${token}\n\nThe link expires in ${INVITE_DAYS} days. If you weren't expecting this, ignore this email.`,
+    text: `${inviter.name} invited you to join ${org.name} on ${BRAND.name}${org.kind === "homestay" ? " to help run its homestay listing" : org.kind === "hospital" ? " to help run its hospital profile" : ", where your team books verified wellness professionals"}.\n\nAccept the invitation (sign in or create an account with this email address):\n${appUrl()}/invite/${token}\n\nThe link expires in ${INVITE_DAYS} days. If you weren't expecting this, ignore this email.`,
   });
   return { email: d.email, role: d.role };
 }

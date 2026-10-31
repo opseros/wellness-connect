@@ -17,6 +17,7 @@ export const getCompanyOrExit = cache(async (orgId: string) => {
     if (e instanceof AppError && e.status === 404) notFound();
     throw e;
   });
+  if (org.kind === "homestay" || org.kind === "hospital") redirect(`/listing/${org.id}`);
   return { me, org, role, isBuyer: ORG_BUYERS.includes(role), isAdmin: ORG_ADMINS.includes(role) };
 });
 

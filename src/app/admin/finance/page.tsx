@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { getStaffOrExit, when } from "../staff";
-import { adminFinance } from "@/modules/admin/service";
+import { adminFinance, adminStayFinance } from "@/modules/admin/service";
 import { STATE_NAMES } from "@/modules/marketplace/service";
 import { formatPaise } from "@/lib/money";
 import { Badge, Flash, PageTitle, Table } from "../ui";
-import { categoryCommissionAction, financeSettingsAction, markInvoicePaidAction, markRefundSentAction, recordPayoutAction } from "../actions";
+import { categoryCommissionAction, financeSettingsAction, markInvoicePaidAction, markRefundSentAction, recordPayoutAction, recordStayPayoutAction } from "../actions";
 
 export const metadata: Metadata = { title: "Finance" };
 
@@ -13,6 +13,9 @@ const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" 
 export default async function Finance({ searchParams }: { searchParams: Promise<{ msg?: string; error?: string }> }) {
   const me = await getStaffOrExit();
   const [sp, d] = await Promise.all([searchParams, adminFinance(me)]);
+  const st = await adminStayFinance(me);
+  const so = st.overview;
+  const stayOk = so.balanced && so.paymentsMatchLedger && so.mismatchedStays.length === 0;
   const { overview: o, queues: q, settings: s, categories } = d;
   const isSuper = me.platformRole === "super_admin";
   const setupMissing = !s.sellerName || !s.sellerGstin || !s.bankDetails;
@@ -146,6 +149,67 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
         </Table>
       </section>
 
+      <section id="stays" className="flex flex-col gap-3">
+        <h2 className="text-lg font-bold">Homestay stays</h2>
+        <p className={`rounded-xl px-4 py-3 text-sm ${stayOk ? "bg-brand-soft text-brand-dark" : "bg-[#fbe9e6] text-[#9b2c1f]"}`}>
+          {stayOk
+            ? "Stay ledger reconciles: collected − refunded = GST + commission + hosts' share, and payments match the ledger."
+            : `Stay ledger does not reconcile. Stays to check: ${so.mismatchedStays.map((m) => `${m.stayId.slice(0, 8)} (${formatPaise(m.diffPaise)})`).join(", ") || "totals differ"}.`}
+        </p>
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
+          {[
+            { label: "Collected from guests", v: so.collectedPaise },
+            { label: "Refunded to guests", v: so.refundedPaise },
+            { label: "GST on stays", v: so.gstPaise },
+            { label: "Commission on stays", v: so.commissionPaise },
+            { label: "Paid out to hosts", v: so.paidOutPaise },
+            { label: "Owed to hosts", v: so.outstandingPayablePaise },
+          ].map((x) => (
+            <div key={x.label} className="card flex flex-col gap-1 p-4">
+              <span className="text-[13px] text-muted">{x.label}</span>
+              <span className="text-xl font-bold">{formatPaise(x.v)}</span>
+            </div>
+          ))}
+        </div>
+        {st.queues.refunds.length > 0 && (
+          <Table head={["Host", "Refund", "Reason", "Status", "Created"]}>
+            {st.queues.refunds.map(({ refund: r, hostName }) => (
+              <tr key={r.id}>
+                <td>{hostName}</td>
+                <td className="whitespace-nowrap">{formatPaise(r.amountPaise)}</td>
+                <td>{r.reason}</td>
+                <td><Badge status={r.status === "failed" ? "rejected" : "pending"} label={r.status} />{r.failureReason && <span className="block text-[13px] text-muted">{r.failureReason}</span>}</td>
+                <td className="whitespace-nowrap">{when(r.createdAt)}</td>
+              </tr>
+            ))}
+          </Table>
+        )}
+        <Table head={["Host", "Stay", "Owed", isSuper ? "Record payout" : ""]} empty={st.queues.payables.length === 0 && "Nothing owed to hosts right now. Hosts become payable after check-in."}>
+          {st.queues.payables.map((p) => (
+            <tr key={p.stay.id}>
+              <td>{p.hostName}</td>
+              <td className="whitespace-nowrap">{p.stay.checkIn} → {p.stay.checkOut}<br /><span className="text-[13px] text-muted">{p.guestName.split(" ")[0]} · {p.stay.nights} night{p.stay.nights > 1 ? "s" : ""}</span></td>
+              <td className="whitespace-nowrap font-semibold">{formatPaise(p.outstandingPaise)}</td>
+              <td>
+                {isSuper && (
+                  <form action={recordStayPayoutAction} className="flex flex-wrap gap-2">
+                    <input type="hidden" name="stayId" value={p.stay.id} />
+                    <label className="sr-only" htmlFor={`samt-${p.stay.id}`}>Amount in rupees</label>
+                    <input id={`samt-${p.stay.id}`} name="amount" type="number" step="0.01" min="0.01" defaultValue={p.outstandingPaise / 100} className="input h-9 min-h-9 w-28 text-sm" />
+                    <label className="sr-only" htmlFor={`sutr-${p.stay.id}`}>Bank reference</label>
+                    <input id={`sutr-${p.stay.id}`} name="reference" required minLength={4} placeholder="UTR" className="input h-9 min-h-9 w-28 text-sm" />
+                    <label className="sr-only" htmlFor={`son-${p.stay.id}`}>Paid on</label>
+                    <input id={`son-${p.stay.id}`} name="paidOn" type="date" defaultValue={today()} className="input h-9 min-h-9 w-36 text-sm" />
+                    <button className="btn-outline min-h-9 px-3 text-sm">Record</button>
+                  </form>
+                )}
+              </td>
+            </tr>
+          ))}
+        </Table>
+        <p className="text-[13px] text-muted">Guests pay online; refunds go back automatically through Razorpay. Pay hosts from your bank after check-in, then record the transfer.</p>
+      </section>
+
       <section id="settings" className="flex flex-col gap-3">
         <h2 className="text-lg font-bold">Settings</h2>
         <form action={financeSettingsAction} className="card flex flex-col gap-4 p-6">
@@ -164,7 +228,12 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
               </select>
             </F>
             <F id="sacCode" label="SAC code" hint="Confirm with your CA."><input id="sacCode" name="sacCode" defaultValue={s.sacCode} className="input" /></F>
-            <F id="invoicePrefix" label="Invoice number prefix"><input id="invoicePrefix" name="invoicePrefix" defaultValue={s.invoicePrefix} className="input uppercase" /></F>
+            <F id="stayCommission" label="Homestay commission (%)" hint="Taken from the host's room charges."><input id="stayCommission" name="stayCommission" type="number" step="0.01" min="0" max="50" defaultValue={s.stayCommissionBps / 100} className="input" /></F>
+            <F id="stayGstLow" label="GST on rooms up to the threshold (%)"><input id="stayGstLow" name="stayGstLow" type="number" step="0.01" min="0" max="28" defaultValue={s.stayGstLowBps / 100} className="input" /></F>
+            <F id="stayGstHigh" label="GST on rooms above it (%)"><input id="stayGstHigh" name="stayGstHigh" type="number" step="0.01" min="0" max="28" defaultValue={s.stayGstHighBps / 100} className="input" /></F>
+            <F id="stayThreshold" label="Room tariff threshold (₹ per night)" hint="₹7,500 since 22 Sep 2025. Confirm with your CA."><input id="stayThreshold" name="stayThreshold" type="number" step="1" min="0" defaultValue={s.stayGstThresholdPaise / 100} className="input" /></F>
+            <F id="staySac" label="SAC code for stays"><input id="staySac" name="staySac" defaultValue={s.staySacCode} className="input" /></F>
+            <F id="invoicePrefix" label="Invoice number prefix" hint="Stay invoices use the same prefix plus S."><input id="invoicePrefix" name="invoicePrefix" defaultValue={s.invoicePrefix} className="input uppercase" /></F>
           </fieldset>
           <fieldset disabled={!isSuper} className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4">
             <F id="sellerAddress" label="Registered address"><textarea id="sellerAddress" name="sellerAddress" rows={3} defaultValue={s.sellerAddress} className="input py-2" /></F>

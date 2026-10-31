@@ -120,7 +120,7 @@ export async function ensureQuote(tx: Tx, bookingId: string) {
   return updated;
 }
 
-async function nextNumber(tx: Tx, prefix: string, kind: "invoice" | "credit_note", at: Date) {
+export async function nextNumber(tx: Tx, prefix: string, kind: "invoice" | "credit_note", at: Date) {
   const series = `${prefix}${kind === "credit_note" ? "-CN" : ""}/${financialYear(at)}`;
   const rows = await tx.execute<{ n: number }>(sql`
     insert into invoice_counter (series, next) values (${series}, 2)
@@ -524,6 +524,9 @@ export async function getOrgInvoice(userId: string, orgId: string, invoiceId: st
 
 // ---------- Razorpay webhooks ----------
 
+// Loaded lazily: stay-payments imports helpers from this file.
+const stays = () => import("./stay-payments");
+
 type RzpEvent = {
   event: string;
   payload: {
@@ -549,7 +552,13 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string, 
     switch (evt.event) {
       case "payment.captured":
       case "order.paid":
-        if (pay) return { duplicate: false as const, result: await recordOnlinePaid(tx, { orderId: pay.order_id, paymentId: pay.id, amountPaise: pay.amount, method: pay.method }) };
+        if (pay) {
+          const input = { orderId: pay.order_id, paymentId: pay.id, amountPaise: pay.amount, method: pay.method };
+          const result = await recordOnlinePaid(tx, input);
+          // Not a session booking? It may be a homestay stay (M7).
+          if (result.status === "unknown_order") return { duplicate: false as const, result: await (await stays()).recordStayOnlinePaid(tx, input) };
+          return { duplicate: false as const, result };
+        }
         break;
       case "payment.failed":
         if (pay) {
@@ -557,17 +566,21 @@ export async function handleRazorpayWebhook(rawBody: string, signature: string, 
             .update(payment)
             .set({ failureReason: pay.error_description ?? "Payment failed", updatedAt: new Date() })
             .where(and(eq(payment.providerOrderId, pay.order_id), eq(payment.status, "pending")));
+          await (await stays()).stayWebhookPaymentFailed(tx, pay.order_id, pay.error_description ?? "Payment failed");
         }
         break;
       case "refund.processed": {
         if (!ref) break;
         const r = await tx.query.refund.findFirst({ where: ref.notes?.refundId ? eq(refund.id, ref.notes.refundId) : eq(refund.providerRefundId, ref.id) });
         if (r) return { duplicate: false as const, result: await markRefundProcessed(tx, r.id, { providerRefundId: ref.id }) };
+        const sr = await (await stays()).stayWebhookRefundProcessed(tx, ref);
+        if (sr) return { duplicate: false as const, result: sr };
         break;
       }
       case "refund.failed": {
         if (!ref) break;
         await tx.update(refund).set({ status: "failed", failureReason: "Razorpay reported the refund failed" }).where(and(eq(refund.providerRefundId, ref.id), eq(refund.status, "pending")));
+        await (await stays()).stayWebhookRefundFailed(tx, ref.id);
         break;
       }
     }
@@ -760,6 +773,12 @@ export const financeSettingsInput = z.object({
   sacCode: z.string().trim().regex(/^\d{4,8}$/, "SAC is 4 to 8 digits"),
   invoicePrefix: z.string().trim().regex(/^[A-Z0-9]{2,8}$/, "Use 2–8 capital letters or digits"),
   bankDetails: z.string().trim().max(600),
+  // Homestay stays (M7). Optional so older callers keep the current values.
+  stayCommissionPercent: z.number().min(0).max(50).optional(),
+  stayGstLowPercent: z.number().min(0).max(28).optional(),
+  stayGstHighPercent: z.number().min(0).max(28).optional(),
+  stayGstThresholdRupees: z.number().int().min(0).max(1_000_000).optional(),
+  staySacCode: z.string().trim().regex(/^\d{4,8}$/, "SAC is 4 to 8 digits").optional(),
 });
 
 /** Super admins only (checked by the admin module). Applies to bookings priced from now on. */
@@ -782,6 +801,11 @@ export async function updateFinanceSettings(staffId: string, input: z.input<type
         sacCode: d.sacCode,
         invoicePrefix: d.invoicePrefix,
         bankDetails: d.bankDetails,
+        ...(d.stayCommissionPercent !== undefined ? { stayCommissionBps: Math.round(d.stayCommissionPercent * 100) } : {}),
+        ...(d.stayGstLowPercent !== undefined ? { stayGstLowBps: Math.round(d.stayGstLowPercent * 100) } : {}),
+        ...(d.stayGstHighPercent !== undefined ? { stayGstHighBps: Math.round(d.stayGstHighPercent * 100) } : {}),
+        ...(d.stayGstThresholdRupees !== undefined ? { stayGstThresholdPaise: d.stayGstThresholdRupees * 100 } : {}),
+        ...(d.staySacCode !== undefined ? { staySacCode: d.staySacCode } : {}),
         updatedAt: new Date(),
       })
       .where(eq(financeSettings.id, "default"))
@@ -802,6 +826,6 @@ export async function financeAttentionCount() {
       .select({ n: sql<number>`count(*)::int` })
       .from(refund)
       .where(sql`(${refund.provider} = 'manual' and ${refund.status} = 'pending') or ${refund.status} = 'failed'`);
-    return r.n;
+    return r.n + (await (await stays()).stayFinanceAttentionCount());
   });
 }

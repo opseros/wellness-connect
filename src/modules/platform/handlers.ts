@@ -1,10 +1,11 @@
 // Outbox event handlers. Imported once by the cron route.
 import { and, eq } from "drizzle-orm";
-import { credential, enquiry, group, groupMember, invoice, organization, professionalProfile, proposal, user } from "@/db/schema";
+import { credential, enquiry, group, groupMember, invoice, listing, organization, stay, stayInvoice, professionalProfile, proposal, user } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { registerOutboxHandler } from "./outbox";
 import { orgAdminEmails } from "@/modules/organizations/service";
 import { sendRefundToRazorpay } from "@/modules/marketplace/payments";
+import { sendStayRefundToRazorpay } from "@/modules/marketplace/stay-payments";
 import { BRAND } from "@/lib/brand";
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -196,3 +197,122 @@ registerOutboxHandler("referral.updated", async (tx, p) => {
 });
 
 export {};
+
+registerOutboxHandler("listing.reviewed", async (tx, p) => {
+  const orgId = String(p.orgId);
+  const org = await tx.query.organization.findFirst({ where: eq(organization.id, orgId) });
+  const l = await tx.query.listing.findFirst({ where: eq(listing.orgId, orgId) });
+  if (!org || !l) return;
+  const what = l.kind === "hospital" ? "hospital profile" : "homestay listing";
+  const text =
+    p.decision === "approved"
+      ? `Good news: your ${what} "${org.name}" is verified and now appears in the ${BRAND.name} directory.`
+      : p.decision === "changes_requested"
+        ? `We need a few changes before "${org.name}" can go live:\n\n${l.reviewNote ?? ""}\n\nUpdate it and submit again.`
+        : `We couldn't approve "${org.name}":\n\n${l.reviewNote ?? ""}`;
+  for (const to of await orgAdminEmails(orgId, tx)) {
+    await sendEmail({ to, subject: p.decision === "approved" ? `"${org.name}" is verified` : `Update on "${org.name}"`, text: `${text}\n\n${appUrl()}/listing/${orgId}` });
+  }
+});
+
+// ---------- Homestay stays (M7) ----------
+
+const rs = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+const dd = (d: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
+const istTime = (d: Date | null) => (d ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(d) : "");
+
+async function stayCtx(tx: Parameters<Parameters<typeof registerOutboxHandler>[1]>[0], stayId: string) {
+  const st = await tx.query.stay.findFirst({ where: eq(stay.id, stayId) });
+  if (!st) return null;
+  const guest = await tx.query.user.findFirst({ where: eq(user.id, st.guestUserId) });
+  const org = await tx.query.organization.findFirst({ where: eq(organization.id, st.orgId) });
+  const dates = `${dd(st.checkIn)} to ${dd(st.checkOut)} (${st.nights} night${st.nights > 1 ? "s" : ""}, ${st.rooms} room${st.rooms > 1 ? "s" : ""})`;
+  return { st, guest, org, dates };
+}
+
+registerOutboxHandler("stay.requested", async (tx, p) => {
+  const c = await stayCtx(tx, String(p.stayId));
+  if (!c?.org) return;
+  for (const to of await orgAdminEmails(c.st.orgId, tx)) {
+    await sendEmail({
+      to,
+      subject: `New booking request for ${c.org.name}`,
+      text: `${c.guest?.name.split(" ")[0] ?? "A guest"} asked to stay ${c.dates}.\n\nPlease accept or decline by ${istTime(c.st.respondBy)}; after that the request lapses.\n${appUrl()}/listing/${c.st.orgId}/bookings`,
+    });
+  }
+});
+
+registerOutboxHandler("stay.accepted", async (tx, p) => {
+  const c = await stayCtx(tx, String(p.stayId));
+  if (!c?.guest || !c.org) return;
+  await sendEmail({
+    to: c.guest.email,
+    subject: `${c.org.name} accepted your request`,
+    text: `Good news: ${c.org.name} accepted your stay ${c.dates}.\n\nPay ${rs(c.st.totalPaise)} by ${istTime(c.st.payBy)} to confirm it; the rooms are held for you until then.\n${appUrl()}/stays/${c.st.id}`,
+  });
+});
+
+registerOutboxHandler("stay.declined", async (tx, p) => {
+  const c = await stayCtx(tx, String(p.stayId));
+  if (!c?.guest || !c.org) return;
+  await sendEmail({
+    to: c.guest.email,
+    subject: `${c.org.name} can't host you on these dates`,
+    text: `${c.org.name} declined your request for ${c.dates}.${c.st.hostNote ? `\n\nNote from the host: ${c.st.hostNote}` : ""}\n\nYou haven't been charged. Find another stay: ${appUrl()}/homestays`,
+  });
+});
+
+registerOutboxHandler("stay.expired", async (tx, p) => {
+  const c = await stayCtx(tx, String(p.stayId));
+  if (!c?.guest || !c.org) return;
+  const why = p.stage === "payment" ? "the time to pay passed, so the rooms were released" : "the host didn't answer in time";
+  await sendEmail({ to: c.guest.email, subject: `Your request for ${c.org.name} has lapsed`, text: `Your request for ${c.dates} has lapsed: ${why}. You haven't been charged.\n${appUrl()}/homestays` });
+});
+
+registerOutboxHandler("stay.confirmed", async (tx, p) => {
+  const c = await stayCtx(tx, String(p.stayId));
+  if (!c?.guest || !c.org) return;
+  const inv = await tx.query.stayInvoice.findFirst({ where: eq(stayInvoice.id, String(p.invoiceId)) });
+  await sendEmail({
+    to: c.guest.email,
+    subject: `Confirmed: ${c.org.name}, ${dd(c.st.checkIn)}`,
+    text: `Your stay at ${c.org.name} is confirmed: ${c.dates}.\nPaid ${rs(c.st.totalPaise)}${inv ? `; tax invoice ${inv.number}` : ""}.\n${appUrl()}/stays/${c.st.id}`,
+  });
+  for (const to of await orgAdminEmails(c.st.orgId, tx)) {
+    await sendEmail({
+      to,
+      subject: `Booking confirmed: ${dd(c.st.checkIn)}`,
+      text: `${c.guest.name.split(" ")[0]} paid for ${c.dates}. Your share is ${rs(c.st.payablePaise)}, paid after check-in.\n${appUrl()}/listing/${c.st.orgId}/bookings`,
+    });
+  }
+});
+
+registerOutboxHandler("stay.cancelled", async (tx, p) => {
+  const c = await stayCtx(tx, String(p.stayId));
+  if (!c?.guest || !c.org) return;
+  const refund = Number(p.refundPaise) > 0 ? ` A refund of ${rs(Number(p.refundPaise))} is on its way to the original payment method.` : "";
+  if (p.byHost) {
+    await sendEmail({ to: c.guest.email, subject: `${c.org.name} cancelled your stay`, text: `${c.org.name} had to cancel your stay ${c.dates}.${refund}\n\nReason: ${c.st.cancelReason ?? ""}\n${appUrl()}/homestays` });
+  } else {
+    await sendEmail({ to: c.guest.email, subject: `You cancelled your stay at ${c.org.name}`, text: `Your stay ${c.dates} is cancelled.${refund}\n${appUrl()}/stays/${c.st.id}` });
+    for (const to of await orgAdminEmails(c.st.orgId, tx)) {
+      await sendEmail({ to, subject: `Cancelled: ${dd(c.st.checkIn)}`, text: `${c.guest.name.split(" ")[0]} cancelled ${c.dates}. The rooms are free again.\n${appUrl()}/listing/${c.st.orgId}/bookings` });
+    }
+  }
+});
+
+registerOutboxHandler("stay_refund.requested", async (tx, p) => {
+  await sendStayRefundToRazorpay(tx, String(p.refundId));
+});
+
+registerOutboxHandler("stay_refund.processed", async (tx, p) => {
+  const guest = await tx.query.user.findFirst({ where: eq(user.id, String(p.guestUserId)) });
+  if (!guest) return;
+  await sendEmail({ to: guest.email, subject: "Your refund has been processed", text: `We've refunded ${rs(Number(p.amountPaise))} to your original payment method. Banks usually take 5–7 working days to show it.\n${appUrl()}/stays/${p.stayId}` });
+});
+
+registerOutboxHandler("stay_payout.recorded", async (tx, p) => {
+  for (const to of await orgAdminEmails(String(p.orgId), tx)) {
+    await sendEmail({ to, subject: "Payout sent", text: `We've sent ${rs(Number(p.amountPaise))} to your bank account for a recent stay.\n${appUrl()}/listing/${p.orgId}/bookings` });
+  }
+});

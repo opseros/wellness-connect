@@ -1,4 +1,5 @@
 import { processOutbox } from "@/modules/platform/outbox";
+import { expireStaysJob } from "@/modules/stays/service";
 import "@/modules/platform/handlers";
 
 // Retry sweep for the outbox. Vercel Cron calls it on the schedule in vercel.json with
@@ -10,6 +11,8 @@ export async function GET(req: Request) {
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return new Response("Unauthorized", { status: 401 });
   }
+  // Lapse unanswered stay requests and unpaid acceptances first, so their emails go out in this run.
+  const stays = await expireStaysJob();
   const result = await processOutbox(50);
-  return Response.json(result);
+  return Response.json({ ...result, staysExpired: stays.expired });
 }

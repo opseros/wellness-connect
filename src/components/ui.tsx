@@ -19,6 +19,8 @@ export function Flash({ msg, error }: { msg?: string; error?: string }) {
 const tones: Record<string, string> = {
   pending: "bg-[#fbf0dc] text-[#7a4b00]",
   info_requested: "bg-[#e8ecf5] text-[#2e3f66]",
+  changes_requested: "bg-[#e8ecf5] text-[#2e3f66]",
+  draft: "bg-[#eceeed] text-[#5b6660]",
   approved: "bg-brand-soft text-brand-dark",
   verified: "bg-brand-soft text-brand-dark",
   active: "bg-brand-soft text-brand-dark",

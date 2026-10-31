@@ -36,7 +36,7 @@ Without Resend configured, verification and reset links appear in the terminal r
 Google/Microsoft buttons appear only when their keys are set.
 
 ```bash
-npm test          # 77 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
+npm test          # 100 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
 npm run typecheck && npm run lint && npm run build
 ```
 
@@ -104,8 +104,21 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
   - Meet-ups: date, time (IST), place and city, with RSVP; listed for your network, your groups and your city.
   - Referrals between connected professionals with minimum information (phone numbers and emails are rejected), a status trail (sent → accepted/declined → completed, or withdrawn) and email notifications.
   - REST under `/api/v1/connect/*` for all of the above (members, follow, blocks, suggestions, conversations, comments, RSVP, meet-ups, groups and membership, referrals, reports, badges).
+- Account types (M6): one login per person; companies, homestays and hospitals are organisations with members and roles. "Join as" (`/app/onboarding?as=member|pro|company|homestay|hospital`) at sign-up or later from Home.
+  - Homestay and hospital workspaces (`/listing/<orgId>`): details (rooms, price from, recovery-friendly features; or specialties, accreditations, international desk, visa letters), photos, verification documents per checklist, team and invitations, submit for verification.
+  - Documents are private (row-level security on `org_document`, private storage); staff opens are audited. Contact email and phone are for verification only.
+  - Admin → Homestays & hospitals: per-type checklist that staff must tick to approve; request changes, reject or take down; owners emailed.
+  - Public directories: `/professionals`, `/homestays`, `/hospitals` (and `/homestays/<slug>`, `/hospitals/<slug>`), verified listings only. Accreditations show only after staff checked the certificate. Photos are served by `/media/listing-photos/<id>` only for verified listings.
+  - Home page tabs: Members, Professionals, Companies, Homestays, Hospitals, with real verified listings.
+  - REST: `/api/v1/directory/*`, `/api/v1/listings`, `/api/v1/organizations/<orgId>/listing` (+ `/documents`, `/photos`, `/submit`), `/api/v1/admin/listings`.
+- Homestay stays (M7, `src/modules/stays`, money in `src/modules/marketplace/stay-payments.ts`):
+  - Host: calendar with per-date prices and blocked dates (`/listing/<orgId>/calendar`), cancellation policy (flexible, moderate, strict), minimum nights, check-in/out times; bookings page with requests to accept or decline, upcoming stays, host cancellation (full refund) and each stay's host share.
+  - Guest: search homestays by dates, price and availability on the homestay page, request to book (reason for the stay and access needs; no medical details, no phone numbers or emails), pay online once the host accepts, "My stays" (`/stays`) with invoices and credit notes as PDFs, cancel with the refund shown first.
+  - Timing: hosts answer within 48 hours; accepting holds the rooms for 48 hours (or until check-in) for the guest to pay; lapsed requests and holds expire (daily cron and on every view).
+  - Money: room charges + GST by tariff per room per night (5% up to ₹7,500, 18% above, editable in Admin → Finance); place of supply is the property's state; invoices in their own series (`<prefix>S/2026-27/0001`); 12% commission from the host's share; refunds through Razorpay by policy; payouts to hosts after check-in, recorded by staff. A separate stay ledger reconciles to the paisa and is checked on Admin → Finance.
+  - REST: `/api/v1/homestays/<orgId>/quote`, `/api/v1/homestays/<orgId>/stays`, `/api/v1/stays` (+ `/<id>`, `/cancel`, `/payment/order`, `/payment/verify`), `/api/v1/organizations/<orgId>/stays` (+ `/respond`, `/cancel`), `/api/v1/organizations/<orgId>/calendar`, `/api/v1/admin/stays/<stayId>/payouts`; `/api/v1/directory/homestays` takes `checkIn`, `checkOut`, `rooms`.
 - Payments (`src/modules/marketplace/payments.ts`): each booking's price is fixed when it's accepted (session fee + 18% GST on the fee; 10% commission from the professional's share, overridable per category). Companies pay online with Razorpay Checkout (UPI, cards, net banking) or by invoice (bank transfer, marked paid by staff). Signed, idempotent webhooks; GST tax invoices and credit notes with financial-year numbering and PDFs; refunds by the cancellation policy (sent to Razorpay through the outbox with an idempotency key, or by bank transfer for invoice payments); manual payouts to professionals. An append-only ledger reconciles to the paisa: collected − refunded = GST + commission + professionals' share; `/admin/finance` checks it on every load.
-- Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect (feed, network, member pages, messages, groups and spaces, meet-ups, referrals) and profile setup.
+- Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect (feed, network, member pages, messages, groups and spaces, meet-ups, referrals) and profile setup, Join as, homestay/hospital workspace, directories.
 
 ## Admin portal (`/admin`)
 
@@ -119,9 +132,10 @@ Only `super_admin` and `ops` users with two-factor on can open it; everyone else
 | Users: edit name/email (an email change must be re-verified and signs them out) | | ✓ |
 | Users: remove an account (typed confirmation; personal details erased, sign-in blocked, bookings/payments/audit kept anonymously) | | ✓ |
 | Organizations: view; link and verify company email domains | view | ✓ |
+| Homestays & hospitals: verification checklist, approve, request changes, reject or take down | ✓ | ✓ |
 | Reports: remove reported posts/comments, archive reported communities, or dismiss (reported members and conversations are named, messages stay private) | ✓ | ✓ |
-| Finance: reconciliation, invoices, refunds, payments, amounts owed | view | ✓ |
-| Finance: mark invoices paid, record bank refunds and payouts, settings and commission | | ✓ |
+| Finance: reconciliation, invoices, refunds, payments, amounts owed (sessions and stays) | view | ✓ |
+| Finance: mark invoices paid, record bank refunds and payouts to professionals and hosts, settings and commission | | ✓ |
 | Audit log | ✓ | ✓ |
 
 Every account also has **Account → security**: authenticator-app two-factor with backup codes, active sessions, and setting a password for Google/Microsoft accounts.
@@ -131,6 +145,6 @@ In production (`VERCEL_ENV=production`) the app refuses to start if `DATABASE_UR
 
 ## Next steps
 
-1. Before real payments: have your CA confirm the GST treatment (GST on the full session fee, SAC code, place of supply for companies without a GSTIN, TDS on payouts) and complete Razorpay KYC.
-2. M6 account types and directories (Users, Professionals, Homestays, Companies, Hospitals); then M7 Homestays and M8 Care & Travel (see the Build Plan).
+1. Before real payments: have your CA confirm the GST treatment (GST on the full session fee, SAC code, place of supply for companies without a GSTIN, TDS on payouts; for stays, the accommodation rates, SAC 996311 and whether the platform pays GST as an e-commerce operator under section 9(5)) and complete Razorpay KYC.
+2. M8 Care & Travel: hospital packages, quote requests, consented report sharing, care trip plans with a recovery stay (see the Build Plan).
 3. Official Google/Microsoft sign-in buttons, PWA icons, privacy notice and consent records (DPDP).

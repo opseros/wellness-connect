@@ -64,3 +64,23 @@ export async function storeCredentialFile(userId: string, file: unknown): Promis
   if (!ext) throw badRequest("Upload a PDF, JPG or PNG");
   return putPrivateFile(`credentials/${userId}/${crypto.randomUUID()}.${ext}`, file, file.type);
 }
+
+const IMAGES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/** Verification document for a homestay or hospital (PDF/JPG/PNG), stored privately. */
+export async function storeOrgDocument(orgId: string, file: unknown): Promise<string> {
+  if (!(file instanceof File) || file.size === 0) throw badRequest("Attach a file");
+  if (file.size > MAX_UPLOAD_BYTES) throw badRequest("Files must be 4 MB or smaller");
+  const ext = ALLOWED[file.type];
+  if (!ext) throw badRequest("Upload a PDF, JPG or PNG");
+  return putPrivateFile(`org-documents/${orgId}/${crypto.randomUUID()}.${ext}`, file, file.type);
+}
+
+/** Listing photo (JPG/PNG/WebP). Stored privately; served only for verified listings. */
+export async function storeListingPhoto(orgId: string, file: unknown): Promise<string> {
+  if (!(file instanceof File) || file.size === 0) throw badRequest("Attach a photo");
+  if (file.size > MAX_UPLOAD_BYTES) throw badRequest("Photos must be 4 MB or smaller");
+  const ext = IMAGES[file.type];
+  if (!ext) throw badRequest("Upload a JPG, PNG or WebP photo");
+  return putPrivateFile(`listing-photos/${orgId}/${crypto.randomUUID()}.${ext}`, file, file.type);
+}

@@ -23,7 +23,17 @@ export type OutboxEvent =
   | { type: "refund.processed"; payload: { refundId: string; bookingId: string; orgId: string; amountPaise: number } }
   | { type: "payout.recorded"; payload: { payoutId: string; professionalUserId: string; amountPaise: number } }
   | { type: "group.join_requested"; payload: { groupId: string; userId: string } }
-  | { type: "referral.updated"; payload: { referralId: string; toUserId: string; status: string } };
+  | { type: "referral.updated"; payload: { referralId: string; toUserId: string; status: string } }
+  | { type: "listing.reviewed"; payload: { orgId: string; decision: string } }
+  | { type: "stay.requested"; payload: { stayId: string; orgId: string } }
+  | { type: "stay.accepted"; payload: { stayId: string; guestUserId: string } }
+  | { type: "stay.declined"; payload: { stayId: string; guestUserId: string } }
+  | { type: "stay.expired"; payload: { stayId: string; guestUserId: string; stage: string } }
+  | { type: "stay.confirmed"; payload: { stayId: string; orgId: string; guestUserId: string; invoiceId: string } }
+  | { type: "stay.cancelled"; payload: { stayId: string; orgId: string; guestUserId: string; byHost: boolean; refundPaise: number } }
+  | { type: "stay_refund.requested"; payload: { refundId: string } }
+  | { type: "stay_refund.processed"; payload: { refundId: string; stayId: string; guestUserId: string; amountPaise: number } }
+  | { type: "stay_payout.recorded"; payload: { payoutId: string; orgId: string; amountPaise: number } };
 
 /**
  * Call inside the same transaction as the business change. Delivery starts

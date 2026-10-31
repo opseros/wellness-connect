@@ -1,13 +1,17 @@
 import { pgTable, uuid, text, timestamp, uniqueIndex, index } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
+/** One login per person; companies, homestays and hospitals are organisations with members and roles. */
+export const ORG_KINDS = ["company", "provider", "homestay", "hospital"] as const;
+export type OrgKind = (typeof ORG_KINDS)[number];
+
 export const organization = pgTable(
   "organization",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
-    kind: text("kind", { enum: ["company", "provider"] }).notNull().default("company"),
+    kind: text("kind", { enum: ORG_KINDS }).notNull().default("company"),
     // Verified email domain, lower case, e.g. "northwindlabs.com".
     domain: text("domain"),
     domainVerifiedAt: timestamp("domain_verified_at", { withTimezone: true }),

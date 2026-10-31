@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { category, credential, professionalCategory, professionalProfile, service, user } from "@/db/schema";
 import { getDb } from "@/db/client";
@@ -336,4 +336,56 @@ export async function setCategoryCommission(categoryId: string, commissionBps: n
   const [row] = await getDb().update(category).set({ commissionBps }).where(eq(category.id, categoryId)).returning();
   if (!row) throw notFound("Category not found");
   return row;
+}
+
+export const proDirectoryInput = z.object({
+  city: z.string().trim().max(80).optional(),
+  category: z.string().trim().max(60).optional(),
+  q: z.string().trim().max(80).optional(),
+});
+
+/**
+ * Public directory: verified, discoverable professionals in good standing only.
+ * Shows what's on their public profile (never credentials or contact details).
+ */
+export async function listProfessionalDirectory(filters: z.input<typeof proDirectoryInput> = {}) {
+  const f = proDirectoryInput.parse(filters);
+  const clean = (s: string) => s.replace(/[%_]/g, "");
+  const where = [
+    eq(professionalProfile.verificationStatus, "verified"),
+    eq(professionalProfile.discoverable, true),
+    isNull(user.suspendedAt),
+    isNull(user.deletedAt),
+  ];
+  if (f.city) where.push(ilike(professionalProfile.city, `${clean(f.city)}%`));
+  if (f.q) where.push(or(ilike(user.name, `%${clean(f.q)}%`), ilike(professionalProfile.headline, `%${clean(f.q)}%`))!);
+  if (f.category) {
+    where.push(sql`exists (select 1 from ${professionalCategory} pc join ${category} c on c.id = pc.category_id where pc.profile_id = ${professionalProfile.id} and c.slug = ${f.category})`);
+  }
+  const rows = await getDb()
+    .select({
+      id: professionalProfile.id,
+      name: user.name,
+      headline: professionalProfile.headline,
+      city: professionalProfile.city,
+      years: professionalProfile.yearsExperience,
+      modes: professionalProfile.deliveryModes,
+      categories: sql<string[]>`coalesce((select array_agg(c.name order by c.name) from ${professionalCategory} pc join ${category} c on c.id = pc.category_id where pc.profile_id = ${professionalProfile.id}), '{}')`,
+      priceFromPaise: sql<number | null>`(select min(s.price_min_paise) from ${service} s where s.profile_id = ${professionalProfile.id} and s.active)`,
+    })
+    .from(professionalProfile)
+    .innerJoin(user, eq(user.id, professionalProfile.userId))
+    .where(and(...where))
+    .orderBy(desc(professionalProfile.yearsExperience), asc(user.name))
+    .limit(60);
+  return rows;
+}
+
+export async function countVerifiedProfessionals() {
+  const [r] = await getDb()
+    .select({ n: sql<number>`count(*)::int` })
+    .from(professionalProfile)
+    .innerJoin(user, eq(user.id, professionalProfile.userId))
+    .where(and(eq(professionalProfile.verificationStatus, "verified"), eq(professionalProfile.discoverable, true), isNull(user.suspendedAt), isNull(user.deletedAt)));
+  return r.n;
 }

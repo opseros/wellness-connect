@@ -7,5 +7,5 @@ export default async function CompanyIndex() {
   const me = await getCurrentUser();
   if (!me) redirect("/");
   const orgs = await listBuyerOrgs(me.id);
-  redirect(orgs.length ? `/company/${orgs[0].organization.id}` : "/app/onboarding#company");
+  redirect(orgs.length ? `/company/${orgs[0].organization.id}` : "/app/onboarding?as=company");
 }

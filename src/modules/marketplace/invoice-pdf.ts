@@ -2,7 +2,11 @@ import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from "pdf
 import type { invoice } from "@/db/schema";
 import { BRAND } from "@/lib/brand";
 
-type Invoice = typeof invoice.$inferSelect;
+/** Session invoices and stay invoices share this shape. */
+type Invoice = Pick<
+  typeof invoice.$inferSelect,
+  "buyer" | "cgstPaise" | "dueAt" | "igstPaise" | "issuedAt" | "kind" | "lines" | "number" | "paidAt" | "placeOfSupply" | "seller" | "sgstPaise" | "status" | "taxablePaise" | "totalPaise"
+>;
 
 // Standard PDF fonts have no ₹ glyph, so amounts are written as "INR".
 const inr = (paise: number) => `INR ${(paise / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

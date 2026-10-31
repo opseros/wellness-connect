@@ -10,7 +10,7 @@ export const getProOrExit = cache(async () => {
   if (!me) redirect("/");
   if (!me.emailVerified) redirect(`/check-email?email=${encodeURIComponent(me.email)}`);
   const profile = await getOwnProfile(me.id);
-  if (!profile) redirect("/app/onboarding#professional");
+  if (!profile) redirect("/app/onboarding?as=pro");
   return { me, profile };
 });
 

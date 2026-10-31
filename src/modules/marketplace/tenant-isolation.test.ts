@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
 import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import { withScope, type DB } from "@/db/client";
-import { membership, organization, proposal, requirement } from "@/db/schema";
+import { membership, organization, orgDocument, proposal, requirement, stay, stayLedgerEntry } from "@/db/schema";
 import { createRequirement, listOrgRequirements, getMatches, sendEnquiries } from "./service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -99,5 +99,31 @@ describe("tenant isolation (row-level security)", () => {
   it("matching for another org's requirement is refused", async () => {
     const pub = (await listOrgRequirements(alice.id, orgA)).find((r) => r.status === "published")!;
     await expect(getMatches(bob.id, orgB, pub.id)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("homestay/hospital verification documents stay inside their organisation", async () => {
+    await withScope({ userId: alice.id, orgId: orgA }, (tx) =>
+      tx.insert(orgDocument).values({ orgId: orgA, docType: "registration", name: "Licence", blobPath: "x.pdf", uploadedBy: alice.id }),
+    );
+    expect(await withScope({ userId: bob.id, orgId: orgB }, (tx) => tx.select().from(orgDocument))).toHaveLength(0);
+    await expect(
+      withScope({ userId: bob.id, orgId: orgB }, (tx) => tx.insert(orgDocument).values({ orgId: orgA, docType: "registration", name: "Fake", blobPath: "y.pdf", uploadedBy: bob.id })),
+    ).rejects.toThrow();
+  });
+
+  it("homestay stays are visible only to the host's org and the guest; guests can't read the ledger split", async () => {
+    const g = await makeUser(db);
+    const [st] = await withScope({ userId: null, bypass: true }, (tx) =>
+      tx
+        .insert(stay)
+        .values({ orgId: orgA, guestUserId: g.id, checkIn: "2027-03-15", checkOut: "2027-03-17", nights: 2, purpose: "rest", respondBy: new Date(), nightly: [], gstParts: [], subtotalPaise: 100, gstPaise: 5, totalPaise: 105, commissionPaise: 12, payablePaise: 88, cancellationPolicy: "moderate", idempotencyKey: "iso-stay" })
+        .returning(),
+    );
+    await withScope({ userId: null, bypass: true }, (tx) => tx.insert(stayLedgerEntry).values({ stayId: st.id, orgId: orgA, guestUserId: g.id, entryType: "platform_commission", amountPaise: 12 }));
+    expect(await withScope({ userId: bob.id, orgId: orgB }, (tx) => tx.select().from(stay))).toHaveLength(0);
+    expect(await withScope({ userId: alice.id, orgId: orgA }, (tx) => tx.select().from(stay))).toHaveLength(1);
+    expect(await withScope({ userId: g.id }, (tx) => tx.select().from(stay))).toHaveLength(1);
+    expect(await withScope({ userId: g.id }, (tx) => tx.select().from(stayLedgerEntry))).toHaveLength(0);
+    expect(await withScope({ userId: alice.id, orgId: orgA }, (tx) => tx.select().from(stayLedgerEntry))).toHaveLength(1);
   });
 });

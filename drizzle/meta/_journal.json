@@ -78,6 +78,34 @@
       "when": 1793424285659,
       "tag": "0010_seed_spaces",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793427028700,
+      "tag": "0011_account_types_and_listings",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793427029818,
+      "tag": "0012_org_document_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793428564180,
+      "tag": "0013_homestay_stays",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793428565554,
+      "tag": "0014_stays_rls",
+      "breakpoints": true
     }
   ]
 }
