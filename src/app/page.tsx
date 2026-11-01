@@ -4,6 +4,7 @@ import { FeedCollage, LandingHeader, SpaceIcon, SPACES } from "@/components/land
 import { JoinHero } from "@/components/join-hero";
 import { HeroPhotos } from "@/components/hero-photos";
 import { AlsoOn } from "@/components/also-on";
+import { MoveSection } from "@/components/move-section";
 import { BRAND } from "@/lib/brand";
 import { enabledProviders } from "@/lib/providers";
 import { getCurrentUser } from "@/modules/identity/session";
@@ -76,6 +77,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
                 <li>Join spaces for wellness, travel, meet-ups, fitness, food and careers</li>
                 <li>Start or join communities, open to all or moderated</li>
                 <li>Find verified coaches, nutritionists and therapists</li>
+                <li>Discover gyms, yoga studios and wellness centres near you</li>
                 <li>Book quiet homestays for a proper break</li>
               </ul>
             </div>
@@ -127,6 +129,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
           </ul>
         </div>
       </section>
+
+      <MoveSection count={counts.facilities} />
 
       <AlsoOn care={care} counts={counts} hospitals={showHospitals} />
 

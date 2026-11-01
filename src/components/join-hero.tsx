@@ -6,7 +6,7 @@ import { JoinPanel, type JoinRole } from "./join-panel";
 const COPY: Record<JoinRole, { title: string; body: string; points: string[] }> = {
   member: {
     title: "The professional network for a better working life.",
-    body: "Connect with colleagues and peers, join spaces for wellness, travel and careers, plan meet-ups near you, and learn from verified experts. Free for every working professional.",
+    body: "Connect with colleagues and peers, join spaces for wellness, travel and careers, plan meet-ups near you, find gyms and yoga studios, and learn from verified experts. Free for every working professional.",
     points: ["Free, always", "Verified wellness experts", "No health details asked"],
   },
   pro: {
