@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestDb } from "@/test/db";
-import { makeUser, setFeature } from "@/test/factories";
+import { makeUser } from "@/test/factories";
 import { user } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { DB } from "@/db/client";

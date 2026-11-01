@@ -136,7 +136,7 @@ export function LandingHeader({ home = true, signedIn = false }: { home?: boolea
       </Link>
       <nav aria-label="Explore" className="order-last flex w-full gap-1 overflow-x-auto text-sm font-semibold md:order-none md:w-auto">
         <Link href="/professionals" className={link}>Find professionals</Link>
-        <Link href="/facilities" className={link}>Gyms &amp; studios</Link>
+        <a href={home ? "#explore" : "/#explore"} className={link}>Explore</a>
         <a href={home ? "#spaces" : "/#spaces"} className={link}>Spaces</a>
         <a href={home ? "#more" : "/#more"} className={link}>For organisations</a>
       </nav>

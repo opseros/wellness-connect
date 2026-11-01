@@ -4,7 +4,7 @@ import { FeedCollage, LandingHeader, SpaceIcon, SPACES } from "@/components/land
 import { JoinHero } from "@/components/join-hero";
 import { HeroPhotos } from "@/components/hero-photos";
 import { AlsoOn } from "@/components/also-on";
-import { MoveSection } from "@/components/move-section";
+import { ExploreSection } from "@/components/explore-section";
 import { BRAND } from "@/lib/brand";
 import { enabledProviders } from "@/lib/providers";
 import { getCurrentUser } from "@/modules/identity/session";
@@ -130,7 +130,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
         </div>
       </section>
 
-      <MoveSection count={counts.facilities} />
+      <ExploreSection counts={{ professionals: verified, homestays: counts.homestays, facilities: counts.facilities }} />
 
       <AlsoOn care={care} counts={counts} hospitals={showHospitals} />
 
