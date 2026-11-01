@@ -5,7 +5,7 @@ import Link from "next/link";
 import { BRAND } from "@/lib/brand";
 
 type Card = {
-  key: "company" | "homestay" | "hospital";
+  key: "company" | "homestay" | "facility" | "hospital";
   eyebrow: string;
   title: string;
   body: string;
@@ -28,6 +28,7 @@ function Icon({ k }: { k: Card["key"] }) {
     <svg aria-hidden viewBox="0 0 24 24" className="size-6">
       {k === "company" && <path {...p} d="M4 20V6.5L12 4v16M12 9h8v11M4 20h16M7.5 9h1.5m-1.5 3.5h1.5m-1.5 3.5h1.5M15 12.5h2m-2 3.5h2" />}
       {k === "homestay" && <path {...p} d="M3.5 11 12 4l8.5 7M6 9.5V20h12V9.5M10 20v-5.5h4V20" />}
+      {k === "facility" && <path {...p} d="M6 8v8M3 10v4m15-6v8m3-6v4M6 12h12" />}
       {k === "hospital" && <path {...p} d="M5 20V5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5V20M3 20h18M12 7.5v5m-2.5-2.5h5M10 20v-3.5h4V20" />}
     </svg>
   );
@@ -50,6 +51,26 @@ function Preview({ k }: { k: Card["key"] }) {
             ))}
           </span>
           <span className="text-[12.5px] font-semibold text-ink">3 proposals from verified pros</span>
+        </div>
+      </div>
+    );
+  if (k === "facility")
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="rounded-2xl bg-white p-3.5 shadow-[0_12px_30px_-18px_rgba(122,38,74,0.45)]">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[14px] font-bold text-ink">Lotus Yoga &amp; Fitness</p>
+            <span className="rounded-full bg-meetup px-2 py-0.5 text-[10.5px] font-bold text-meetup-ink">Free trial</span>
+          </div>
+          <p className="text-[12px] text-muted">Yoga · Strength · Pilates · Indiranagar</p>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {["6 am to 10 pm", "Women-only batches", "Showers"].map((t) => (
+              <span key={t} className="rounded-full bg-move px-2 py-0.5 text-[11px] font-semibold text-move-ink">{t}</span>
+            ))}
+          </div>
+        </div>
+        <div className="ml-6 rounded-2xl bg-white p-3 shadow-[0_12px_30px_-18px_rgba(122,38,74,0.45)]">
+          <p className="text-[12.5px] font-semibold text-ink">From ₹1,800 a month · corporate plans</p>
         </div>
       </div>
     );
@@ -95,8 +116,8 @@ function Preview({ k }: { k: Card["key"] }) {
   );
 }
 
-export function AlsoOn({ care, counts }: { care: boolean; counts: { homestays: number; hospitals: number } }) {
-  const cards: Card[] = [
+export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; counts: { homestays: number; hospitals: number; facilities: number }; hospitals?: boolean }) {
+  const all: Card[] = [
     {
       key: "company",
       eyebrow: "For HR and wellness teams",
@@ -119,6 +140,17 @@ export function AlsoOn({ care, counts }: { care: boolean; counts: { homestays: n
       tone: { bg: "bg-travel", ink: "text-travel-ink", ring: "ring-travel-ink/15", dot: "text-travel-ink" },
     },
     {
+      key: "facility",
+      eyebrow: "For gyms and studios",
+      title: "Gyms, studios and wellness centres",
+      body: "Reach working professionals nearby and companies looking for team memberships.",
+      points: ["A verified listing with prices and timings", "Show free trials and women-only batches", "Get found by companies for team plans"],
+      primary: { label: "List your facility", href: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dfacility" },
+      secondary: { label: "Browse", href: "/facilities" },
+      count: counts.facilities > 0 ? `${counts.facilities} verified` : undefined,
+      tone: { bg: "bg-move", ink: "text-move-ink", ring: "ring-move-ink/15", dot: "text-move-ink" },
+    },
+    {
       key: "hospital",
       eyebrow: "Care & Travel",
       title: "Hospitals",
@@ -130,6 +162,7 @@ export function AlsoOn({ care, counts }: { care: boolean; counts: { homestays: n
       tone: { bg: "bg-wellness", ink: "text-wellness-ink", ring: "ring-wellness-ink/15", dot: "text-brand" },
     },
   ];
+  const cards = all.filter((c) => hospitals || c.key !== "hospital");
 
   return (
     <section id="more" aria-labelledby="more-h" className="mx-auto max-w-[1200px] scroll-mt-6 px-4 py-16 sm:px-8 sm:py-24">
@@ -145,7 +178,7 @@ export function AlsoOn({ care, counts }: { care: boolean; counts: { homestays: n
         </p>
       </div>
 
-      <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      <div className={`mt-10 grid gap-5 md:grid-cols-2 ${cards.length === 4 ? "xl:grid-cols-4" : "lg:grid-cols-3"}`}>
         {cards.map((c) => (
           <article key={c.key} className="group flex flex-col overflow-hidden rounded-[28px] bg-white ring-1 ring-line transition-shadow hover:shadow-[0_30px_60px_-40px_rgba(24,33,29,0.45)]">
             <div className={`relative flex h-[220px] flex-col justify-center overflow-hidden px-6 ${c.tone.bg}`} role="img" aria-label={`Example of the ${c.title.toLowerCase()} workspace`}>

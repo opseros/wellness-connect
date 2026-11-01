@@ -35,6 +35,7 @@ import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { decryptFile, encryptFile } from "@/lib/file-crypto";
 import { deletePrivateFile, MAX_UPLOAD_BYTES, putPrivateFile, readPrivateFile } from "@/lib/storage";
 import { audit, enqueue } from "@/modules/platform/outbox";
+import { assertHospitalsVisible } from "@/modules/platform/features";
 import { hospitalsByIds, listDirectory } from "@/modules/listings/service";
 import { assertCompanyOrg, isActiveMember, ORG_ADMINS, ORG_ALL, ORG_BUYERS, requireOrgRole } from "@/modules/organizations/service";
 import { getMyStay } from "@/modules/stays/service";
@@ -115,6 +116,7 @@ const packageValues = (d: z.output<typeof packageInput>) => ({
 });
 
 export async function createPackage(userId: string, orgId: string, input: z.input<typeof packageInput>) {
+  await assertHospitalsVisible(userId);
   const d = packageInput.parse(input);
   await requireOrgRole(userId, orgId, ORG_ADMINS);
   await assertHospital(orgId);
@@ -123,6 +125,7 @@ export async function createPackage(userId: string, orgId: string, input: z.inpu
 }
 
 export async function updatePackage(userId: string, orgId: string, packageId: string, input: z.input<typeof packageInput>) {
+  await assertHospitalsVisible(userId);
   const d = packageInput.parse(input);
   assertUuid(packageId, "Package");
   await requireOrgRole(userId, orgId, ORG_ADMINS);
@@ -136,6 +139,7 @@ export async function updatePackage(userId: string, orgId: string, packageId: st
 }
 
 export async function setPackageActive(userId: string, orgId: string, packageId: string, active: boolean) {
+  await assertHospitalsVisible(userId);
   assertUuid(packageId, "Package");
   await requireOrgRole(userId, orgId, ORG_ADMINS);
   const [row] = await getDb().update(carePackage).set({ active, updatedAt: new Date() }).where(and(eq(carePackage.id, packageId), eq(carePackage.orgId, orgId))).returning();
@@ -144,6 +148,7 @@ export async function setPackageActive(userId: string, orgId: string, packageId:
 }
 
 export async function listOwnPackages(userId: string, orgId: string) {
+  await assertHospitalsVisible(userId);
   await requireOrgRole(userId, orgId, ORG_ALL);
   return getDb().select().from(carePackage).where(eq(carePackage.orgId, orgId)).orderBy(desc(carePackage.active), asc(carePackage.title));
 }
@@ -191,6 +196,7 @@ async function verifiedHospitals(ids: string[], requesterId: string) {
 }
 
 export async function createCareRequest(userId: string, input: z.input<typeof careRequestInput>) {
+  await assertHospitalsVisible(userId);
   assertEnabled();
   const d = careRequestInput.parse(input);
   await verifiedHospitals(d.hospitalIds, userId);
@@ -228,6 +234,7 @@ export const healthCheckInput = z.object({
 
 /** A company asks hospitals for a health check-up quote. Headcount only: no individual health details, no reports. */
 export async function createHealthCheckRequest(userId: string, orgId: string, input: z.input<typeof healthCheckInput>) {
+  await assertHospitalsVisible(userId);
   assertEnabled();
   const d = healthCheckInput.parse(input);
   await requireOrgRole(userId, orgId, ORG_BUYERS);
@@ -245,6 +252,7 @@ export async function createHealthCheckRequest(userId: string, orgId: string, in
 }
 
 export async function listMyCareRequests(userId: string) {
+  await assertHospitalsVisible(userId);
   const rows = await withScope({ userId }, async (tx) => {
     const reqs = await tx.select().from(careRequest).where(eq(careRequest.requesterUserId, userId)).orderBy(desc(careRequest.createdAt));
     const quotes = reqs.length ? await tx.select().from(careQuote).where(inArray(careQuote.requestId, reqs.map((r) => r.id))) : [];
@@ -256,6 +264,7 @@ export async function listMyCareRequests(userId: string) {
 
 /** Everything the traveller sees about one request: quotes to compare, reports and consent, trip plan. */
 export async function getCareRequest(userId: string, requestId: string) {
+  await assertHospitalsVisible(userId);
   assertUuid(requestId, "Request");
   const data = await withScope({ userId }, async (tx) => {
     const r = await tx.query.careRequest.findFirst({ where: and(eq(careRequest.id, requestId), eq(careRequest.requesterUserId, userId)) });
@@ -314,6 +323,7 @@ async function unshareFrom(tx: Parameters<Parameters<typeof withScope>[1]>[0], r
 
 /** Accepting one quote closes the others and starts the trip plan. The chosen hospital now sees who you are. */
 export async function acceptQuote(userId: string, requestId: string, quoteId: string) {
+  await assertHospitalsVisible(userId);
   assertEnabled();
   assertUuid(quoteId, "Quote");
   return withScope({ userId }, async (tx) => {
@@ -366,6 +376,7 @@ const REPORT_TYPES: Record<string, true> = { "application/pdf": true, "image/jpe
 
 /** Upload a report to this request. It is encrypted before storage and shared with no one until you choose. */
 export async function uploadReport(userId: string, requestId: string, file: unknown, name = "") {
+  await assertHospitalsVisible(userId);
   assertEnabled();
   assertUuid(requestId, "Request");
   if (!(file instanceof File) || file.size === 0) throw badRequest("Attach a file");
@@ -401,6 +412,7 @@ export const shareInput = z.object({ orgId: z.string().uuid(), consent: z.litera
 
 /** Share a report with one of the hospitals on the request, recording consent. */
 export async function shareReport(userId: string, reportId: string, input: z.input<typeof shareInput>) {
+  await assertHospitalsVisible(userId);
   assertEnabled();
   const d = shareInput.parse(input);
   return withScope({ userId }, async (tx) => {
@@ -427,6 +439,7 @@ export async function revokeReportShare(userId: string, reportId: string, orgId:
 }
 
 export async function setReportKeep(userId: string, reportId: string, keep: boolean) {
+  await assertHospitalsVisible(userId);
   return withScope({ userId }, async (tx) => {
     const rep = await ownReport(tx, userId, reportId);
     await tx.update(careReport).set({ keep }).where(eq(careReport.id, rep.id));
@@ -446,6 +459,7 @@ export async function deleteReport(userId: string, reportId: string) {
 
 /** The traveller downloads their own report (decrypted). */
 export async function openOwnReport(userId: string, reportId: string) {
+  await assertHospitalsVisible(userId);
   const rep = await withScope({ userId }, (tx) => ownReport(tx, userId, reportId));
   return readReport(rep);
 }
@@ -477,6 +491,7 @@ export async function purgeExpiredReports() {
 
 /** The hospital's quote requests. The requester is anonymous until they accept this hospital's quote. */
 export async function listHospitalQuotes(userId: string, orgId: string) {
+  await assertHospitalsVisible(userId);
   await assertHospital(orgId);
   const rows = await withScope({ userId, orgId }, async (tx) => {
     const m = await requireOrgRole(userId, orgId, ORG_ALL, tx);
@@ -522,6 +537,7 @@ export const quoteReplyInput = z.discriminatedUnion("action", [
 
 /** Owners and admins of the hospital reply: a quote, a decline, or a request for reports. */
 export async function replyToQuote(userId: string, orgId: string, quoteId: string, input: z.input<typeof quoteReplyInput>) {
+  await assertHospitalsVisible(userId);
   const d = quoteReplyInput.parse(input);
   assertUuid(quoteId, "Quote");
   return withScope({ userId, orgId }, async (tx) => {
@@ -569,6 +585,7 @@ export async function replyToQuote(userId: string, orgId: string, quoteId: strin
 
 /** Someone at the hospital opens a shared report: decrypted for them and logged. Members of the hospital only. */
 export async function openSharedReport(userId: string, orgId: string, reportId: string) {
+  await assertHospitalsVisible(userId);
   assertUuid(reportId, "Report");
   const rep = await withScope({ userId, orgId }, async (tx) => {
     await requireOrgRole(userId, orgId, ORG_ALL, tx);
@@ -582,6 +599,7 @@ export async function openSharedReport(userId: string, orgId: string, reportId: 
 }
 
 export async function hospitalOpenRequestCount(userId: string, orgId: string) {
+  await assertHospitalsVisible(userId);
   return withScope({ userId, orgId }, async (tx) => {
     const [r] = await tx.select({ n: sql<number>`count(*)::int` }).from(careQuote).where(and(eq(careQuote.orgId, orgId), eq(careQuote.status, "requested")));
     return r.n;
@@ -603,6 +621,7 @@ async function ownTrip(userId: string, tripId: string) {
 
 /** Set travel dates. Reports on this request will be deleted 90 days after departure (unless kept). */
 export async function updateTrip(userId: string, tripId: string, input: z.input<typeof tripInput>) {
+  await assertHospitalsVisible(userId);
   const d = tripInput.parse(input);
   const t = await ownTrip(userId, tripId);
   return withScope({ userId }, async (tx) => {
@@ -616,6 +635,7 @@ export async function updateTrip(userId: string, tripId: string, input: z.input<
 }
 
 export async function toggleChecklist(userId: string, tripId: string, key: string, done: boolean) {
+  await assertHospitalsVisible(userId);
   const t = await ownTrip(userId, tripId);
   if (!t.checklist.some((c) => c.key === key)) throw badRequest("Unknown checklist item");
   return withScope({ userId }, (tx) =>
@@ -625,6 +645,7 @@ export async function toggleChecklist(userId: string, tripId: string, key: strin
 
 /** Link (or unlink) one of your homestay stays. The host is never told it's part of a care trip beyond the stay's own reason. */
 export async function linkTripStay(userId: string, tripId: string, stayId: string | null) {
+  await assertHospitalsVisible(userId);
   const t = await ownTrip(userId, tripId);
   if (stayId) await getMyStay(userId, stayId); // 404 unless it's yours
   return withScope({ userId }, (tx) => tx.update(careTrip).set({ stayId, updatedAt: new Date() }).where(eq(careTrip.id, t.id)));
@@ -658,6 +679,7 @@ export { todayIst };
 
 /** A company's health check-up requests (any buyer in the company can see them). */
 export async function listCompanyHealthChecks(userId: string, orgId: string) {
+  await assertHospitalsVisible(userId);
   const rows = await withScope({ userId, orgId }, async (tx) => {
     await requireOrgRole(userId, orgId, ORG_BUYERS, tx);
     const reqs = await tx.select().from(careRequest).where(and(eq(careRequest.requesterOrgId, orgId), eq(careRequest.kind, "health_check"))).orderBy(desc(careRequest.createdAt));

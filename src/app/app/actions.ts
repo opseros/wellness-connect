@@ -67,7 +67,7 @@ export async function createListingAction(_: string | null, form: FormData): Pro
   const me = await requireUser();
   let orgId: string;
   try {
-    orgId = (await createListingOrg(me, { kind: String(form.get("kind")) as "homestay" | "hospital", name: String(form.get("name") ?? ""), city: String(form.get("city") ?? "") })).id;
+    orgId = (await createListingOrg(me, { kind: String(form.get("kind")) as "homestay" | "hospital" | "facility", name: String(form.get("name") ?? ""), city: String(form.get("city") ?? "") })).id;
   } catch (e) {
     return e instanceof AppError ? e.message : e instanceof ZodError ? (e.issues[0]?.message ?? "Check the form") : "Something went wrong. Please try again.";
   }

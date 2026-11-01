@@ -8,6 +8,7 @@ import { listMemberships } from "@/modules/organizations/service";
 import { getOwnProfile } from "@/modules/professionals/service";
 import { listingsForUser, STATUS_LABEL } from "@/modules/listings/service";
 import { connectBadges, getMemberProfile } from "@/modules/connect/service";
+import { hospitalsVisible } from "@/modules/platform/features";
 
 const roleLabel: Record<string, string> = { owner: "Owner", admin: "Admin", wellness_manager: "Wellness manager", member: "Member" };
 
@@ -59,6 +60,8 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
   const profileMissing = !member?.headline || !member?.city;
   const homestays = listings.filter((l) => l.kind === "homestay");
   const hospitals = listings.filter((l) => l.kind === "hospital");
+  const facilities = listings.filter((l) => l.kind === "facility");
+  const showHospitals = await hospitalsVisible(me.id);
 
   return (
     <div>
@@ -91,10 +94,16 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
               <p className="text-sm text-muted">Verified homestays for a break, recovery or a team retreat. You pay once the host accepts.</p>
               <span className="mt-auto flex flex-wrap gap-x-4 gap-y-1"><A href="/homestays">Find a homestay</A><A href="/stays">My stays</A></span>
             </Card>
-            <Card title="Care & Travel">
-              <p className="text-sm text-muted">Compare verified hospitals and ask up to three for a quote, without sharing your records.</p>
-              <span className="mt-auto flex flex-wrap gap-x-4 gap-y-1"><A href="/hospitals">Browse hospitals</A><A href="/care/requests">My care requests</A></span>
+            <Card title="Gyms & studios">
+              <p className="text-sm text-muted">Verified gyms, yoga and pilates studios, pools and wellness centres near you.</p>
+              <span className="mt-auto"><A href="/facilities">Find a place to work out</A></span>
             </Card>
+            {showHospitals && (
+            <Card title="Care & Travel">
+                <p className="text-sm text-muted">Compare verified hospitals and ask up to three for a quote, without sharing your records.</p>
+                <span className="mt-auto flex flex-wrap gap-x-4 gap-y-1"><A href="/hospitals">Browse hospitals</A><A href="/care/requests">My care requests</A></span>
+              </Card>
+            )}
           </div>
         </section>
 
@@ -103,7 +112,7 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
             <h2 id="offer-h" className="text-[20px] font-bold">Offer on Moosam</h2>
             <p className="text-[15px] text-muted">Things you run. Each is optional and uses this same account.</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Card title="Professional profile">
               {pro ? (
                 <>
@@ -134,7 +143,8 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
               <span className="mt-auto"><A href="/app/onboarding?as=company">{companies.length ? "Add another company" : "Set up a company"}</A></span>
             </Card>
             <ListingCard title="Homestay" items={homestays} empty="Host guests who come to rest, recover or hold a team retreat. To book one for yourself, use “Book a stay”." add={{ href: "/app/onboarding?as=homestay", label: homestays.length ? "List another homestay" : "List a homestay" }} />
-            <ListingCard title="Hospital (Care & Travel)" items={hospitals} empty="Run your hospital’s international patient desk: packages, quote requests and travelling patients." add={{ href: "/app/onboarding?as=hospital", label: hospitals.length ? "Register another hospital" : "Register a hospital" }} />
+            <ListingCard title="Gym, studio or wellness centre" items={facilities} empty="List your gym, yoga or pilates studio, pool or wellness centre so members and companies can find you." add={{ href: "/app/onboarding?as=facility", label: facilities.length ? "List another facility" : "List your facility" }} />
+            {showHospitals && <ListingCard title="Hospital (Care & Travel)" items={hospitals} empty="Run your hospital’s international patient desk: packages, quote requests and travelling patients." add={{ href: "/app/onboarding?as=hospital", label: hospitals.length ? "Register another hospital" : "Register a hospital" }} />}
           </div>
         </section>
       </main>

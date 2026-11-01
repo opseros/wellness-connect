@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppError } from "@/lib/errors";
 import { getStaffOrExit, when } from "../../staff";
-import { getListingForReview } from "@/modules/admin/service";
-import { DOC_CHECKLIST, FEATURE_LABEL, SERVES_LABEL, STATUS_LABEL } from "@/modules/listings/service";
+import { getListingForReview, staffSeesHospitals } from "@/modules/admin/service";
+import { AMENITY_LABEL, DOC_CHECKLIST, FACILITY_TYPE_LABEL, FEATURE_LABEL, SERVES_LABEL, STATUS_LABEL } from "@/modules/listings/service";
 import { decideListingAction } from "../../actions";
 import { Badge, Flash, PageTitle } from "../../ui";
 
@@ -17,6 +17,7 @@ export default async function ListingReview({ params, searchParams }: { params: 
     throw e;
   });
   const l = d.listing;
+  if (l.kind === "hospital" && !(await staffSeesHospitals(me))) notFound();
   const homestay = l.kind === "homestay";
   const docLabel = Object.fromEntries(DOC_CHECKLIST[l.kind].map((c) => [c.key, c.label]));
   const canDecide = l.status === "pending" || l.status === "verified";
@@ -25,7 +26,15 @@ export default async function ListingReview({ params, searchParams }: { params: 
     ["Location", [l.area, l.city, l.state].filter(Boolean).join(", ") || "—"],
     ["Tagline", l.tagline || "—"],
     ["About", <span key="a" className="whitespace-pre-line">{l.about || "—"}</span>],
-    ...(homestay
+    ...(l.kind === "facility"
+      ? ([
+          ["Offers", l.facilityTypes.map((t) => FACILITY_TYPE_LABEL[t as keyof typeof FACILITY_TYPE_LABEL] ?? t).join(", ") || "—"],
+          ["Prices", `${l.membershipFromPaise !== null ? `${rupees(l.membershipFromPaise)} a month` : "—"} · drop-in ${rupees(l.dropInPaise)}`],
+          ["Opening hours", l.openingHours || "—"],
+          ["Amenities", l.amenities.map((a) => AMENITY_LABEL[a as keyof typeof AMENITY_LABEL] ?? a).join(", ") || "—"],
+          ["Also", [l.freeTrial && "Free trial", l.corporatePlans && "Corporate memberships"].filter(Boolean).join(", ") || "—"],
+        ] as [string, React.ReactNode][])
+      : homestay
       ? ([
           ["Rooms / guests", `${l.rooms ?? "—"} rooms · up to ${l.maxGuests ?? "—"} guests`],
           ["Price from", `${rupees(l.priceFromPaise)} a night`],
@@ -49,10 +58,10 @@ export default async function ListingReview({ params, searchParams }: { params: 
   return (
     <>
       <span className="flex flex-wrap justify-between gap-3">
-        <Link href={homestay ? "/admin/homestays" : "/admin/hospitals"} className="text-sm font-semibold text-brand hover:underline">← {homestay ? "Homestays" : "Hospitals"}</Link>
+        <Link href={`/admin/${{ homestay: "homestays", hospital: "hospitals", facility: "facilities" }[l.kind]}`} className="text-sm font-semibold text-brand hover:underline">← {{ homestay: "Homestays", hospital: "Hospitals", facility: "Gyms & studios" }[l.kind]}</Link>
         <Link href={`/admin/organizations/${orgId}`} className="text-sm font-semibold text-brand hover:underline">Edit, suspend or remove →</Link>
       </span>
-      <PageTitle title={d.org.name} subtitle={homestay ? "Homestay" : "Hospital · Care & Travel"} />
+      <PageTitle title={d.org.name} subtitle={{ homestay: "Homestay", hospital: "Hospital · Care & Travel", facility: "Gym, studio or wellness centre" }[l.kind]} />
       {d.org.removedAt ? (
         <p className="rounded-xl bg-[#fbe9e7] px-4 py-3 text-sm text-[#9b2c1f]">Removed {when(d.org.removedAt)}. Kept for records only.</p>
       ) : d.org.suspendedAt ? (

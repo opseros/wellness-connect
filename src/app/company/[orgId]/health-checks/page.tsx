@@ -5,6 +5,8 @@ import { listDirectory } from "@/modules/listings/service";
 import { Flash } from "@/components/ui";
 import { healthCheckAction } from "@/app/care/actions";
 import { getBuyerOrExit } from "../company";
+import { notFound } from "next/navigation";
+import { hospitalsVisible } from "@/modules/platform/features";
 
 export const metadata: Metadata = { title: "Health check-ups" };
 const rs = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
@@ -12,8 +14,9 @@ const rs = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
 export default async function HealthChecks({ params, searchParams }: { params: Promise<{ orgId: string }>; searchParams: Promise<{ error?: string; msg?: string }> }) {
   const { orgId } = await params;
   const { me } = await getBuyerOrExit(orgId);
+  if (!(await hospitalsVisible(me.id))) notFound();
   const sp = await searchParams;
-  const [packages, hospitals, requests] = [await listCompanyPackages(), await listDirectory("hospital"), await listCompanyHealthChecks(me.id, orgId)];
+  const [packages, hospitals, requests] = [await listCompanyPackages(), await listDirectory("hospital", {}, me.id), await listCompanyHealthChecks(me.id, orgId)];
   const field = "flex flex-col gap-1.5 text-sm font-semibold";
   return (
     <>

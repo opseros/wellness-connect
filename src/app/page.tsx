@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/modules/identity/session";
 import { countVerifiedProfessionals } from "@/modules/professionals/service";
 import { careTravelEnabled } from "@/modules/care/service";
 import { directoryCounts } from "@/modules/listings/service";
+import { hospitalsVisible } from "@/modules/platform/features";
 
 const tile: Record<string, string> = {
   wellness: "bg-wellness text-wellness-ink",
@@ -38,7 +39,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
   const { reset, next, as } = await searchParams;
   if (user) redirect(next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/app");
   const returning = Boolean(reset || next);
-  const [verified, counts] = await Promise.all([countVerifiedProfessionals(), directoryCounts()]);
+  const [verified, counts, showHospitals] = await Promise.all([countVerifiedProfessionals(), directoryCounts(), hospitalsVisible(null)]);
   const care = careTravelEnabled();
 
   return (
@@ -127,7 +128,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
         </div>
       </section>
 
-      <AlsoOn care={care} counts={counts} />
+      <AlsoOn care={care} counts={counts} hospitals={showHospitals} />
 
       <section className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-8 sm:pb-20">
         <div className="flex flex-wrap items-center justify-between gap-6 rounded-[28px] bg-brand p-8 text-white sm:p-12">
@@ -151,7 +152,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
           <span className="flex flex-wrap gap-5">
             <Link href="/professionals" className="hover:text-ink">Professionals</Link>
             <Link href="/homestays" className="hover:text-ink">Homestays</Link>
-            <Link href="/hospitals" className="hover:text-ink">Hospitals</Link>
+            <Link href="/facilities" className="hover:text-ink">Gyms &amp; studios</Link>
+            {showHospitals && <Link href="/hospitals" className="hover:text-ink">Hospitals</Link>}
             <Link href="/sign-in" className="hover:text-ink">Sign in</Link>
           </span>
         </div>

@@ -2,14 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppError } from "@/lib/errors";
 import { getCurrentUser } from "@/modules/identity/session";
-import { FEATURE_LABEL, getPublicListing, SERVES_LABEL } from "@/modules/listings/service";
+import { AMENITY_LABEL, FACILITY_TYPE_LABEL, FEATURE_LABEL, getPublicListing, SERVES_LABEL } from "@/modules/listings/service";
 import { DirectoryShell, rupees } from "./directory";
 import { StayBooking, type StaySearch } from "./stay-booking";
 import { POLICY_TEXT, type CancellationPolicy } from "@/modules/stays/policy";
 import { careTravelEnabled, listPublicPackages } from "@/modules/care/service";
 
-/** Public page for one verified homestay or hospital (team members can preview before verification). */
-export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" | "hospital"; slug: string; sp?: StaySearch }) {
+/** Public page for one verified homestay, hospital or facility (team members can preview before verification). */
+export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" | "hospital" | "facility"; slug: string; sp?: StaySearch }) {
   const me = await getCurrentUser();
   const d = await getPublicListing(me?.id ?? null, kind, slug).catch((e) => {
     if (e instanceof AppError && e.status === 404) notFound();
@@ -17,10 +17,20 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
   });
   const l = d.listing;
   const homestay = kind === "homestay";
-  const packages = homestay ? [] : await listPublicPackages(d.orgId);
+  const facility = kind === "facility";
+  const hospital = kind === "hospital";
+  const packages = hospital ? await listPublicPackages(d.orgId) : [];
   const quoteHref = `/care/request?hospital=${d.orgId}`;
-  const back = homestay ? "/homestays" : "/hospitals";
-  const facts: [string, string][] = homestay
+  const back = { homestay: "/homestays", hospital: "/hospitals", facility: "/facilities" }[kind];
+  const facts: [string, string][] = facility
+    ? [
+        ["What's here", l.facilityTypes.map((t) => FACILITY_TYPE_LABEL[t as keyof typeof FACILITY_TYPE_LABEL] ?? t).join(", ")],
+        ["Membership from", l.membershipFromPaise !== null ? `${rupees(l.membershipFromPaise)} a month` : ""],
+        ["Drop-in or single class", l.dropInPaise !== null ? rupees(l.dropInPaise) : ""],
+        ["Opening hours", l.openingHours],
+        ["Languages", l.languages.join(", ")],
+      ]
+    : homestay
     ? [
         ["Rooms", l.rooms ? `${l.rooms}${l.maxGuests ? ` · up to ${l.maxGuests} guests` : ""}` : ""],
         ["Price from", l.priceFromPaise !== null ? `${rupees(l.priceFromPaise)} a night` : ""],
@@ -37,7 +47,7 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
       ];
   return (
     <DirectoryShell>
-      <Link href={back} className="text-sm font-semibold text-brand hover:underline">← All {homestay ? "homestays" : "hospitals"}</Link>
+      <Link href={back} className="text-sm font-semibold text-brand hover:underline">← All {{ homestay: "homestays", hospital: "hospitals", facility: "gyms, studios and wellness centres" }[kind]}</Link>
       {!d.isPublic && (
         <p role="status" className="rounded-xl bg-[#fbf0dc] px-4 py-3 text-sm text-[#7a4b00]">
           Preview: only your team can see this until our verification team approves it. <Link href={`/listing/${d.orgId}`} className="font-semibold underline">Back to your workspace</Link>
@@ -46,6 +56,8 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
       <section className="flex flex-col gap-2">
         <span className="flex flex-wrap gap-2">
           {d.isPublic && <span className="rounded-full bg-brand-soft px-2.5 py-1 text-xs font-bold text-brand-dark">Verified by our team</span>}
+          {facility && l.freeTrial && <span className="rounded-full bg-meetup px-2.5 py-1 text-xs font-bold text-meetup-ink">Free trial</span>}
+          {facility && l.corporatePlans && <span className="rounded-full bg-career px-2.5 py-1 text-xs font-bold text-career-ink">Corporate memberships</span>}
           {l.accreditations.map((a) => <span key={a} className="rounded-full bg-travel px-2.5 py-1 text-xs font-bold text-travel-ink">{a} accredited</span>)}
         </span>
         <h1 className="font-display text-[34px] leading-tight font-extrabold tracking-[-0.02em] sm:text-[44px]">{d.name}</h1>
@@ -76,7 +88,17 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
               </ul>
             </>
           )}
-          {!homestay && packages.length > 0 && (
+          {facility && l.amenities.length > 0 && (
+            <>
+              <h2 className="text-lg font-bold">Amenities</h2>
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
+                {l.amenities.map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-[15px]"><span aria-hidden className="text-brand">✓</span>{AMENITY_LABEL[f as keyof typeof AMENITY_LABEL] ?? f}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {hospital && packages.length > 0 && (
             <>
               <h2 className="text-lg font-bold">Treatment packages</h2>
               <ul className="flex flex-col gap-3">
@@ -105,7 +127,16 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
               <div key={k}><dt className="text-[13px] text-muted">{k}</dt><dd className="font-semibold">{v}</dd></div>
             ))}
           </dl>
-          {homestay ? (
+          {facility ? (
+            <div className="flex flex-col gap-2 border-t border-line pt-4">
+              {l.website ? (
+                <a href={l.website} target="_blank" rel="noopener noreferrer nofollow" className="btn-primary">Visit their website</a>
+              ) : (
+                <p className="text-[13.5px] text-[#3d4842]">Drop in during opening hours{l.freeTrial ? " and ask for your free trial" : ""}.</p>
+              )}
+              {l.corporatePlans && <p className="text-[12.5px] text-muted">Offers memberships for company teams. Ask about corporate rates.</p>}
+            </div>
+          ) : homestay ? (
             d.isPublic ? (
               <div className="border-t border-line pt-4"><StayBooking orgId={d.orgId} slug={d.slug} sp={sp} minNights={l.minNights} maxRooms={l.rooms ?? 1} /></div>
             ) : null
@@ -119,7 +150,7 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
               <p className="rounded-xl bg-ground px-4 py-3 text-[13.5px] text-[#3d4842]">Quote requests open soon. You&apos;ll be able to ask for a quote without sharing medical records.</p>
             )
           )}
-          {!homestay && <p className="text-[12.5px] text-muted">Not medical advice. Talk to a qualified doctor about your treatment.</p>}
+          {hospital && <p className="text-[12.5px] text-muted">Not medical advice. Talk to a qualified doctor about your treatment.</p>}
         </aside>
       </div>
     </DirectoryShell>

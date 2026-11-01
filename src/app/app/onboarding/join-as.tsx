@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CompanyForm, ListingForm, ProfessionalForm } from "./forms";
 
-export type JoinKind = "member" | "pro" | "company" | "homestay" | "hospital";
+export type JoinKind = "member" | "pro" | "company" | "homestay" | "facility" | "hospital";
 
 const KINDS: Record<JoinKind, { label: string; line: string; tint: string; icon: string; steps: string[]; time: string; verify: string }> = {
   member: {
@@ -42,6 +42,15 @@ const KINDS: Record<JoinKind, { label: string; line: string; tint: string; icon:
     time: "About 15 minutes",
     verify: "We check your homestay or tourism registration, the owner's ID and the photos before you appear in the directory.",
   },
+  facility: {
+    label: "Gym, studio or wellness centre",
+    line: "Gyms, yoga and pilates studios, pools, spas and wellness centres.",
+    tint: "bg-move text-move-ink",
+    icon: "M6 8v8M3 10v4m15-6v8m3-6v4M6 12h12",
+    steps: ["What you offer, prices, opening hours and amenities", "At least 2 photos", "Business registration and the owner's or manager's ID"],
+    time: "About 10 minutes",
+    verify: "We check your business registration, the person registering and the photos before you appear in the directory.",
+  },
   hospital: {
     label: "Hospital",
     line: "Welcome patients who travel to you for care.",
@@ -52,16 +61,16 @@ const KINDS: Record<JoinKind, { label: string; line: string; tint: string; icon:
     verify: "We verify the registration, the person registering and any accreditation before the profile is public.",
   },
 };
-const ORDER: JoinKind[] = ["member", "pro", "company", "homestay", "hospital"];
+const ORDER: JoinKind[] = ["member", "pro", "company", "homestay", "facility", "hospital"];
 
-export function JoinAs({ initial }: { initial: JoinKind }) {
+export function JoinAs({ initial, kinds = ORDER }: { initial: JoinKind; kinds?: JoinKind[] }) {
   const [kind, setKind] = useState<JoinKind>(initial);
   const k = KINDS[kind];
   return (
     <div className="flex w-full max-w-[1180px] flex-col gap-6">
       <fieldset className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
         <legend className="sr-only">Account type</legend>
-        {ORDER.map((key) => {
+        {ORDER.filter((key) => kinds.includes(key)).map((key) => {
           const c = KINDS[key];
           const on = key === kind;
           return (
@@ -95,7 +104,7 @@ export function JoinAs({ initial }: { initial: JoinKind }) {
             {kind === "member" && <Link href="/connect/setup" className="btn-primary">Set up my Connect profile</Link>}
             {kind === "pro" && <ProfessionalForm />}
             {kind === "company" && <CompanyForm />}
-            {(kind === "homestay" || kind === "hospital") && <ListingForm key={kind} kind={kind} />}
+            {(kind === "homestay" || kind === "hospital" || kind === "facility") && <ListingForm key={kind} kind={kind} />}
           </div>
           <span className="text-[13px] text-muted">{k.time}</span>
         </section>
@@ -103,7 +112,7 @@ export function JoinAs({ initial }: { initial: JoinKind }) {
           <h2 className="font-bold">We verify before you appear</h2>
           <p className="text-[14.5px] leading-relaxed text-white/85">{k.verify}</p>
           <p className="rounded-xl bg-white/10 px-4 py-3 text-[13.5px] leading-relaxed text-white/85">
-            One person can be a member, a professional and an admin of a company, homestay or hospital, all from one sign-in. Add more any time from Home.
+            One person can be a member, a professional and an admin of a company, homestay or gym, all from one sign-in. Add more any time from Home.
           </p>
         </aside>
       </div>

@@ -1,5 +1,5 @@
 /**
- * Homestays and hospitals (M6): organisations of kind "homestay" or "hospital"
+ * Homestays, hospitals and facilities (gyms, studios, wellness centres): organisations of kind "homestay", "hospital" or "facility"
  * with a public listing that appears in a directory only after our team has
  * verified it against a per-type document checklist.
  *
@@ -16,6 +16,8 @@ import { z } from "zod";
 import {
   ACCREDITATIONS,
   CANCELLATION_POLICIES,
+  FACILITY_AMENITIES,
+  FACILITY_TYPES,
   HOMESTAY_FEATURES,
   HOSPITAL_SERVES,
   listing,
@@ -28,6 +30,7 @@ import { getDb, withScope } from "@/db/client";
 import { assertUuid, badRequest, notFound } from "@/lib/errors";
 import { storeListingPhoto, storeOrgDocument } from "@/lib/storage";
 import { audit, enqueue } from "@/modules/platform/outbox";
+import { assertHospitalsVisible, hospitalsVisible } from "@/modules/platform/features";
 import { createOrganization, isActiveMember, listMemberships, ORG_ADMINS, ORG_ALL, renameOrganization, requireOrgRole, orgIsLive, isOrgSuspendedError } from "@/modules/organizations/service";
 
 // ---------- Reference data ----------
@@ -46,6 +49,35 @@ export const DOC_CHECKLIST: Record<ListingKind, ChecklistDoc[]> = {
     { key: "authorisation", label: "Letter authorising you to represent the hospital", hint: "On letterhead, signed by the medical superintendent or an authorised signatory.", required: true },
     { key: "accreditation", label: "Accreditation certificate (NABH, JCI or NABL)", hint: "Optional. Accreditations are shown publicly only after we check the certificate.", required: false },
   ],
+  facility: [
+    { key: "registration", label: "Business registration", hint: "Shop and Establishment certificate, trade licence or GST registration in the facility's name.", required: true },
+    { key: "owner_id", label: "Owner's or manager's photo ID", hint: "PAN, passport, driving licence or Aadhaar with all but the last 4 digits masked. Add a letter of authority if you aren't the owner.", required: true },
+    { key: "certifications", label: "Trainer or instructor certificates", hint: "Optional. For example ACE, ACSM, K11 or a Yoga Certification Board certificate.", required: false },
+  ],
+};
+
+export const FACILITY_TYPE_LABEL: Record<(typeof FACILITY_TYPES)[number], string> = {
+  gym: "Gym",
+  yoga: "Yoga studio",
+  pilates: "Pilates studio",
+  swimming: "Swimming pool",
+  spa: "Spa",
+  wellness_centre: "Wellness centre",
+  sports: "Sports club",
+  martial_arts: "Martial arts",
+  dance: "Dance studio",
+};
+
+export const AMENITY_LABEL: Record<(typeof FACILITY_AMENITIES)[number], string> = {
+  trainers: "Certified trainers",
+  group_classes: "Group classes",
+  women_only: "Women-only batches",
+  showers_lockers: "Showers and lockers",
+  parking: "Parking",
+  step_free: "Step-free access",
+  air_conditioned: "Air-conditioned",
+  steam_sauna: "Steam or sauna",
+  online_classes: "Online classes",
 };
 
 export const FEATURE_LABEL: Record<(typeof HOMESTAY_FEATURES)[number], string> = {
@@ -74,8 +106,8 @@ export const STATUS_LABEL: Record<string, string> = {
   rejected: "Not approved",
 };
 
-export const KIND_LABEL: Record<ListingKind, string> = { homestay: "Homestay", hospital: "Hospital" };
-const MIN_PHOTOS: Record<ListingKind, number> = { homestay: 3, hospital: 1 };
+export const KIND_LABEL: Record<ListingKind, string> = { homestay: "Homestay", hospital: "Hospital", facility: "Gym, studio or wellness centre" };
+const MIN_PHOTOS: Record<ListingKind, number> = { homestay: 3, hospital: 1, facility: 2 };
 const MAX_PHOTOS = 12;
 
 const listOf = (max: number, each = 60) =>
@@ -87,7 +119,7 @@ const listOf = (max: number, each = 60) =>
 // ---------- Creating ----------
 
 export const createListingInput = z.object({
-  kind: z.enum(["homestay", "hospital"]),
+  kind: z.enum(["homestay", "hospital", "facility"]),
   name: z.string().trim().min(2, "Enter a name of at least 2 characters").max(120),
   city: z.string().trim().min(2, "Enter the city").max(80),
 });
@@ -95,6 +127,7 @@ export const createListingInput = z.object({
 /** Creates the organisation (caller becomes owner) and its draft listing in one transaction. */
 export async function createListingOrg(actor: { id: string; email: string; emailVerified: boolean }, input: z.input<typeof createListingInput>) {
   const d = createListingInput.parse(input);
+  if (d.kind === "hospital") await assertHospitalsVisible(actor.id);
   return createOrganization(actor, { name: d.name, kind: d.kind }, async (tx, org) => {
     await tx.insert(listing).values({ orgId: org.id, kind: d.kind, city: d.city, contactEmail: actor.email });
   });
@@ -109,9 +142,12 @@ function readiness(l: typeof listing.$inferSelect, docs: { docType: string; stat
   const profileDone =
     l.kind === "homestay"
       ? Boolean(l.about.length >= 40 && l.city && l.rooms && l.priceFromPaise)
-      : Boolean(l.about.length >= 40 && l.city && l.specialties.length > 0);
+      : l.kind === "facility"
+        ? Boolean(l.about.length >= 40 && l.city && l.facilityTypes.length > 0 && (l.membershipFromPaise || l.dropInPaise))
+        : Boolean(l.about.length >= 40 && l.city && l.specialties.length > 0);
+  const profileLabel = { homestay: "About, city, rooms and price from", hospital: "About, city and at least one specialty", facility: "About, city, what you offer and a price" }[l.kind];
   return [
-    { key: "profile", label: l.kind === "homestay" ? "About, city, rooms and price from" : "About, city and at least one specialty", done: profileDone, required: true },
+    { key: "profile", label: profileLabel, done: profileDone, required: true },
     {
       key: "photos",
       label: MIN_PHOTOS[l.kind] > 1 ? `At least ${MIN_PHOTOS[l.kind]} photos` : "At least 1 photo",
@@ -187,6 +223,14 @@ export const listingInput = z.object({
   serves: z.enum(HOSPITAL_SERVES).default("both"),
   internationalDesk: z.boolean().default(false),
   visaLetter: z.boolean().default(false),
+  // Facility
+  facilityTypes: z.array(z.enum(FACILITY_TYPES)).max(5).default([]),
+  amenities: z.array(z.enum(FACILITY_AMENITIES)).default([]),
+  openingHours: z.string().trim().max(200).default(""),
+  membershipFromRupees: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), rupees.nullable()).default(null),
+  dropInRupees: z.preprocess((v) => (v === "" || v === null || v === undefined ? null : v), rupees.nullable()).default(null),
+  freeTrial: z.boolean().default(false),
+  corporatePlans: z.boolean().default(false),
 });
 
 /** Owners and admins edit the listing. Changing accreditations clears their "checked" mark until staff check again. */
@@ -197,7 +241,9 @@ export async function updateListing(userId: string, orgId: string, input: z.inpu
     const l = await tx.query.listing.findFirst({ where: eq(listing.orgId, orgId) });
     if (!l) throw notFound("Listing not found");
     const homestay = l.kind === "homestay";
-    const accreditations = homestay ? [] : d.accreditations;
+    const hospital = l.kind === "hospital";
+    const facility = l.kind === "facility";
+    const accreditations = hospital ? d.accreditations : [];
     const sameAccreditations = [...accreditations].sort().join() === [...l.accreditations].sort().join();
     await renameOrganization(orgId, d.name, tx);
     const [row] = await tx
@@ -221,13 +267,20 @@ export async function updateListing(userId: string, orgId: string, input: z.inpu
         minNights: d.minNights,
         checkInTime: d.checkInTime,
         checkOutTime: d.checkOutTime,
-        specialties: homestay ? [] : d.specialties,
+        specialties: hospital ? d.specialties : [],
         accreditations,
         accreditationVerified: sameAccreditations ? l.accreditationVerified : false,
-        beds: homestay ? null : d.beds,
+        beds: hospital ? d.beds : null,
         serves: d.serves,
-        internationalDesk: homestay ? false : d.internationalDesk,
-        visaLetter: homestay ? false : d.visaLetter,
+        internationalDesk: hospital ? d.internationalDesk : false,
+        visaLetter: hospital ? d.visaLetter : false,
+        facilityTypes: facility ? d.facilityTypes : [],
+        amenities: facility ? d.amenities : [],
+        openingHours: facility ? d.openingHours : "",
+        membershipFromPaise: facility && d.membershipFromRupees !== null ? d.membershipFromRupees * 100 : null,
+        dropInPaise: facility && d.dropInRupees !== null ? d.dropInRupees * 100 : null,
+        freeTrial: facility ? d.freeTrial : false,
+        corporatePlans: facility ? d.corporatePlans : false,
         updatedAt: new Date(),
       })
       .where(eq(listing.orgId, orgId))
@@ -343,7 +396,7 @@ export const listingReviewInput = z
 export function staffChecklist(kind: ListingKind, docs: { docType: string }[]) {
   return [
     { key: "details", label: "Name, address and details match the documents", required: true },
-    { key: "photos", label: kind === "homestay" ? "Photos show the real property and rooms" : "Photos show the hospital", required: true },
+    { key: "photos", label: { homestay: "Photos show the real property and rooms", hospital: "Photos show the hospital", facility: "Photos show the real facility" }[kind], required: true },
     ...DOC_CHECKLIST[kind].map((c) => ({
       key: c.key,
       label: `${c.label}: valid, readable and in the listing's name`,
@@ -406,6 +459,8 @@ export const directoryInput = z.object({
   city: z.string().trim().max(80).optional(),
   q: z.string().trim().max(80).optional(),
   feature: z.enum(HOMESTAY_FEATURES).optional(),
+  type: z.enum(FACILITY_TYPES).optional().catch(undefined),
+  amenity: z.enum(FACILITY_AMENITIES).optional().catch(undefined),
   specialty: z.string().trim().max(60).optional(),
   international: z.coerce.boolean().optional(),
 });
@@ -415,8 +470,9 @@ function firstPhotoSql() {
 }
 
 /** Verified listings only, newest verified first. */
-export async function listDirectory(kind: ListingKind, filters: z.input<typeof directoryInput> = {}) {
+export async function listDirectory(kind: ListingKind, filters: z.input<typeof directoryInput> = {}, viewerId: string | null = null) {
   const f = directoryInput.parse(filters);
+  if (kind === "hospital" && !(await hospitalsVisible(viewerId))) return [];
   const where: (SQL | undefined)[] = [visible(kind)];
   if (f.city) where.push(ilike(listing.city, `${f.city.replace(/[%_]/g, "")}%`));
   if (f.q) {
@@ -424,6 +480,8 @@ export async function listDirectory(kind: ListingKind, filters: z.input<typeof d
     where.push(or(ilike(organization.name, q), ilike(listing.tagline, q), ilike(listing.area, q), sql`array_to_string(${listing.specialties}, ',') ilike ${q}`));
   }
   if (f.feature) where.push(sql`${f.feature} = any(${listing.features})`);
+  if (f.type) where.push(sql`${f.type} = any(${listing.facilityTypes})`);
+  if (f.amenity) where.push(sql`${f.amenity} = any(${listing.amenities})`);
   if (f.specialty) where.push(sql`exists (select 1 from unnest(${listing.specialties}) s where s ilike ${f.specialty.replace(/[%_]/g, "")})`);
   if (f.international) where.push(inArray(listing.serves, ["international", "both"]));
   const rows = await getDb()
@@ -445,6 +503,7 @@ function publicFields(l: typeof listing.$inferSelect) {
 
 /** A listing page: public when verified; members of the organisation can preview it before that. */
 export async function getPublicListing(viewerId: string | null, kind: ListingKind, slug: string) {
+  if (kind === "hospital") await assertHospitalsVisible(viewerId);
   const db = getDb();
   const [row] = await db
     .select({ listing, org: organization })
@@ -469,12 +528,13 @@ export async function openListingPhoto(viewerId: string | null, photoId: string,
   assertUuid(photoId, "Photo");
   const db = getDb();
   const [row] = await db
-    .select({ blobPath: listingPhoto.blobPath, orgId: listingPhoto.orgId, status: listing.status, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
+    .select({ blobPath: listingPhoto.blobPath, orgId: listingPhoto.orgId, kind: listing.kind, status: listing.status, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
     .from(listingPhoto)
     .innerJoin(listing, eq(listing.orgId, listingPhoto.orgId))
     .innerJoin(organization, eq(organization.id, listingPhoto.orgId))
     .where(eq(listingPhoto.id, photoId));
   if (!row) throw notFound("Photo not found");
+  if (row.kind === "hospital" && !isStaff) await assertHospitalsVisible(viewerId);
   const isPublic = row.status === "verified" && live(row);
   if (!isPublic && !isStaff && !(await isActiveMember(viewerId, row.orgId))) throw notFound("Photo not found");
   return { blobPath: row.blobPath, isPublic };
@@ -489,12 +549,15 @@ export async function directoryCounts() {
     .where(and(eq(listing.status, "verified"), orgIsLive()))
     .groupBy(listing.kind);
   const get = (k: string) => rows.find((r) => r.kind === k)?.n ?? 0;
-  return { homestays: get("homestay"), hospitals: get("hospital") };
+  return { homestays: get("homestay"), hospitals: (await hospitalsVisible(null)) ? get("hospital") : 0, facilities: get("facility") };
 }
 
 /** The homestays and hospitals this user belongs to (app home and navigation). */
 export async function listingsForUser(userId: string) {
-  const mine = (await listMemberships(userId)).filter((r) => r.membership.status === "active" && (r.organization.kind === "homestay" || r.organization.kind === "hospital"));
+  const showHospitals = await hospitalsVisible(userId);
+  const mine = (await listMemberships(userId)).filter(
+    (r) => r.membership.status === "active" && (r.organization.kind === "homestay" || r.organization.kind === "facility" || (r.organization.kind === "hospital" && showHospitals)),
+  );
   if (!mine.length) return [];
   const rows = await getDb().select({ orgId: listing.orgId, status: listing.status, kind: listing.kind }).from(listing).where(inArray(listing.orgId, mine.map((m) => m.organization.id)));
   return mine.flatMap((m) => {

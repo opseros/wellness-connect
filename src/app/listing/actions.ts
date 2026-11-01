@@ -61,6 +61,13 @@ export async function saveListingAction(form: FormData) {
       serves: (str(form, "serves") || "both") as never,
       internationalDesk: form.get("internationalDesk") === "on",
       visaLetter: form.get("visaLetter") === "on",
+      facilityTypes: form.getAll("facilityTypes").map(String) as never,
+      amenities: form.getAll("amenities").map(String) as never,
+      openingHours: str(form, "openingHours"),
+      membershipFromRupees: str(form, "membershipFromRupees"),
+      dropInRupees: str(form, "dropInRupees"),
+      freeTrial: form.get("freeTrial") === "on",
+      corporatePlans: form.get("corporatePlans") === "on",
     }),
   );
 }

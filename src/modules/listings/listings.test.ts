@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
-import { makeUser } from "@/test/factories";
+import { makeUser, setFeature } from "@/test/factories";
 import { withScope, type DB } from "@/db/client";
 import { auditLog, membership, orgDocument, stay } from "@/db/schema";
 import { processOutbox } from "@/modules/platform/outbox";
@@ -55,6 +55,7 @@ const ABOUT = "A quiet garden home ten minutes from the hospital, with a ground-
 beforeAll(async () => {
   t = await createTestDb();
   db = t.db;
+  await setFeature(db, "hospitals", true);
   host = await makeUser(db, "host@example.test", "Asha Host");
   hospitalAdmin = await makeUser(db, "desk@aranya.test", "Ravi Desk");
   stranger = await makeUser(db);
@@ -150,7 +151,7 @@ describe("homestay: sign up, verify, appear", () => {
     expect(await listDirectory("homestay", { feature: "step_free" })).toHaveLength(1);
     expect((await getPublicListing(null, "homestay", stayslug)).isPublic).toBe(true);
     expect((await openListingPhoto(null, dir[0].photoId!)).isPublic).toBe(true);
-    expect(await directoryCounts()).toEqual({ homestays: 1, hospitals: 0 });
+    expect(await directoryCounts()).toEqual({ homestays: 1, hospitals: 0, facilities: 0 });
     const docs = await withScope({ userId: host.id, orgId: stayId }, (tx) => tx.select().from(orgDocument));
     expect(docs.every((d) => d.status === "approved")).toBe(true);
   });

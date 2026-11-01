@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getStaffOrExit, when } from "../staff";
-import { listOrganizations, type OrgFilter } from "@/modules/admin/service";
+import { listOrganizations, staffSeesHospitals, type OrgFilter } from "@/modules/admin/service";
 import { STATUS_LABEL } from "@/modules/listings/service";
 import { Badge, Flash, PageTitle, Table, Tabs } from "../ui";
 
@@ -14,6 +14,7 @@ const filters: { key: OrgFilter; label: string }[] = [
 const GROUPS = [
   { kind: "company", title: "Companies", line: "Book wellness programmes for their teams.", review: null },
   { kind: "homestay", title: "Homestays", line: "Host guests for rest, recovery and retreats.", review: "/admin/homestays" },
+  { kind: "facility", title: "Gyms, studios and wellness centres", line: "Places to move, stretch and recharge.", review: "/admin/facilities" },
   { kind: "hospital", title: "Hospitals", line: "Care & Travel: receive patients who travel for treatment.", review: "/admin/hospitals" },
 ] as const;
 
@@ -29,7 +30,9 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
   const sp = await searchParams;
   const q = sp.q ?? "";
   const filter = filters.find((f) => f.key === sp.filter)?.key ?? "active";
-  const rows = await listOrganizations(me, q, filter);
+  const [all, showHospitals] = await Promise.all([listOrganizations(me, q, filter), staffSeesHospitals(me)]);
+  const rows = showHospitals ? all : all.filter((r) => r.kind !== "hospital");
+  const groups = GROUPS.filter((g) => showHospitals || g.kind !== "hospital");
   const href = (f: OrgFilter) => `/admin/organizations?filter=${f}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   return (
@@ -44,14 +47,14 @@ export default async function OrganizationsPage({ searchParams }: { searchParams
         <button className="btn-outline">Search</button>
       </form>
       <nav aria-label="Jump to" className="flex flex-wrap gap-2 text-sm font-semibold">
-        {GROUPS.map((g) => (
+        {groups.map((g) => (
           <a key={g.kind} href={`#${g.kind}`} className="rounded-full border border-line bg-white px-3.5 py-1.5 hover:border-brand">
             {g.title} <span className="text-muted">{rows.filter((r) => r.kind === g.kind).length}</span>
           </a>
         ))}
       </nav>
 
-      {GROUPS.map((g) => {
+      {groups.map((g) => {
         const list = rows.filter((r) => r.kind === g.kind);
         return (
           <section key={g.kind} id={g.kind} aria-labelledby={`${g.kind}-h`} className="card flex scroll-mt-6 flex-col gap-4 p-5 sm:p-6">

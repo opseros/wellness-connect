@@ -2,7 +2,7 @@ import { pgTable, uuid, text, timestamp, uniqueIndex, index } from "drizzle-orm/
 import { user } from "./auth";
 
 /** One login per person; companies, homestays and hospitals are organisations with members and roles. */
-export const ORG_KINDS = ["company", "provider", "homestay", "hospital"] as const;
+export const ORG_KINDS = ["company", "provider", "homestay", "hospital", "facility"] as const;
 export type OrgKind = (typeof ORG_KINDS)[number];
 
 export const organization = pgTable(

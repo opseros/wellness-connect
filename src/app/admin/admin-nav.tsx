@@ -2,17 +2,19 @@
 import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
-export function AdminNav({ pending, homestays = 0, hospitals = 0, reports, finance = 0 }: { pending: number; homestays?: number; hospitals?: number; reports: number; finance?: number }) {
+export function AdminNav({ pending, homestays = 0, hospitals = 0, facilities = 0, showHospitals = true, isSuper = false, reports, finance = 0 }: { pending: number; homestays?: number; hospitals?: number; facilities?: number; showHospitals?: boolean; isSuper?: boolean; reports: number; finance?: number }) {
   const path = usePathname();
   const items = [
     { href: "/admin", label: "Professionals", badge: pending, match: (p: string) => p === "/admin" || p.startsWith("/admin/credentials") },
     { href: "/admin/homestays", label: "Homestays", badge: homestays, match: (p: string) => p.startsWith("/admin/homestays") },
-    { href: "/admin/hospitals", label: "Hospitals", badge: hospitals, match: (p: string) => p.startsWith("/admin/hospitals") },
+    { href: "/admin/facilities", label: "Gyms & studios", badge: facilities, match: (p: string) => p.startsWith("/admin/facilities") },
+    ...(showHospitals ? [{ href: "/admin/hospitals", label: "Hospitals", badge: hospitals, match: (p: string) => p.startsWith("/admin/hospitals") }] : []),
     { href: "/admin/users", label: "Users", match: (p: string) => p.startsWith("/admin/users") },
     { href: "/admin/organizations", label: "Organizations", match: (p: string) => p.startsWith("/admin/organizations") },
     { href: "/admin/finance", label: "Finance", badge: finance, match: (p: string) => p.startsWith("/admin/finance") },
     { href: "/admin/reports", label: "Reports", badge: reports, match: (p: string) => p.startsWith("/admin/reports") },
     { href: "/admin/audit", label: "Audit log", match: (p: string) => p.startsWith("/admin/audit") },
+    ...(isSuper ? [{ href: "/admin/settings", label: "Settings", match: (p: string) => p.startsWith("/admin/settings") }] : []),
   ];
   return (
     <nav aria-label="Admin" className="flex flex-wrap gap-1 text-sm font-semibold">

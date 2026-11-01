@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/modules/identity/session";
 import { listMembers } from "@/modules/organizations/service";
-import { ACCREDITATIONS_LIST, FEATURE_LABEL, getListingWorkspace, SERVES_LABEL, STATUS_LABEL } from "@/modules/listings/service";
+import { ACCREDITATIONS_LIST, AMENITY_LABEL, FACILITY_TYPE_LABEL, FEATURE_LABEL, getListingWorkspace, SERVES_LABEL, STATUS_LABEL } from "@/modules/listings/service";
 import { POLICY_TEXT } from "@/modules/stays/policy";
 import { STATE_NAMES } from "@/modules/marketplace/payments";
 import { Badge, Flash } from "@/components/ui";
@@ -26,8 +26,9 @@ export default async function ListingWorkspace({ params, searchParams }: { param
   const team = await listMembers(me.id, orgId);
   const l = w.listing;
   const homestay = l.kind === "homestay";
-  const noun = homestay ? "homestay" : "hospital";
-  const publicHref = `/${homestay ? "homestays" : "hospitals"}/${w.org.slug}`;
+  const facility = l.kind === "facility";
+  const noun = { homestay: "homestay", hospital: "hospital", facility: "facility" }[l.kind];
+  const publicHref = `/${{ homestay: "homestays", hospital: "hospitals", facility: "facilities" }[l.kind]}/${w.org.slug}`;
   const hidden = <input type="hidden" name="orgId" value={orgId} />;
   const ro = !w.canEdit;
   const field = "flex flex-col gap-1.5 text-sm font-semibold";
@@ -36,7 +37,7 @@ export default async function ListingWorkspace({ params, searchParams }: { param
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <span className="text-[13px] font-semibold uppercase tracking-wide text-muted">{homestay ? "Homestay workspace" : "Hospital workspace"}</span>
+          <span className="text-[13px] font-semibold uppercase tracking-wide text-muted">{{ homestay: "Homestay workspace", hospital: "Hospital workspace", facility: "Facility workspace" }[l.kind]}</span>
           <h1 className="font-display text-[30px] font-extrabold leading-tight">{w.org.name}</h1>
         </div>
         <span className="flex items-center gap-3">
@@ -90,7 +91,7 @@ export default async function ListingWorkspace({ params, searchParams }: { param
           {hidden}
           <fieldset disabled={ro} className="contents">
             <label className={field}>Name<input name="name" required minLength={2} maxLength={120} defaultValue={w.org.name} className="input" /></label>
-            <label className={field}>One-line tagline<input name="tagline" maxLength={140} defaultValue={l.tagline} className="input" placeholder={homestay ? "Garden home for quiet recovery stays" : "Orthopaedic and cardiac care with an international desk"} /></label>
+            <label className={field}>One-line tagline<input name="tagline" maxLength={140} defaultValue={l.tagline} className="input" placeholder={{ homestay: "Garden home for quiet recovery stays", hospital: "Orthopaedic and cardiac care with an international desk", facility: "Strength, yoga and a pool, five minutes from the metro" }[l.kind]} /></label>
             <label className={`${field} col-span-full`}>About (at least 40 characters)
               <textarea name="about" rows={4} maxLength={3000} defaultValue={l.about} className="input py-2.5" />
             </label>
@@ -101,7 +102,31 @@ export default async function ListingWorkspace({ params, searchParams }: { param
             <label className={field}>Area or landmark (public)<input name="area" maxLength={120} defaultValue={l.area} className="input" placeholder="Near Kuvempunagar" /></label>
             <label className={field}>Languages spoken<input name="languages" defaultValue={l.languages.join(", ")} className="input" placeholder="English, Kannada, Hindi" /></label>
 
-            {homestay ? (
+            {facility ? (
+              <>
+                <fieldset className="col-span-full flex flex-col gap-2">
+                  <legend className="mb-2 text-sm font-semibold">What you offer (up to 5)</legend>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2">
+                    {Object.entries(FACILITY_TYPE_LABEL).map(([k, v]) => (
+                      <label key={k} className="flex items-center gap-2 text-[15px]"><input type="checkbox" name="facilityTypes" value={k} defaultChecked={l.facilityTypes.includes(k)} className="size-4 accent-brand" />{v}</label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className={field}>Membership from (₹ a month)<input name="membershipFromRupees" type="number" min={0} step={1} defaultValue={l.membershipFromPaise !== null ? l.membershipFromPaise / 100 : ""} className="input" /></label>
+                <label className={field}>Drop-in or single class (₹)<input name="dropInRupees" type="number" min={0} step={1} defaultValue={l.dropInPaise !== null ? l.dropInPaise / 100 : ""} className="input" /></label>
+                <label className={`${field} col-span-full`}>Opening hours<input name="openingHours" maxLength={200} defaultValue={l.openingHours} className="input" placeholder="Mon to Sat 6 am to 10 pm, Sun 7 am to 1 pm" /></label>
+                <fieldset className="col-span-full flex flex-col gap-2">
+                  <legend className="mb-2 text-sm font-semibold">Amenities</legend>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-2">
+                    {Object.entries(AMENITY_LABEL).map(([k, v]) => (
+                      <label key={k} className="flex items-center gap-2 text-[15px]"><input type="checkbox" name="amenities" value={k} defaultChecked={l.amenities.includes(k)} className="size-4 accent-brand" />{v}</label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label className="flex items-center gap-2 text-[15px]"><input type="checkbox" name="freeTrial" defaultChecked={l.freeTrial} className="size-4 accent-brand" />Free trial session</label>
+                <label className="flex items-center gap-2 text-[15px]"><input type="checkbox" name="corporatePlans" defaultChecked={l.corporatePlans} className="size-4 accent-brand" />Corporate or team memberships</label>
+              </>
+            ) : homestay ? (
               <>
                 <label className={field}>Rooms<input name="rooms" type="number" min={0} max={50} defaultValue={l.rooms ?? ""} className="input" /></label>
                 <label className={field}>Guests at most<input name="maxGuests" type="number" min={0} max={200} defaultValue={l.maxGuests ?? ""} className="input" /></label>
@@ -144,7 +169,7 @@ export default async function ListingWorkspace({ params, searchParams }: { param
             )}
 
             <div className="col-span-full mt-2 border-t border-line pt-4">
-              <p className="mb-3 text-sm text-muted">{homestay ? "For our verification team only; never shown publicly." : "Your international desk contact: for our verification team and, once they accept your quote, your patients. Never shown publicly."}</p>
+              <p className="mb-3 text-sm text-muted">{homestay || facility ? "For our verification team only; never shown publicly." : "Your international desk contact: for our verification team and, once they accept your quote, your patients. Never shown publicly."}</p>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
                 <label className={field}>Contact email<input name="contactEmail" type="email" defaultValue={l.contactEmail} className="input" /></label>
                 <label className={field}>Contact phone<input name="contactPhone" type="tel" defaultValue={l.contactPhone} className="input" /></label>
@@ -159,7 +184,7 @@ export default async function ListingWorkspace({ params, searchParams }: { param
       <section id="photos" aria-labelledby="photos-h" className="card scroll-mt-6 flex flex-col gap-4 p-6">
         <div>
           <h2 id="photos-h" className="text-lg font-bold">Photos</h2>
-          <p className="text-sm text-muted">{homestay ? "At least 3: the outside, a bedroom and the bathroom or common area." : "At least 1: the building or reception."} Photos are public once you&apos;re verified.</p>
+          <p className="text-sm text-muted">{{ homestay: "At least 3: the outside, a bedroom and the bathroom or common area.", hospital: "At least 1: the building or reception.", facility: "At least 2: the main floor or studio, and the entrance or changing area." }[l.kind]} Photos are public once you&apos;re verified.</p>
         </div>
         {w.photos.length > 0 && (
           <ul className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">

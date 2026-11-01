@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStaffOrExit, when } from "../../staff";
-import { getOrganizationDetail } from "@/modules/admin/service";
+import { getOrganizationDetail, staffSeesHospitals } from "@/modules/admin/service";
 import { STATUS_LABEL } from "@/modules/listings/service";
 import { AppError } from "@/lib/errors";
 import { editOrganizationAction, removeOrganizationAction, setDomainAction, suspendOrganizationAction, unsuspendOrganizationAction } from "../../actions";
 import { Badge, Flash, PageTitle } from "../../ui";
 
-const KIND = { company: "Company", homestay: "Homestay", hospital: "Hospital · Care & Travel" } as const;
-const BACK = { company: "/admin/organizations#company", homestay: "/admin/organizations#homestay", hospital: "/admin/organizations#hospital" } as const;
+const KIND = { company: "Company", homestay: "Homestay", hospital: "Hospital · Care & Travel", facility: "Gym, studio or wellness centre", provider: "Provider" } as const;
+const BACK = {
+  company: "/admin/organizations#company",
+  homestay: "/admin/organizations#homestay",
+  hospital: "/admin/organizations#hospital",
+  facility: "/admin/organizations#facility",
+  provider: "/admin/organizations",
+} as const;
+const DIR = { homestay: "homestays", hospital: "hospitals", facility: "facilities" } as const;
 const roleLabel: Record<string, string> = { owner: "Owner", admin: "Admin", wellness_manager: "Wellness manager", member: "Member" };
 
 function Field({ id, label, value, type = "text", hint }: { id: string; label: string; value: string; type?: string; hint?: string }) {
@@ -30,11 +37,13 @@ export default async function OrganizationDetail({ params, searchParams }: { par
     throw e;
   });
   const { org, listing: l } = d;
+  if (org.kind === "hospital" && !(await staffSeesHospitals(me))) notFound();
   const kind = org.kind as keyof typeof KIND;
   const isSuper = me.platformRole === "super_admin";
   const canChange = isSuper && !org.removedAt;
-  const reviewHref = kind === "homestay" ? `/admin/homestays/${org.id}` : kind === "hospital" ? `/admin/hospitals/${org.id}` : null;
-  const publicHref = l && l.status === "verified" ? `/${kind === "homestay" ? "homestays" : "hospitals"}/${org.slug}` : null;
+  const dir = l ? DIR[l.kind] : null;
+  const reviewHref = dir ? `/admin/${dir}/${org.id}` : null;
+  const publicHref = l && dir && l.status === "verified" ? `/${dir}/${org.slug}` : null;
 
   return (
     <>

@@ -6,6 +6,7 @@ import { navOptions } from "@/components/nav-options";
 import { listBuyerOrgs } from "@/modules/organizations/service";
 import { listOrgProposals } from "@/modules/marketplace/service";
 import { getCompanyOrExit } from "./company";
+import { hospitalsVisible } from "@/modules/platform/features";
 import { CompanyNav } from "./company-nav";
 
 export const metadata: Metadata = { title: { default: "Company", template: "%s Â· Company" } };
@@ -13,10 +14,11 @@ export const metadata: Metadata = { title: { default: "Company", template: "%s Â
 export default async function CompanyLayout({ children, params }: { children: React.ReactNode; params: Promise<{ orgId: string }> }) {
   const { orgId } = await params;
   const { me, org, isBuyer, isAdmin } = await getCompanyOrExit(orgId);
-  const [nav, orgs, proposals] = await Promise.all([
+  const [nav, orgs, proposals, healthChecks] = await Promise.all([
     navOptions(me.id),
     listBuyerOrgs(me.id),
     isBuyer ? listOrgProposals(me.id, orgId) : Promise.resolve([]),
+    hospitalsVisible(me.id),
   ]);
   const toReview = proposals.filter((p) => p.proposal.status === "submitted" && p.requirementStatus === "published").length;
   const others = orgs.filter((o) => o.organization.id !== orgId);
@@ -25,7 +27,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
       <AppHeader name={me.name} nav={mainNav(me, "company", { ...nav, companyHref: `/company/${orgId}` })} />
       <div className="border-b border-line bg-ground">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-x-4 gap-y-1 px-6 py-2">
-          <CompanyNav base={`/company/${orgId}`} toReview={toReview} isBuyer={isBuyer} isAdmin={isAdmin} />
+          <CompanyNav base={`/company/${orgId}`} toReview={toReview} isBuyer={isBuyer} isAdmin={isAdmin} healthChecks={healthChecks} />
           <span className="flex items-center gap-2 text-sm text-muted">
             <span className="font-semibold text-ink">{org.name}</span>
             {others.map((o) => (

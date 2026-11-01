@@ -2,14 +2,14 @@
 import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
-export function CompanyNav({ base, toReview, isBuyer, isAdmin }: { base: string; toReview: number; isBuyer: boolean; isAdmin: boolean }) {
+export function CompanyNav({ base, toReview, isBuyer, isAdmin, healthChecks = false }: { base: string; toReview: number; isBuyer: boolean; isAdmin: boolean; healthChecks?: boolean }) {
   const path = usePathname();
   const items = [
     { href: base, label: "Dashboard", show: true, match: (p: string) => p === base },
     { href: `${base}/requirements`, label: "Requirements", show: isBuyer, match: (p: string) => p.startsWith(`${base}/requirements`) },
     { href: `${base}/proposals`, label: "Proposals", show: isBuyer, badge: toReview, match: (p: string) => p.startsWith(`${base}/proposals`) },
     { href: `${base}/bookings`, label: "Bookings", show: isBuyer, match: (p: string) => p.startsWith(`${base}/bookings`) },
-    { href: `${base}/health-checks`, label: "Health check-ups", show: isBuyer, match: (p: string) => p.startsWith(`${base}/health-checks`) },
+    { href: `${base}/health-checks`, label: "Health check-ups", show: isBuyer && healthChecks, match: (p: string) => p.startsWith(`${base}/health-checks`) },
     { href: `${base}/invoices`, label: "Invoices", show: isBuyer, match: (p: string) => p.startsWith(`${base}/invoices`) },
     { href: `${base}/settings`, label: isAdmin ? "Settings & members" : "Members", show: true, match: (p: string) => p.startsWith(`${base}/settings`) },
   ].filter((i) => i.show);

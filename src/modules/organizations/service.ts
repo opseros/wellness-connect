@@ -8,6 +8,7 @@ import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { sendEmail } from "@/lib/email";
 import { BRAND } from "@/lib/brand";
 import { enqueue, audit } from "@/modules/platform/outbox";
+import { hospitalsVisible } from "@/modules/platform/features";
 
 /** Free/public mailbox domains never link someone to a company. */
 export const PUBLIC_EMAIL_DOMAINS = new Set([
@@ -29,7 +30,7 @@ const slugify = (s: string) =>
 
 export const createOrganizationInput = z.object({
   name: z.string().trim().min(2).max(120),
-  kind: z.enum(["company", "provider", "homestay", "hospital"]).default("company"),
+  kind: z.enum(["company", "provider", "homestay", "hospital", "facility"]).default("company"),
 });
 
 /**
@@ -108,12 +109,14 @@ async function queryMemberships(userId: string, db: Executor) {
 export async function requireOrgRole(userId: string, orgId: string, roles: readonly OrgRole[], db: Executor = getDb()) {
   assertUuid(orgId, "Organization");
   const [row] = await db
-    .select({ m: membership, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
+    .select({ m: membership, kind: organization.kind, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
     .from(membership)
     .innerJoin(organization, eq(organization.id, membership.orgId))
     .where(and(eq(membership.orgId, orgId), eq(membership.userId, userId), eq(membership.status, "active")));
   if (!row || !roles.includes(row.m.role)) throw forbidden();
   if (row.suspendedAt || row.removedAt) throw forbidden(ORG_SUSPENDED);
+  // Hospitals are switched off by default (Admin → Settings): their workspaces don't exist until then.
+  if (row.kind === "hospital" && !(await hospitalsVisible(userId, db))) throw notFound("Organization not found");
   return row.m;
 }
 

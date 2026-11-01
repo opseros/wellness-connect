@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp, integer, jsonb, bigserial, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, jsonb, bigserial, index, boolean } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 
 // Transactional outbox: write an event in the same transaction as the
@@ -31,3 +31,14 @@ export const auditLog = pgTable(
   },
   (t) => [index("audit_target_idx").on(t.targetType, t.targetId)],
 );
+
+/**
+ * Platform switches that super admins flip in Admin → Settings (e.g. "hospitals").
+ * A missing row means the feature's default in src/modules/platform/features.ts.
+ */
+export const featureFlag = pgTable("feature_flag", {
+  key: text("key").primaryKey(),
+  enabled: boolean("enabled").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by").references(() => user.id),
+});

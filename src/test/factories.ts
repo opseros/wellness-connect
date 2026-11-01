@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { category, credential, professionalCategory, professionalProfile, service, user } from "@/db/schema";
+import { category, credential, featureFlag, professionalCategory, professionalProfile, service, user } from "@/db/schema";
 import type { DB } from "@/db/client";
 
 let n = 0;
@@ -49,4 +49,9 @@ export async function makeProfessional(
     priceMaxPaise: (opts.priceMax ?? 45_000) * 100,
   });
   return { user: u, profile: p };
+}
+
+/** Platform switches (the migrations start hospitals off). */
+export async function setFeature(db: DB, key: string, enabled: boolean) {
+  await db.insert(featureFlag).values({ key, enabled }).onConflictDoUpdate({ target: featureFlag.key, set: { enabled } });
 }

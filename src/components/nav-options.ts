@@ -12,6 +12,6 @@ export const navOptions = cache(async (userId: string): Promise<NavOptions> => {
   return {
     professional: Boolean(pro),
     companyHref: orgs.length ? `/company/${orgs[0].organization.id}` : null,
-    listing: l ? { href: `/listing/${l.orgId}`, label: l.kind === "hospital" ? "Hospital" : "Homestay" } : null,
+    listing: l ? { href: `/listing/${l.orgId}`, label: { homestay: "Homestay", hospital: "Hospital", facility: "Facility" }[l.kind] } : null,
   };
 });

@@ -14,6 +14,7 @@ import {
   adminUpdateFinanceSettings,
   decideCredential,
   editOrganization,
+  setPlatformFeature,
   removeOrganization,
   suspendOrganization,
   unsuspendOrganization,
@@ -197,7 +198,8 @@ export async function decideListingAction(form: FormData) {
   const orgId = String(form.get("orgId"));
   const decision = String(form.get("decision")) as "approved" | "changes_requested" | "rejected";
   const label = decision === "approved" ? "Verified. It's now in the directory and the owners have been emailed." : decision === "changes_requested" ? "Changes requested. The owners have been emailed." : "Not approved. The owners have been emailed.";
-  const base = String(form.get("kind")) === "hospital" ? "/admin/hospitals" : "/admin/homestays";
+  const k = String(form.get("kind"));
+  const base = k === "hospital" ? "/admin/hospitals" : k === "facility" ? "/admin/facilities" : "/admin/homestays";
   await run(`${base}/${orgId}`, label, () =>
     decideListing(staff, orgId, { decision, note: String(form.get("note") ?? ""), checked: form.getAll("checked").map(String) }),
   );
@@ -239,4 +241,13 @@ export async function removeOrganizationAction(form: FormData) {
   const staff = await requirePlatformStaff();
   const id = String(form.get("orgId"));
   await run(`/admin/organizations/${id}`, "Removed. Its team no longer has access; records are kept.", () => removeOrganization(staff, id, String(form.get("confirm") ?? "")));
+}
+
+// ---------- Platform switches ----------
+
+export async function setFeatureAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const key = String(form.get("key")) as "hospitals";
+  const enabled = String(form.get("enabled")) === "1";
+  await run("/admin/settings", enabled ? "Switched on. Everyone can see it now." : "Switched off. Only super admins can see it now.", () => setPlatformFeature(staff, { key, enabled }));
 }

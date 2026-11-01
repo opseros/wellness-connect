@@ -1,3 +1,4 @@
+import { getCurrentUser } from "@/modules/identity/session";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DirectoryHero, DirectoryShell, EmptyDirectory, FilterBar } from "@/components/directory";
@@ -7,7 +8,8 @@ export const metadata: Metadata = { title: "Verified hospitals", description: "H
 
 export default async function HospitalDirectory({ searchParams }: { searchParams: Promise<{ q?: string; city?: string; specialty?: string; international?: string }> }) {
   const sp = await searchParams;
-  const rows = await listDirectory("hospital", { q: sp.q || undefined, city: sp.city || undefined, specialty: sp.specialty || undefined, international: sp.international === "1" || undefined });
+  const me = await getCurrentUser();
+  const rows = await listDirectory("hospital", { q: sp.q || undefined, city: sp.city || undefined, specialty: sp.specialty || undefined, international: sp.international === "1" || undefined }, me?.id ?? null);
   return (
     <DirectoryShell>
       <DirectoryHero kicker="Hospitals" title="Hospitals that welcome patients who travel" line="We check each hospital's registration and the person who registered it. Accreditations appear only after we've seen the certificate. We don't rank hospitals by medical outcomes." tint="bg-travel text-travel-ink" />

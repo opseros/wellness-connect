@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
-import { makeUser } from "@/test/factories";
+import { makeUser, setFeature } from "@/test/factories";
 import { withScope, type DB } from "@/db/client";
 import { careQuote, careReport, careReportAccess, careRequest, listing, membership, organization } from "@/db/schema";
 import { readPrivateFile } from "@/lib/storage";
@@ -53,6 +53,7 @@ const ask = (hospitalIds: string[], extra: Record<string, unknown> = {}) =>
 beforeAll(async () => {
   t = await createTestDb();
   db = t.db;
+  await setFeature(db, "hospitals", true);
   [deskA, deskB, deskC, traveller, other, host, hr] = await Promise.all([
     u("desk@aranya.in", "Ravi Desk"),
     u("desk@lotus.in", "Meera Desk"),

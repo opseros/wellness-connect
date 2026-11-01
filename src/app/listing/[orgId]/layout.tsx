@@ -24,16 +24,16 @@ export default async function ListingLayout({ children, params }: { children: Re
     throw e;
   });
   const nav = await navOptions(me.id);
-  const homestay = w.listing.kind === "homestay";
-  const pending = homestay ? await hostPendingCount(me.id, orgId) : await hospitalOpenRequestCount(me.id, orgId);
-  const label = w.listing.kind === "hospital" ? "Hospital" : "Homestay";
+  const kind = w.listing.kind;
+  const pending = kind === "homestay" ? await hostPendingCount(me.id, orgId) : kind === "hospital" ? await hospitalOpenRequestCount(me.id, orgId) : 0;
+  const label = { homestay: "Homestay", hospital: "Hospital", facility: "Facility" }[kind];
   return (
     <div>
       <AppHeader name={me.name} nav={mainNav(me, "listing", { ...nav, listing: { href: `/listing/${orgId}`, label } })} />
       <main className="mx-auto flex max-w-[1120px] flex-col gap-6 px-4 py-8 sm:px-6">
         {(
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <ListingNav base={`/listing/${orgId}`} pending={pending} kind={homestay ? "homestay" : "hospital"} />
+            <ListingNav base={`/listing/${orgId}`} pending={pending} kind={kind} />
             <span className="text-sm font-semibold">{w.org.name}</span>
           </div>
         )}

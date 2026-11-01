@@ -18,10 +18,11 @@ import {
 } from "@/modules/marketplace/payments";
 import { listCategories, setCategoryCommission } from "@/modules/professionals/service";
 import { z } from "zod";
-import { booking, careQuote, invitation, stay, account, auditLog, comment, connection, conversationParticipant, credential, group, listing, listingPhoto, memberProfile, orgDocument, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
+import { featureFlag, booking, careQuote, invitation, stay, account, auditLog, comment, connection, conversationParticipant, credential, group, listing, listingPhoto, memberProfile, orgDocument, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
 import { getDb, withScope, type Tx } from "@/db/client";
 import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit } from "@/modules/platform/outbox";
+import { FEATURES, featureOn, listFeatures, type FeatureKey } from "@/modules/platform/features";
 import { reviewCredential, reviewInput } from "@/modules/professionals/service";
 import { isCompanyDomain } from "@/modules/organizations/service";
 import { getStayInvoice, listStayFinanceQueues, recordStayPayoutAsStaff, stayFinanceOverview, stayPayoutInput } from "@/modules/marketplace/stay-payments";
@@ -97,7 +98,7 @@ export async function decideCredential(actor: StaffActor, credentialId: string, 
 
 export type ListingQueueStatus = "pending" | "changes_requested" | "verified" | "rejected" | "draft" | "all";
 
-export async function listListingQueue(actor: StaffActor, status: ListingQueueStatus = "pending", kind?: "homestay" | "hospital") {
+export async function listListingQueue(actor: StaffActor, status: ListingQueueStatus = "pending", kind?: "homestay" | "hospital" | "facility") {
   assertStaff(actor);
   return getDb()
     .select({ orgId: listing.orgId, kind: listing.kind, status: listing.status, city: listing.city, submittedAt: listing.submittedAt, reviewedAt: listing.reviewedAt, name: organization.name, suspendedAt: organization.suspendedAt, removedAt: organization.removedAt })
@@ -383,6 +384,7 @@ async function openWork(tx: Tx, org: { id: string; kind: string }) {
     const [st] = await tx.select({ n: count() }).from(stay).where(and(eq(stay.orgId, org.id), inArray(stay.status, ["requested", "accepted", "confirmed"])));
     return st.n ? `${st.n} open stay${st.n === 1 ? "" : "s"}` : null;
   }
+  if (org.kind === "facility") return null;
   const [cq] = await tx.select({ n: count() }).from(careQuote).where(and(eq(careQuote.orgId, org.id), inArray(careQuote.status, ["requested", "reports_requested", "quoted"])));
   return cq.n ? `${cq.n} open quote request${cq.n === 1 ? "" : "s"}` : null;
 }
@@ -627,7 +629,9 @@ export async function adminCounts(actor: StaffActor) {
   const byKind = await db.select({ kind: listing.kind, n: count() }).from(listing).where(eq(listing.status, "pending")).groupBy(listing.kind);
   const pendingHomestays = byKind.find((r) => r.kind === "homestay")?.n ?? 0;
   const pendingHospitals = byKind.find((r) => r.kind === "hospital")?.n ?? 0;
-  return { pendingCredentials: pending.n, pendingListings: pendingHomestays + pendingHospitals, pendingHomestays, pendingHospitals, openReports: reports.n, financeAttention: await financeAttentionCount() };
+  const pendingFacilities = byKind.find((r) => r.kind === "facility")?.n ?? 0;
+  const hospitals = actor.platformRole === "super_admin" || (await featureOn("hospitals"));
+  return { pendingCredentials: pending.n, pendingListings: pendingHomestays + pendingHospitals + pendingFacilities, pendingHomestays, pendingHospitals, pendingFacilities, hospitals, openReports: reports.n, financeAttention: await financeAttentionCount() };
 }
 
 
@@ -690,4 +694,32 @@ export async function adminSetCategoryCommission(actor: StaffActor, input: z.inp
   const row = await setCategoryCommission(d.categoryId, d.percent == null ? null : Math.round(d.percent * 100));
   await audit(getDb(), { actorId: actor.id, action: "category.commission", targetType: "category", targetId: row.id, metadata: { commissionBps: row.commissionBps } });
   return row;
+}
+
+// ---------- Platform switches (Admin → Settings) ----------
+
+export async function listPlatformFeatures(actor: StaffActor) {
+  assertStaff(actor);
+  return listFeatures();
+}
+
+export const featureInput = z.object({ key: z.enum(Object.keys(FEATURES) as [FeatureKey, ...FeatureKey[]]), enabled: z.boolean() });
+
+/** Turns a platform feature on or off for everyone (super admins always see it). Audited. */
+export async function setPlatformFeature(actor: StaffActor, input: z.input<typeof featureInput>) {
+  assertSuperAdmin(actor);
+  const d = featureInput.parse(input);
+  return getDb().transaction(async (tx) => {
+    await tx
+      .insert(featureFlag)
+      .values({ key: d.key, enabled: d.enabled, updatedBy: actor.id, updatedAt: new Date() })
+      .onConflictDoUpdate({ target: featureFlag.key, set: { enabled: d.enabled, updatedBy: actor.id, updatedAt: new Date() } });
+    await audit(tx, { actorId: actor.id, action: d.enabled ? "feature.on" : "feature.off", targetType: "feature", targetId: d.key });
+  });
+}
+
+/** Ops staff don't see hospital admin pages while hospitals are switched off. */
+export async function staffSeesHospitals(actor: StaffActor) {
+  assertStaff(actor);
+  return actor.platformRole === "super_admin" || (await featureOn("hospitals"));
 }

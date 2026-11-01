@@ -2,7 +2,8 @@ import { pgTable, uuid, text, timestamp, integer, boolean, index } from "drizzle
 import { user } from "./auth";
 import { organization } from "./organizations";
 
-export const LISTING_KINDS = ["homestay", "hospital"] as const;
+// "facility": gyms, yoga and pilates studios, pools, spas and wellness centres.
+export const LISTING_KINDS = ["homestay", "hospital", "facility"] as const;
 export type ListingKind = (typeof LISTING_KINDS)[number];
 
 /** draft → pending (submitted) → verified | changes_requested | rejected. Only "verified" is ever public. */
@@ -25,6 +26,19 @@ export const HOMESTAY_FEATURES = [
 export const CANCELLATION_POLICIES = ["flexible", "moderate", "strict"] as const;
 
 export const HOSPITAL_SERVES = ["domestic", "international", "both"] as const;
+
+export const FACILITY_TYPES = ["gym", "yoga", "pilates", "swimming", "spa", "wellness_centre", "sports", "martial_arts", "dance"] as const;
+export const FACILITY_AMENITIES = [
+  "trainers",
+  "group_classes",
+  "women_only",
+  "showers_lockers",
+  "parking",
+  "step_free",
+  "air_conditioned",
+  "steam_sauna",
+  "online_classes",
+] as const;
 export const ACCREDITATIONS = ["NABH", "JCI", "NABL"] as const;
 
 /**
@@ -66,6 +80,14 @@ export const listing = pgTable(
     serves: text("serves", { enum: HOSPITAL_SERVES }).notNull().default("both"),
     internationalDesk: boolean("international_desk").notNull().default(false),
     visaLetter: boolean("visa_letter").notNull().default(false),
+    // Facilities (gyms, studios, wellness centres). Prices are "from", in paise.
+    facilityTypes: text("facility_types").array().notNull().default([]),
+    amenities: text("amenities").array().notNull().default([]),
+    openingHours: text("opening_hours").notNull().default(""),
+    membershipFromPaise: integer("membership_from_paise"),
+    dropInPaise: integer("drop_in_paise"),
+    freeTrial: boolean("free_trial").notNull().default(false),
+    corporatePlans: boolean("corporate_plans").notNull().default(false),
     // Review
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),

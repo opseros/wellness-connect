@@ -36,16 +36,22 @@ export function ProfessionalForm() {
   );
 }
 
-export function ListingForm({ kind }: { kind: "homestay" | "hospital" }) {
+const LISTING_COPY = {
+  homestay: { name: "Homestay name", placeholder: "Aranya Garden Stay", button: "List my homestay" },
+  hospital: { name: "Hospital name", placeholder: "Aranya Multispeciality Hospital", button: "Register my hospital" },
+  facility: { name: "Facility name", placeholder: "Lotus Yoga and Fitness Studio", button: "List my facility" },
+};
+
+export function ListingForm({ kind }: { kind: "homestay" | "hospital" | "facility" }) {
   const [error, action, pending] = useActionState(createListingAction, null);
-  const homestay = kind === "homestay";
+  const c = LISTING_COPY[kind];
   return (
     <form action={action} className="flex flex-col gap-3">
       <input type="hidden" name="kind" value={kind} />
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${kind}-name`} className="label">{homestay ? "Homestay name" : "Hospital name"}</label>
-          <input id={`${kind}-name`} name="name" required minLength={2} maxLength={120} className="input" placeholder={homestay ? "Aranya Garden Stay" : "Aranya Multispeciality Hospital"} />
+          <label htmlFor={`${kind}-name`} className="label">{c.name}</label>
+          <input id={`${kind}-name`} name="name" required minLength={2} maxLength={120} className="input" placeholder={c.placeholder} />
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${kind}-city`} className="label">City</label>
@@ -53,7 +59,7 @@ export function ListingForm({ kind }: { kind: "homestay" | "hospital" }) {
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-[#9b2c1f]">{error}</p>}
-      <button className="btn-primary self-start" disabled={pending}>{pending ? "Creating…" : homestay ? "List my homestay" : "Register my hospital"}</button>
+      <button className="btn-primary self-start" disabled={pending}>{pending ? "Creating…" : c.button}</button>
     </form>
   );
 }

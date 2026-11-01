@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getStaffOrExit, when } from "../staff";
-import { listListingQueue, type ListingQueueStatus } from "@/modules/admin/service";
+import { listListingQueue, staffSeesHospitals, type ListingQueueStatus } from "@/modules/admin/service";
+import { notFound } from "next/navigation";
 import { STATUS_LABEL } from "@/modules/listings/service";
 import { Badge, Flash, PageTitle, Table, Tabs } from "../ui";
 
@@ -16,12 +17,14 @@ const STATUSES: { key: ListingQueueStatus; label: string }[] = [
 const TEXT = {
   homestay: { title: "Homestays", subtitle: "Stays for rest, recovery and retreats", path: "/admin/homestays" },
   hospital: { title: "Hospitals", subtitle: "Care & Travel: hospitals that receive travelling patients", path: "/admin/hospitals" },
+  facility: { title: "Gyms, studios and wellness centres", subtitle: "Gyms, yoga and pilates studios, pools, spas and wellness centres", path: "/admin/facilities" },
 } as const;
 
 /** Verification queue for one kind of listing. Homestays and hospitals are reviewed separately. */
-export async function ListingQueuePage({ kind, searchParams }: { kind: "homestay" | "hospital"; searchParams: Promise<{ status?: string; msg?: string; error?: string }> }) {
+export async function ListingQueuePage({ kind, searchParams }: { kind: "homestay" | "hospital" | "facility"; searchParams: Promise<{ status?: string; msg?: string; error?: string }> }) {
   const me = await getStaffOrExit();
   const sp = await searchParams;
+  if (kind === "hospital" && !(await staffSeesHospitals(me))) notFound();
   const t = TEXT[kind];
   const status = STATUSES.find((s) => s.key === sp.status)?.key ?? "pending";
   const rows = await listListingQueue(me, status, kind);
