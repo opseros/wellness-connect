@@ -135,7 +135,6 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
       body: "Host guests who come to rest, recover or hold a small team retreat.",
       points: ["Calendar with your own nightly prices", "You accept each booking request", "Payouts after every stay"],
       primary: { label: "List your homestay", href: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dhomestay" },
-      secondary: { label: "Browse homestays", href: "/homestays" },
       count: counts.homestays > 0 ? `${counts.homestays} verified` : undefined,
       tone: { bg: "bg-travel", ink: "text-travel-ink", ring: "ring-travel-ink/15", dot: "text-travel-ink" },
     },
@@ -146,7 +145,6 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
       body: "Reach working professionals nearby and companies looking for team memberships.",
       points: ["A verified listing with prices and timings", "Show free trials and women-only batches", "Get found by companies for team plans"],
       primary: { label: "List your facility", href: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dfacility" },
-      secondary: { label: "Browse", href: "/facilities" },
       count: counts.facilities > 0 ? `${counts.facilities} verified` : undefined,
       tone: { bg: "bg-move", ink: "text-move-ink", ring: "ring-move-ink/15", dot: "text-move-ink" },
     },
@@ -165,12 +163,13 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
   const cards = all.filter((c) => hospitals || c.key !== "hospital");
 
   return (
-    <section id="more" aria-labelledby="more-h" className="mx-auto max-w-[1200px] scroll-mt-6 px-4 py-16 sm:px-8 sm:py-24">
+    <section id="more" aria-labelledby="more-h" className="scroll-mt-6 border-y border-line bg-white">
+      <div className="mx-auto max-w-[1200px] px-4 py-16 sm:px-8 sm:py-24">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div className="flex max-w-[640px] flex-col gap-3">
           <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-brand">For organisations</p>
-          <h2 id="more-h" className="font-display text-[34px] leading-[1.08] font-extrabold tracking-[-0.02em] sm:text-[44px]">Also on {BRAND.name}</h2>
-          <p className="text-[17px] leading-relaxed text-[#3d4842]">Organisations that look after people join with the same account. Our team verifies each one before it appears.</p>
+          <h2 id="more-h" className="font-display text-[34px] leading-[1.08] font-extrabold tracking-[-0.02em] sm:text-[44px]">Bring your organisation to {BRAND.name}</h2>
+          <p className="text-[17px] leading-relaxed text-[#3d4842]">Companies, homestay hosts and gyms join with the same free account. Our team verifies each one before it appears.</p>
         </div>
         <p className="flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13.5px] font-semibold ring-1 ring-line">
           <svg aria-hidden viewBox="0 0 24 24" className="size-4 text-brand" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3Z" /><path d="m9 12 2 2 4-4" /></svg>
@@ -180,7 +179,7 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
 
       <div className={`mt-10 grid gap-5 md:grid-cols-2 ${cards.length === 4 ? "xl:grid-cols-4" : "lg:grid-cols-3"}`}>
         {cards.map((c) => (
-          <article key={c.key} className="group flex flex-col overflow-hidden rounded-[28px] bg-white ring-1 ring-line transition-shadow hover:shadow-[0_30px_60px_-40px_rgba(24,33,29,0.45)]">
+          <article key={c.key} className="group flex flex-col overflow-hidden rounded-[28px] bg-white ring-1 ring-line shadow-[0_20px_50px_-40px_rgba(24,33,29,0.35)] transition-shadow hover:shadow-[0_30px_60px_-40px_rgba(24,33,29,0.45)]">
             <div className={`relative flex h-[220px] flex-col justify-center overflow-hidden px-6 ${c.tone.bg}`} role="img" aria-label={`Example of the ${c.title.toLowerCase()} workspace`}>
               <div aria-hidden className="pointer-events-none absolute -top-16 -right-16 size-48 rounded-full bg-white/35" />
               <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-10 size-40 rounded-full bg-white/25" />
@@ -217,6 +216,7 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
             </div>
           </article>
         ))}
+      </div>
       </div>
     </section>
   );
