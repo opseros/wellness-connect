@@ -47,6 +47,15 @@ export async function hospitalsVisible(userId: string | null | undefined, db?: E
   return (await featureOn("hospitals", db)) || (await isSuperAdmin(userId, db));
 }
 
+/**
+ * "on": everyone sees hospitals. "preview": switched off, but this viewer is a super admin
+ * (show an "Off" label so they know others don't see it). "hidden": switched off.
+ */
+export async function hospitalsMode(userId: string | null | undefined): Promise<"on" | "preview" | "hidden"> {
+  if (await featureOn("hospitals")) return "on";
+  return (await isSuperAdmin(userId)) ? "preview" : "hidden";
+}
+
 /** Use in services: hidden features look like they don't exist (404). */
 export async function assertHospitalsVisible(userId: string | null | undefined) {
   if (!(await hospitalsVisible(userId))) throw notFound("Not found");

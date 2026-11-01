@@ -630,8 +630,9 @@ export async function adminCounts(actor: StaffActor) {
   const pendingHomestays = byKind.find((r) => r.kind === "homestay")?.n ?? 0;
   const pendingHospitals = byKind.find((r) => r.kind === "hospital")?.n ?? 0;
   const pendingFacilities = byKind.find((r) => r.kind === "facility")?.n ?? 0;
-  const hospitals = actor.platformRole === "super_admin" || (await featureOn("hospitals"));
-  return { pendingCredentials: pending.n, pendingListings: pendingHomestays + pendingHospitals + pendingFacilities, pendingHomestays, pendingHospitals, pendingFacilities, hospitals, openReports: reports.n, financeAttention: await financeAttentionCount() };
+  const hospitalsOn = await featureOn("hospitals");
+  const hospitals = actor.platformRole === "super_admin" || hospitalsOn;
+  return { pendingCredentials: pending.n, pendingListings: pendingHomestays + pendingHospitals + pendingFacilities, pendingHomestays, pendingHospitals, pendingFacilities, hospitals, hospitalsOn, openReports: reports.n, financeAttention: await financeAttentionCount() };
 }
 
 

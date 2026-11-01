@@ -8,14 +8,16 @@ import { listMemberships } from "@/modules/organizations/service";
 import { getOwnProfile } from "@/modules/professionals/service";
 import { listingsForUser, STATUS_LABEL } from "@/modules/listings/service";
 import { connectBadges, getMemberProfile } from "@/modules/connect/service";
-import { hospitalsVisible } from "@/modules/platform/features";
+import { hospitalsMode } from "@/modules/platform/features";
+import { OffBadge } from "@/components/off-badge";
 
 const roleLabel: Record<string, string> = { owner: "Owner", admin: "Admin", wellness_manager: "Wellness manager", member: "Member" };
 
-function Card({ title, children, wide = false }: { title: string; children: React.ReactNode; wide?: boolean }) {
+function Card({ title, children, wide = false, badge }: { title: string; children: React.ReactNode; wide?: boolean; badge?: React.ReactNode }) {
   return (
     <div className={`card flex flex-col gap-3 p-5 ${wide ? "md:col-span-2 md:row-span-2" : ""}`}>
       <h3 className="text-lg font-bold">{title}</h3>
+      {badge && <span className="-mt-1">{badge}</span>}
       {children}
     </div>
   );
@@ -29,9 +31,9 @@ const A = ({ href, children }: { href: string; children: React.ReactNode }) => (
  * "Use" (Connect, booking a stay, Care & Travel) and "Offer" (things you run:
  * a professional profile, a company, a homestay or a hospital).
  */
-function ListingCard({ title, empty, items, add }: { title: string; empty: string; items: Awaited<ReturnType<typeof listingsForUser>>; add: { href: string; label: string } }) {
+function ListingCard({ title, empty, items, add, badge }: { title: string; empty: string; items: Awaited<ReturnType<typeof listingsForUser>>; add: { href: string; label: string }; badge?: React.ReactNode }) {
   return (
-    <Card title={title}>
+    <Card title={title} badge={badge}>
       {items.length === 0 ? (
         <p className="text-sm text-muted">{empty}</p>
       ) : (
@@ -61,7 +63,8 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
   const homestays = listings.filter((l) => l.kind === "homestay");
   const hospitals = listings.filter((l) => l.kind === "hospital");
   const facilities = listings.filter((l) => l.kind === "facility");
-  const showHospitals = await hospitalsVisible(me.id);
+  const hospitalMode = await hospitalsMode(me.id);
+  const showHospitals = hospitalMode !== "hidden";
 
   return (
     <div>
@@ -99,7 +102,7 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
               <span className="mt-auto"><A href="/facilities">Find a place to work out</A></span>
             </Card>
             {showHospitals && (
-            <Card title="Care & Travel">
+            <Card title="Care & Travel" badge={hospitalMode === "preview" ? <OffBadge /> : undefined}>
                 <p className="text-sm text-muted">Compare verified hospitals and ask up to three for a quote, without sharing your records.</p>
                 <span className="mt-auto flex flex-wrap gap-x-4 gap-y-1"><A href="/hospitals">Browse hospitals</A><A href="/care/requests">My care requests</A></span>
               </Card>
@@ -144,7 +147,7 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
             </Card>
             <ListingCard title="Homestay" items={homestays} empty="Host guests who come to rest, recover or hold a team retreat. To book one for yourself, use “Book a stay”." add={{ href: "/app/onboarding?as=homestay", label: homestays.length ? "List another homestay" : "List a homestay" }} />
             <ListingCard title="Gym, studio or wellness centre" items={facilities} empty="List your gym, yoga or pilates studio, pool or wellness centre so members and companies can find you." add={{ href: "/app/onboarding?as=facility", label: facilities.length ? "List another facility" : "List your facility" }} />
-            {showHospitals && <ListingCard title="Hospital (Care & Travel)" items={hospitals} empty="Run your hospital’s international patient desk: packages, quote requests and travelling patients." add={{ href: "/app/onboarding?as=hospital", label: hospitals.length ? "Register another hospital" : "Register a hospital" }} />}
+            {showHospitals && <ListingCard badge={hospitalMode === "preview" ? <OffBadge /> : undefined} title="Hospital (Care & Travel)" items={hospitals} empty="Run your hospital’s international patient desk: packages, quote requests and travelling patients." add={{ href: "/app/onboarding?as=hospital", label: hospitals.length ? "Register another hospital" : "Register a hospital" }} />}
           </div>
         </section>
       </main>
