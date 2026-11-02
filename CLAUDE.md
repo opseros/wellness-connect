@@ -36,8 +36,8 @@ Read README.md for the product and setup. These rules are not optional.
 - Marketplace tables (`requirement`, `enquiry`, `proposal`, `booking`, `payment`,
   `ledger_entry`), `org_document` and the stay tables (`stay`, `stay_payment`, `stay_invoice`,
   `stay_refund`, `stay_payout`, `stay_ledger_entry`) and the Care & Travel tables (`care_request`,
-  `care_quote`, `care_report`, `care_report_share`, `care_report_access`, `care_trip`) have Postgres
-  row-level security with FORCE.
+  `care_quote`, `care_report`, `care_report_share`, `care_report_access`, `care_trip`) and member
+  sessions (`appointment`: the member or the professional) have Postgres row-level security with FORCE.
   Every query on them MUST run inside `withScope({ userId, orgId }, tx => ...)` from
   `@/db/client`. Never call `getDb()` directly for those tables. Guests reach their stays with
   `withScope({ userId })`; hosts with `{ userId, orgId }`. (`stay_night`, room counts, and

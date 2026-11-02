@@ -33,7 +33,7 @@ export async function upsertProfessionalProfile(userId: string, input: z.input<t
 }
 
 /** Always reads the database; services use this so a save never sees a stale profile. */
-function findOwnProfile(userId: string) {
+export function findOwnProfile(userId: string) {
   return getDb().query.professionalProfile.findFirst({ where: eq(professionalProfile.userId, userId) });
 }
 
@@ -49,6 +49,8 @@ export const serviceInput = z
     durationMinutes: z.number().int().min(15).max(60 * 24 * 30),
     priceMinRupees: z.number().min(0),
     priceMaxRupees: z.number().min(0),
+    // Members book one session at this price; leave empty to keep the service company-only.
+    memberPriceRupees: z.number().int().min(0).max(1_000_000).nullable().default(null),
   })
   .refine((v) => v.priceMaxRupees >= v.priceMinRupees, { message: "Maximum price must be at least the minimum" });
 
@@ -67,9 +69,38 @@ export async function addService(userId: string, input: z.input<typeof serviceIn
       durationMinutes: d.durationMinutes,
       priceMinPaise: Math.round(d.priceMinRupees * 100),
       priceMaxPaise: Math.round(d.priceMaxRupees * 100),
+      memberPricePaise: d.memberPriceRupees === null ? null : d.memberPriceRupees * 100,
     })
     .returning();
   return row;
+}
+
+/**
+ * A service a member can book: active, priced for members, from a verified,
+ * discoverable professional whose account is in good standing. Null otherwise.
+ */
+export async function bookableService(serviceId: string) {
+  assertUuid(serviceId, "Service");
+  const [row] = await getDb()
+    .select({ service, profile: professionalProfile, proName: user.name, suspendedAt: user.suspendedAt, deletedAt: user.deletedAt })
+    .from(service)
+    .innerJoin(professionalProfile, eq(professionalProfile.id, service.profileId))
+    .innerJoin(user, eq(user.id, professionalProfile.userId))
+    .where(eq(service.id, serviceId));
+  if (!row) return null;
+  const ok = row.service.active && row.service.memberPricePaise !== null && row.profile.verificationStatus === "verified" && row.profile.discoverable && !row.suspendedAt && !row.deletedAt;
+  return ok ? { service: row.service, profile: row.profile, proName: row.proName } : null;
+}
+
+/** Public name and headline for a set of profiles (session lists). */
+export async function profileNames(profileIds: string[]) {
+  if (!profileIds.length) return new Map<string, { name: string; headline: string; userId: string }>();
+  const rows = await getDb()
+    .select({ id: professionalProfile.id, name: user.name, headline: professionalProfile.headline, userId: professionalProfile.userId })
+    .from(professionalProfile)
+    .innerJoin(user, eq(user.id, professionalProfile.userId))
+    .where(inArray(professionalProfile.id, [...new Set(profileIds)]));
+  return new Map(rows.map((r) => [r.id, r]));
 }
 
 export const credentialInput = z.object({
@@ -172,6 +203,7 @@ export async function updateService(userId: string, serviceId: string, input: z.
       durationMinutes: d.durationMinutes,
       priceMinPaise: Math.round(d.priceMinRupees * 100),
       priceMaxPaise: Math.round(d.priceMaxRupees * 100),
+      memberPricePaise: d.memberPriceRupees === null ? null : d.memberPriceRupees * 100,
     })
     .where(and(eq(service.id, serviceId), eq(service.profileId, p.id)))
     .returning();

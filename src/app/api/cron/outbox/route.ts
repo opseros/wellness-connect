@@ -1,6 +1,7 @@
 import { processOutbox } from "@/modules/platform/outbox";
 import { expireStaysJob } from "@/modules/stays/service";
 import { purgeExpiredReports } from "@/modules/care/service";
+import { sessionLifecycleJob } from "@/modules/sessions/service";
 import "@/modules/platform/handlers";
 
 // Retry sweep for the outbox. Vercel Cron calls it on the schedule in vercel.json with
@@ -16,6 +17,8 @@ export async function GET(req: Request) {
   const stays = await expireStaysJob();
   // Care & Travel retention: reports past their delete date are destroyed.
   const reports = await purgeExpiredReports();
+  // Member sessions: lapse unanswered or unpaid ones, complete ones that have ended.
+  const sessions = await sessionLifecycleJob();
   const result = await processOutbox(50);
-  return Response.json({ ...result, staysExpired: stays.expired, reportsDeleted: reports.deleted });
+  return Response.json({ ...result, staysExpired: stays.expired, reportsDeleted: reports.deleted, sessionsExpired: sessions.expired, sessionsCompleted: sessions.completed });
 }

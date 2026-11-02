@@ -79,6 +79,8 @@ export const service = pgTable(
     priceMinPaise: integer("price_min_paise").notNull(),
     priceMaxPaise: integer("price_max_paise").notNull(),
     currency: text("currency").notNull().default("INR"),
+    // Fixed price for one session booked by a member (paise). Null: members can't book this service.
+    memberPricePaise: integer("member_price_paise"),
     active: boolean("active").notNull().default(true),
   },
   (t) => [index("service_profile_idx").on(t.profileId), index("service_category_idx").on(t.categoryId)],

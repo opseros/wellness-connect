@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: { default: `${BRAND.name} · ${BRAND.tagline}`, template: `%s · ${BRAND.name}` },
   description: `${BRAND.name} ${BRAND.tagline}: book verified wellness professionals for your teams, and connect with professionals.`,
   manifest: "/manifest.webmanifest",
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = { themeColor: "#0f6b5c" };

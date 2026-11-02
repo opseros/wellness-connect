@@ -90,6 +90,7 @@ export default async function AppHome({ searchParams }: { searchParams: Promise<
                 <li><Link href="/connect/messages" className="flex items-center gap-2 rounded-full bg-ground px-3.5 py-2 font-semibold hover:bg-brand-soft">Messages{badges.unread > 0 && <span className="rounded-full bg-[#f2c46d] px-2 text-xs">{badges.unread}</span>}</Link></li>
                 <li><Link href="/connect/groups" className="rounded-full bg-ground px-3.5 py-2 font-semibold hover:bg-brand-soft">Groups &amp; spaces</Link></li>
                 <li><Link href="/connect/meetups" className="rounded-full bg-ground px-3.5 py-2 font-semibold hover:bg-brand-soft">Meet-ups</Link></li>
+                <li><Link href="/sessions" className="rounded-full bg-ground px-3.5 py-2 font-semibold hover:bg-brand-soft">My sessions</Link></li>
               </ul>
               <span className="mt-auto"><A href="/connect">Open my feed</A></span>
             </Card>

@@ -1,5 +1,6 @@
 // Loading placeholders shown the moment a link is clicked, while the server renders the page.
 // Neutral blocks only; the pulse is turned off for people who prefer reduced motion.
+import { BrandMark } from "./brand-mark";
 
 const Bar = ({ className = "" }: { className?: string }) => <span aria-hidden className={`block rounded-lg bg-[#e6ebe8] motion-safe:animate-pulse ${className}`} />;
 
@@ -32,7 +33,7 @@ export function FullPageSkeleton({ cards = 3 }: { cards?: number }) {
     <div>
       <div className="flex items-center justify-between border-b border-line bg-white px-6 py-3.5 sm:px-8">
         <span className="flex items-center gap-2.5">
-          <span aria-hidden className="grid size-8 place-items-center rounded-lg bg-brand text-[17px] font-extrabold text-white">M</span>
+          <BrandMark size={34} />
           <Bar className="h-4 w-24" />
         </span>
         <Bar className="h-4 w-40" />

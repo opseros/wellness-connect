@@ -79,6 +79,7 @@ export async function saveServiceAction(form: FormData) {
     durationMinutes: num(form, "durationMinutes"),
     priceMinRupees: num(form, "priceMinRupees"),
     priceMaxRupees: num(form, "priceMaxRupees"),
+    memberPriceRupees: String(form.get("memberPriceRupees") ?? "").trim() === "" ? null : Math.round(Number(form.get("memberPriceRupees"))),
   };
   await run({ to: "/pro/services", msg: id ? "Service updated." : "Service added." }, id ? `/pro/services/${id}` : "/pro/services/new", () =>
     id ? updateService(me.id, id, input) : addService(me.id, input),

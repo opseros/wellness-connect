@@ -2,12 +2,14 @@
 import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
-export function ProNav({ openEnquiries, profileId }: { openEnquiries: number; profileId: string }) {
+export function ProNav({ openEnquiries, profileId, sessionRequests = 0 }: { openEnquiries: number; profileId: string; sessionRequests?: number }) {
   const path = usePathname();
   const items = [
     { href: "/pro", label: "Overview", match: (p: string) => p === "/pro" },
     { href: "/pro/profile", label: "Profile", match: (p: string) => p.startsWith("/pro/profile") },
     { href: "/pro/services", label: "Services", match: (p: string) => p.startsWith("/pro/services") },
+    { href: "/pro/sessions", label: "Sessions", badge: sessionRequests, match: (p: string) => p.startsWith("/pro/sessions") },
+    { href: "/pro/schedule", label: "Schedule", match: (p: string) => p.startsWith("/pro/schedule") },
     { href: "/pro/credentials", label: "Credentials", match: (p: string) => p.startsWith("/pro/credentials") },
     { href: "/pro/enquiries", label: "Enquiries", badge: openEnquiries, match: (p: string) => p.startsWith("/pro/enquiries") },
     { href: "/pro/proposals", label: "Proposals & bookings", match: (p: string) => p.startsWith("/pro/proposals") },

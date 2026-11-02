@@ -2,6 +2,7 @@
 // looks like (fictional people, no counts), not real activity.
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
+import { BrandMark } from "./brand-mark";
 
 export type SpaceKey = "wellness" | "travel" | "meetup" | "move" | "food" | "career";
 
@@ -128,7 +129,7 @@ export function LandingHeader({ home = true, signedIn = false }: { home?: boolea
   return (
     <header className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 sm:px-8">
       <Link href="/" aria-label={`${BRAND.name}, ${BRAND.tagline}`} className="flex items-center gap-2.5">
-        <span aria-hidden className="grid size-9 place-items-center rounded-xl bg-brand font-display text-[19px] font-extrabold text-white">{BRAND.name[0]}</span>
+        <BrandMark size={38} />
         <span aria-hidden className="flex flex-col leading-none">
           <span className="font-display text-[20px] font-extrabold tracking-tight">{BRAND.name}</span>
           <span className="mt-1 text-[11px] font-semibold text-muted">{BRAND.tagline}</span>

@@ -1,3 +1,4 @@
+import { BrandMark } from "./brand-mark";
 import Link from "next/link";
 import { IntentLink } from "./intent-link";
 import { BRAND } from "@/lib/brand";
@@ -5,12 +6,7 @@ import { BRAND } from "@/lib/brand";
 export function Logo({ href = "/", light = false }: { href?: string; light?: boolean }) {
   return (
     <Link href={href} aria-label={`${BRAND.name}, ${BRAND.tagline}`} className={`flex items-center gap-2.5 ${light ? "text-white" : "text-ink"}`}>
-      <span
-        aria-hidden
-        className={`grid size-8 place-items-center rounded-lg text-[17px] font-extrabold ${light ? "bg-white text-brand" : "bg-brand text-white"}`}
-      >
-        {BRAND.name[0]}
-      </span>
+      <BrandMark size={34} light={light} />
       <span aria-hidden className="flex flex-col leading-none">
         <span className="text-[18px] font-extrabold tracking-tight">{BRAND.name}</span>
         <span className={`mt-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] ${light ? "text-white/75" : "text-muted"}`}>{BRAND.tagline}</span>

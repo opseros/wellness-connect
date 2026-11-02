@@ -148,6 +148,20 @@
       "when": 1793555385087,
       "tag": "0020_facilities",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793636772159,
+      "tag": "0021_member_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793636773565,
+      "tag": "0022_member_sessions_rls",
+      "breakpoints": true
     }
   ]
 }

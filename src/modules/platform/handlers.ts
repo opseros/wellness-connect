@@ -1,6 +1,6 @@
 // Outbox event handlers. Imported once by the cron route.
 import { and, eq } from "drizzle-orm";
-import { careQuote, credential, enquiry, group, groupMember, invoice, listing, organization, stay, stayInvoice, professionalProfile, proposal, user } from "@/db/schema";
+import { appointment, careQuote, credential, enquiry, group, groupMember, invoice, listing, organization, stay, stayInvoice, professionalProfile, proposal, user } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { registerOutboxHandler } from "./outbox";
 import { orgAdminEmails } from "@/modules/organizations/service";
@@ -354,3 +354,65 @@ for (const [type, subject, line] of [
     await sendEmail({ to: guest.email, subject, text: `${d.name} ${line}: ${appUrl()}/care/requests/${p.requestId}` });
   });
 }
+
+// ---------- Member sessions with professionals ----------
+
+async function sessionCtx(tx: Parameters<Parameters<typeof registerOutboxHandler>[1]>[0], appointmentId: string) {
+  const a = await tx.query.appointment.findFirst({ where: eq(appointment.id, appointmentId) });
+  if (!a) return null;
+  const member = await tx.query.user.findFirst({ where: eq(user.id, a.memberUserId) });
+  const pro = await tx.query.user.findFirst({ where: eq(user.id, a.proUserId) });
+  const when = `${istTime(a.startsAt)} (${a.mode === "online" ? "online" : "in person"})`;
+  return { a, member, pro, when };
+}
+
+registerOutboxHandler("session.requested", async (tx, p) => {
+  const c = await sessionCtx(tx, String(p.appointmentId));
+  if (!c?.pro) return;
+  await sendEmail({
+    to: c.pro.email,
+    subject: `New session request: ${c.a.serviceTitle}`,
+    text: `${c.member?.name.split(" ")[0] ?? "A member"} asked for "${c.a.serviceTitle}" on ${c.when}.\n\nPlease accept or decline by ${istTime(c.a.respondBy)}; after that the request lapses and the time is freed.\n${appUrl()}/pro/sessions`,
+  });
+});
+
+registerOutboxHandler("session.accepted", async (tx, p) => {
+  const c = await sessionCtx(tx, String(p.appointmentId));
+  if (!c?.member) return;
+  await sendEmail({
+    to: c.member.email,
+    subject: `${c.pro?.name ?? "Your professional"} accepted your session`,
+    text: `Good news: "${c.a.serviceTitle}" on ${c.when} was accepted.\n\nPay ${rs(c.a.pricePaise)} by ${istTime(c.a.payBy)} to confirm it; the time is held for you until then.\n${appUrl()}/sessions/${c.a.id}`,
+  });
+});
+
+registerOutboxHandler("session.confirmed", async (tx, p) => {
+  const c = await sessionCtx(tx, String(p.appointmentId));
+  if (!c) return;
+  if (c.member) await sendEmail({ to: c.member.email, subject: `Confirmed: ${c.a.serviceTitle}`, text: `Your session on ${c.when} is confirmed. The ${c.a.mode === "online" ? "meeting link" : "address"} is on the session page.\n${appUrl()}/sessions/${c.a.id}` });
+  if (c.pro) await sendEmail({ to: c.pro.email, subject: `Confirmed: ${c.a.serviceTitle}`, text: `Your session with ${c.member?.name ?? "a member"} on ${c.when} is confirmed.\n${appUrl()}/pro/sessions` });
+});
+
+registerOutboxHandler("session.declined", async (tx, p) => {
+  const c = await sessionCtx(tx, String(p.appointmentId));
+  if (!c?.member) return;
+  await sendEmail({ to: c.member.email, subject: `Session request not accepted`, text: `${c.pro?.name ?? "The professional"} couldn't take "${c.a.serviceTitle}" on ${c.when}.${c.a.proNote ? `\n\nTheir note: ${c.a.proNote}` : ""}\n\nPick another time: ${appUrl()}/p/${c.a.profileId}` });
+});
+
+registerOutboxHandler("session.expired", async (tx, p) => {
+  const c = await sessionCtx(tx, String(p.appointmentId));
+  if (!c?.member) return;
+  await sendEmail({ to: c.member.email, subject: `Session request lapsed`, text: `Your request for "${c.a.serviceTitle}" on ${c.when} lapsed, so the time has been freed. You can pick another time: ${appUrl()}/p/${c.a.profileId}` });
+});
+
+registerOutboxHandler("session.cancelled", async (tx, p) => {
+  const c = await sessionCtx(tx, String(p.appointmentId));
+  if (!c) return;
+  const to = p.byPro ? c.member : c.pro;
+  if (!to) return;
+  await sendEmail({
+    to: to.email,
+    subject: `Cancelled: ${c.a.serviceTitle}`,
+    text: `The session on ${c.when} was cancelled by ${p.byPro ? "the professional" : "the member"}.${c.a.cancelReason ? `\n\nReason: ${c.a.cancelReason}` : ""}${p.byPro && p.wasConfirmed ? "\n\nIf you paid, your refund is on its way." : ""}`,
+  });
+});

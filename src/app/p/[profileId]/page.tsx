@@ -12,6 +12,7 @@ import { connectionState } from "@/modules/connect/service";
 import { connectAction } from "@/app/pro/actions";
 import { BRAND } from "@/lib/brand";
 import { navOptions } from "@/components/nav-options";
+import { bookingOptions } from "@/modules/sessions/service";
 
 const MODE: Record<string, string> = { in_person: "In person", virtual: "Virtual", hybrid: "Hybrid" };
 
@@ -28,7 +29,8 @@ export default async function PublicProfile({ params, searchParams }: { params: 
     throw e;
   });
   const p = d.profile;
-  const state = await connectionState(me.id, p.userId);
+  const [state, booking] = await Promise.all([connectionState(me.id, p.userId), bookingOptions(p.id)]);
+  const canBook = booking.enabled && d.isPublic && d.services.some((s) => s.service.memberPricePaise !== null);
   const initials = d.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
   return (
@@ -61,11 +63,12 @@ export default async function PublicProfile({ params, searchParams }: { params: 
           </div>
           {!d.isOwner && (
             <div className="flex flex-col items-end gap-2">
+              {canBook && <Link href={`/p/${p.id}/book`} className="btn-primary">Book a session</Link>}
               {state === "none" && (
                 <form action={connectAction}>
                   <input type="hidden" name="profileId" value={p.id} />
                   <input type="hidden" name="userId" value={p.userId} />
-                  <button className="btn-primary">Connect</button>
+                  <button className={canBook ? "btn-outline" : "btn-primary"}>Connect</button>
                 </form>
               )}
               {state === "sent" && <span className="btn-outline pointer-events-none">Request sent</span>}
@@ -95,7 +98,14 @@ export default async function PublicProfile({ params, searchParams }: { params: 
                     <span className="text-[13px] text-muted">{categoryName} · {s.deliveryModes.map((m) => MODE[m]).join(", ")} · {s.durationMinutes} min</span>
                     {s.description && <p className="text-sm">{s.description}</p>}
                   </div>
-                  <span className="font-semibold">{paiseRange(s.priceMinPaise, s.priceMaxPaise)}</span>
+                  <span className="flex flex-col items-end gap-1.5">
+                    <span className="font-semibold">{paiseRange(s.priceMinPaise, s.priceMaxPaise)}</span>
+                    {canBook && s.memberPricePaise !== null && !d.isOwner && (
+                      <Link href={`/p/${p.id}/book?service=${s.id}`} className="text-sm font-semibold text-brand hover:underline">
+                        Book one session · {s.memberPricePaise === 0 ? "Free" : `₹${(s.memberPricePaise / 100).toLocaleString("en-IN")}`}
+                      </Link>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>

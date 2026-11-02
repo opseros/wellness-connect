@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { BRAND } from "@/lib/brand";
 
-// Installable PWA (blueprint section 11). Add icons in /public before launch.
+// Installable PWA (blueprint section 11). Icons: the Seasons mark (public/icons).
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: `${BRAND.name} · ${BRAND.tagline}`,
@@ -11,6 +11,10 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#f5f7f5",
     theme_color: "#0f6b5c",
     description: `${BRAND.tagline}: verified wellness professionals for teams.`,
-    icons: [{ src: "/favicon.ico", sizes: "any", type: "image/x-icon" }],
+    icons: [
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+    ],
   };
 }

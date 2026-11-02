@@ -40,7 +40,9 @@ export type OutboxEvent =
   | { type: "care.reports_requested"; payload: { quoteId: string; requesterUserId: string; requestId: string } }
   | { type: "care.accepted"; payload: { quoteId: string; orgId: string } }
   | { type: "care.not_selected"; payload: { quoteId: string; orgId: string } }
-  | { type: "care.report_shared"; payload: { quoteId: string; orgId: string } };
+  | { type: "care.report_shared"; payload: { quoteId: string; orgId: string } }
+  | { type: "session.requested" | "session.declined" | "session.accepted" | "session.confirmed" | "session.expired"; payload: { appointmentId: string } }
+  | { type: "session.cancelled"; payload: { appointmentId: string; byPro: boolean; wasConfirmed: boolean } };
 
 /**
  * Call inside the same transaction as the business change. Delivery starts

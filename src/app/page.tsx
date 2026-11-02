@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { FeedCollage, LandingHeader, SpaceIcon, SPACES } from "@/components/landing";
 import { JoinHero } from "@/components/join-hero";
 import { HeroPhotos } from "@/components/hero-photos";
+import { BrandMark } from "@/components/brand-mark";
 import { AlsoOn } from "@/components/also-on";
 import { ExploreSection } from "@/components/explore-section";
 import { BRAND } from "@/lib/brand";
@@ -206,7 +207,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
         <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-12 sm:px-8 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
           <div className="flex flex-col gap-3">
             <span className="flex items-center gap-2.5">
-              <span aria-hidden className="grid size-9 place-items-center rounded-xl bg-brand font-display text-[17px] font-extrabold text-white">{BRAND.name[0]}</span>
+              <BrandMark size={36} />
               <span className="flex flex-col leading-none">
                 <span className="font-display text-[18px] font-extrabold">{BRAND.name}</span>
                 <span className="mt-1 text-[11px] font-semibold text-muted">{BRAND.tagline}</span>

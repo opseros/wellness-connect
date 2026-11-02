@@ -12,6 +12,7 @@ type Svc = {
   durationMinutes: number;
   priceMinPaise: number;
   priceMaxPaise: number;
+  memberPricePaise?: number | null;
 };
 
 export function ServiceForm({ categories, service }: { categories: { id: string; name: string }[]; service?: Svc }) {
@@ -51,6 +52,10 @@ export function ServiceForm({ categories, service }: { categories: { id: string;
         </Field>
       </div>
       <p className="-mt-2 text-[13px] text-muted">Companies see this range when matching. You quote an exact fee in each proposal.</p>
+      <Field id="memberPriceRupees" label="Price for one session booked by a member (₹, optional)">
+        <input id="memberPriceRupees" name="memberPriceRupees" type="number" min={0} step={1} defaultValue={service?.memberPricePaise != null ? service.memberPricePaise / 100 : undefined} className="input max-w-[240px]" placeholder="Leave empty for companies only" />
+      </Field>
+      <p className="-mt-2 text-[13px] text-muted">Set a price (0 for a free intro call) and members can book this from your profile at the times in <Link href="/pro/schedule" className="font-semibold text-brand underline">Schedule</Link>.</p>
       <div className="flex gap-2">
         <button className="btn-primary">{service ? "Save changes" : "Add service"}</button>
         <Link href="/pro/services" className="btn-outline">Cancel</Link>
