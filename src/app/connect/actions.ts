@@ -31,6 +31,7 @@ import {
   updateReferral,
 } from "@/modules/connect/service";
 import { answerBuddyMatch, closeBuddyRequest, requestBuddy } from "@/modules/connect/social";
+import { joinChallenge, leaveChallenge, logProgress } from "@/modules/connect/challenges";
 
 // Each action re-checks the session; the Connect service checks visibility, blocks and roles.
 
@@ -120,6 +121,27 @@ export async function answerBuddyAction(form: FormData) {
     const { status } = await answerBuddyMatch(me.id, str(form, "matchId"), { answer });
     if (status === "matched") return "It's a match! You're now connected, so you can message to plan your first session.";
     return answer === "yes" ? "Nice. We'll tell you if they say yes too." : "Skipped. They won't be told.";
+  });
+}
+
+export async function joinChallengeAction(form: FormData) {
+  const me = await requireUser();
+  await runWithMessage(back(form, "/connect/challenges"), async () => {
+    await joinChallenge(me.id, str(form, "challengeId"));
+    return "You're in. Log your first number below.";
+  });
+}
+
+export async function leaveChallengeAction(form: FormData) {
+  const me = await requireUser();
+  await run("/connect/challenges", "You left the challenge. Your numbers for it were deleted.", () => leaveChallenge(me.id, str(form, "challengeId")));
+}
+
+export async function logChallengeAction(form: FormData) {
+  const me = await requireUser();
+  await runWithMessage(back(form, "/connect/challenges"), async () => {
+    const r = await logProgress(me.id, str(form, "challengeId"), { day: str(form, "day"), amount: str(form, "amount") as unknown as number });
+    return r.justCompleted ? "Goal reached. Well done!" : "Saved.";
   });
 }
 

@@ -41,14 +41,14 @@ export default async function BuddiesPage({ searchParams }: { searchParams: Prom
 
   return (
     <main className="flex flex-col gap-5">
-      <header className="relative overflow-hidden rounded-[24px] bg-[#0f1f1a] px-6 py-7 text-[#f4efe6] sm:px-8">
-        <svg aria-hidden viewBox="0 0 64 64" className="pointer-events-none absolute -right-10 -bottom-16 size-[260px] opacity-[0.14]">
-          <path d="M31 54 C13 47 8 27 14 9 C29 15 36 34 31 54 Z" fill="#3fb39b" />
-          <path d="M33 54 C51 47 56 27 50 9 C35 15 28 34 33 54 Z" fill="#a8e0d3" />
+      <header className="relative overflow-hidden rounded-[24px] bg-[linear-gradient(135deg,#e4f1ea_0%,#eef4ec_55%,#f6efe0_100%)] px-6 py-7 text-[#10231c] ring-1 ring-[#0f6b5c]/10 sm:px-8">
+        <svg aria-hidden viewBox="0 0 64 64" className="pointer-events-none absolute -right-10 -bottom-16 size-[260px] opacity-[0.08]">
+          <path d="M31 54 C13 47 8 27 14 9 C29 15 36 34 31 54 Z" fill="#0f6b5c" />
+          <path d="M33 54 C51 47 56 27 50 9 C35 15 28 34 33 54 Z" fill="#0f6b5c" />
         </svg>
-        <p className="text-[12.5px] font-bold uppercase tracking-[0.16em] text-[#a8e0d3]">Buddy match</p>
+        <p className="text-[12.5px] font-bold uppercase tracking-[0.16em] text-brand">Buddy match</p>
         <h1 className="mt-1.5 max-w-[520px] font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.03em] sm:text-[36px]">Habits stick better with someone beside you.</h1>
-        <p className="mt-2 max-w-[540px] text-[15px] leading-relaxed text-[#f4efe6]/75">
+        <p className="mt-2 max-w-[540px] text-[15px] leading-relaxed text-[#33433b]">
           Tell us what you&apos;d like to do, where and when. We suggest people looking for the same. You both say yes before you&apos;re introduced; a no is never shown.
         </p>
       </header>
@@ -60,8 +60,8 @@ export default async function BuddiesPage({ searchParams }: { searchParams: Prom
           <h2 id="new-h" className="font-display text-[20px] font-bold">New suggestions · {toAnswer.length}</h2>
           <ul className="grid gap-3 sm:grid-cols-2">
             {toAnswer.map((m) => (
-              <li key={m.id} className="card flex flex-col gap-3 p-4">
-                <div className="flex items-center gap-3">
+              <li key={m.id} className="card flex min-w-0 flex-col gap-3 p-4">
+                <div className="flex flex-wrap items-center gap-3">
                   <Avatar name={m.firstName} size={44} />
                   <span className="flex min-w-0 flex-col">
                     <span className="font-bold">{m.firstName}</span>
@@ -161,7 +161,7 @@ export default async function BuddiesPage({ searchParams }: { searchParams: Prom
           )}
         </section>
 
-        <aside className="flex flex-[1_1_260px] flex-col gap-4">
+        <aside className="flex min-w-0 flex-[1_1_260px] flex-col gap-4">
           <section aria-labelledby="mine-h" className="card flex flex-col gap-3 p-4">
             <h2 id="mine-h" className="font-bold">You&apos;re looking for</h2>
             {requests.length === 0 ? (

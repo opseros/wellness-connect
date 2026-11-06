@@ -19,6 +19,7 @@ import {
 import { listCategories, setCategoryCommission } from "@/modules/professionals/service";
 import { z } from "zod";
 import { featureFlag, booking, careQuote, invitation, stay, account, auditLog, comment, connection, conversationParticipant, credential, group, listing, listingPhoto, memberProfile, orgDocument, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
+import { archiveChallengeById, challengeInput, createPlatformChallenge, platformChallenges } from "@/modules/connect/challenges";
 import { getDb, withScope, type Tx } from "@/db/client";
 import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit } from "@/modules/platform/outbox";
@@ -599,6 +600,31 @@ export async function resolveReport(actor: StaffActor, reportId: string, input: 
       if (r.targetType === "comment") await tx.update(comment).set({ hiddenAt: null }).where(eq(comment.id, r.targetId));
     }
     await audit(tx, { actorId: actor.id, action: `report.${action}`, targetType: r.targetType, targetId: r.targetId, metadata: { reportId: r.id } });
+  });
+}
+
+// ---------- Challenges (platform-wide) ----------
+
+export async function listPlatformChallenges(actor: StaffActor) {
+  assertStaff(actor);
+  return platformChallenges();
+}
+
+export async function createPlatformChallengeAsStaff(actor: StaffActor, input: z.input<typeof challengeInput>) {
+  assertStaff(actor);
+  return getDb().transaction(async (tx) => {
+    const c = await createPlatformChallenge(actor.id, input, tx);
+    await audit(tx, { actorId: actor.id, action: "challenge.create", targetType: "challenge", targetId: c.id, metadata: { title: c.title } });
+    return c;
+  });
+}
+
+export async function archivePlatformChallenge(actor: StaffActor, challengeId: string) {
+  assertStaff(actor);
+  return getDb().transaction(async (tx) => {
+    const c = await archiveChallengeById(challengeId, tx);
+    await audit(tx, { actorId: actor.id, action: "challenge.archive", targetType: "challenge", targetId: c.id, metadata: { title: c.title } });
+    return c;
   });
 }
 

@@ -16,6 +16,8 @@ import {
 } from "@/modules/connect/service";
 import { SPACE_TINT, SpaceIcon, type SpaceKey } from "@/components/landing";
 import { myCircles, pendingBuddyCount, syncCircles } from "@/modules/connect/social";
+import { istToday, listChallenges } from "@/modules/connect/challenges";
+import { ChallengeLink, QuickLog, Ring, unitText } from "../challenge-ui";
 import { connectAction, joinGroupAction, respondAction } from "../actions";
 import { Composer } from "../composer";
 import { Avatar, Flash, PostCard } from "../ui";
@@ -51,7 +53,7 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
   const q = feedQuery.parse({ show: sp.show, before: sp.before, limit: PAGE });
   // Company circles follow your workplaces (joining or leaving a company).
   await syncCircles(me.id);
-  const [feed, invites, suggestions, profile, snap, groups, meetups, allGroups, circles, met, buddySuggestions] = await Promise.all([
+  const [feed, invites, suggestions, profile, snap, groups, meetups, allGroups, circles, met, buddySuggestions, challenges] = await Promise.all([
     getFeed(me.id, q),
     listInvitations(me.id),
     suggestMembers(me.id, 4),
@@ -63,7 +65,11 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
     myCircles(me.id),
     peopleYouMet(me.id, { onlyNew: true, limit: 3 }),
     pendingBuddyCount(me.id),
+    listChallenges(me.id),
   ]);
+  const myLive = challenges.filter((c) => c.joined && c.state === "live").slice(0, 2);
+  const toJoin = challenges.find((c) => !c.joined && c.state !== "ended");
+  const today = istToday();
   const comments = await commentsForPosts(me.id, feed.map((p) => p.id), 2);
   const spacesToJoin = allGroups.filter((g) => g.group.kind === "space" && !g.myStatus).slice(0, 4);
   const filter = FILTERS.find((f) => f.key === q.show)!;
@@ -175,6 +181,35 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
           </RailCard>
         )}
 
+        {(myLive.length > 0 || toJoin) && (
+          <RailCard title={myLive.length ? "Your challenges" : "Join a challenge"} href="/connect/challenges">
+            {myLive.length ? (
+              <ul className="flex flex-col gap-4">
+                {myLive.map((c) => (
+                  <li key={c.id} className="flex flex-col gap-2.5">
+                    <div className="flex items-center gap-3">
+                      <Ring value={c.myTotal} goal={c.goal} size={44} done={c.completed} />
+                      <span className="flex min-w-0 flex-col text-sm">
+                        <ChallengeLink c={c} className="truncate font-semibold hover:underline">{c.title}</ChallengeLink>
+                        <span className="text-[12.5px] text-muted">{unitText(c, c.myTotal)} of {unitText(c, c.goal)}</span>
+                      </span>
+                    </div>
+                    <QuickLog c={c} today={today} back={back} current={c.myToday} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              toJoin && (
+                <div className="flex flex-col gap-2">
+                  <ChallengeLink c={toJoin} className="font-semibold hover:underline">{toJoin.title}</ChallengeLink>
+                  <span className="text-[13px] text-muted">Goal {unitText(toJoin, toJoin.goal)} · {toJoin.participants} joined</span>
+                  <Link href={`/connect/challenges/${toJoin.slug}`} className="btn-outline min-h-9 w-fit rounded-full px-4 text-sm">Take a look</Link>
+                </div>
+              )
+            )}
+          </RailCard>
+        )}
+
         <RailCard title="Your circles" href="/connect/groups#circles" link="All circles">
           {circles.length === 0 ? (
             <p className="text-sm text-muted">Add your city to <Link href="/connect/setup" className="font-semibold text-brand hover:underline">your profile</Link> and you&apos;ll join its circle. Your company&apos;s circle appears once you join it here.</p>
@@ -199,12 +234,12 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
           )}
         </RailCard>
 
-        <section aria-labelledby="buddy-h" className="relative overflow-hidden rounded-[22px] bg-[#0f1f1a] p-4 text-[#f4efe6]">
+        <section aria-labelledby="buddy-h" className="relative overflow-hidden rounded-[22px] bg-[linear-gradient(135deg,#e4f1ea_0%,#f6efe0_100%)] p-4 text-ink ring-1 ring-[#0f6b5c]/10">
           <h2 id="buddy-h" className="font-display text-[18px] font-bold">{buddySuggestions ? `${buddySuggestions} buddy suggestion${buddySuggestions === 1 ? "" : "s"}` : "Find a buddy"}</h2>
-          <p className="mt-1 text-[13.5px] text-[#f4efe6]/75">
+          <p className="mt-1 text-[13.5px] text-[#33433b]">
             {buddySuggestions ? "People nearby want to walk, run or train at the same time as you." : "Someone to walk, run, train or meditate with, near you and at your times."}
           </p>
-          <Link href="/connect/buddies" className="btn mt-3 min-h-10 rounded-full bg-[#f2c46d] px-4 text-sm text-ink hover:bg-[#f6d48e]">{buddySuggestions ? "See who" : "Get matched"}</Link>
+          <Link href="/connect/buddies" className="btn mt-3 min-h-10 rounded-full bg-brand px-4 text-sm text-white hover:bg-brand-dark">{buddySuggestions ? "See who" : "Get matched"}</Link>
         </section>
 
         {met.length > 0 && (

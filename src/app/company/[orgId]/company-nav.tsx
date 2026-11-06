@@ -10,6 +10,7 @@ export function CompanyNav({ base, toReview, isBuyer, isAdmin, healthChecks = fa
     { href: `${base}/proposals`, label: "Proposals", show: isBuyer, badge: toReview, match: (p: string) => p.startsWith(`${base}/proposals`) },
     { href: `${base}/bookings`, label: "Bookings", show: isBuyer, match: (p: string) => p.startsWith(`${base}/bookings`) },
     { href: `${base}/health-checks`, label: "Health check-ups", show: isBuyer && healthChecks, match: (p: string) => p.startsWith(`${base}/health-checks`) },
+    { href: `${base}/challenges`, label: "Challenges", show: isBuyer, match: (p: string) => p.startsWith(`${base}/challenges`) },
     { href: `${base}/invoices`, label: "Invoices", show: isBuyer, match: (p: string) => p.startsWith(`${base}/invoices`) },
     { href: `${base}/settings`, label: isAdmin ? "Settings & members" : "Members", show: true, match: (p: string) => p.startsWith(`${base}/settings`) },
   ].filter((i) => i.show);

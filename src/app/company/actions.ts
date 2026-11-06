@@ -28,6 +28,8 @@ import {
   withdrawRequirement,
 } from "@/modules/marketplace/service";
 
+import { archiveCompanyChallenge, createCompanyChallenge } from "@/modules/connect/challenges";
+
 // Each action re-checks the session; services check the role and RLS scopes the data.
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -272,4 +274,28 @@ export async function acceptInvitationAction(form: FormData) {
     to: r.role === "member" ? "/app" : `/company/${r.orgId}`,
     msg: "You've joined the team.",
   }));
+}
+
+export async function createChallengeAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = str(form, "orgId");
+  await run(
+    `/company/${orgId}/challenges`,
+    () =>
+      createCompanyChallenge(me.id, orgId, {
+        title: str(form, "title"),
+        about: str(form, "about"),
+        unit: str(form, "unit") as "steps",
+        goal: num(form, "goal"),
+        startsOn: str(form, "startsOn"),
+        endsOn: str(form, "endsOn"),
+      }),
+    () => ({ to: `/company/${orgId}/challenges`, msg: "Challenge started. Your members see it under Connect → Challenges." }),
+  );
+}
+
+export async function archiveChallengeAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = str(form, "orgId");
+  await run(`/company/${orgId}/challenges`, () => archiveCompanyChallenge(me.id, orgId, str(form, "challengeId")), () => ({ to: `/company/${orgId}/challenges`, msg: "Challenge ended and hidden from members." }));
 }

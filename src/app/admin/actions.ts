@@ -5,6 +5,8 @@ import { ZodError } from "zod";
 import { AppError } from "@/lib/errors";
 import { requirePlatformStaff } from "@/modules/identity/session";
 import {
+  archivePlatformChallenge,
+  createPlatformChallengeAsStaff,
   adminRecordStayPayout,
   decideListing,
   adminMarkInvoicePaid,
@@ -250,4 +252,17 @@ export async function setFeatureAction(form: FormData) {
   const key = String(form.get("key")) as "hospitals";
   const enabled = String(form.get("enabled")) === "1";
   await run("/admin/settings", enabled ? "Switched on. Everyone can see it now." : "Switched off. Only super admins can see it now.", () => setPlatformFeature(staff, { key, enabled }));
+}
+
+export async function createChallengeAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  const f = (k: string) => String(form.get(k) ?? "").trim();
+  await run("/admin/challenges", "Challenge started for every member.", () =>
+    createPlatformChallengeAsStaff(staff, { title: f("title"), about: f("about"), unit: f("unit") as "steps", goal: Number(f("goal") || 0), startsOn: f("startsOn"), endsOn: f("endsOn") }),
+  );
+}
+
+export async function archiveChallengeAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  await run("/admin/challenges", "Challenge ended and hidden.", () => archivePlatformChallenge(staff, String(form.get("challengeId"))));
 }

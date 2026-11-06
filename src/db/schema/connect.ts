@@ -1,5 +1,6 @@
 // Connect: the free professional network open to every account.
-import { pgTable, uuid, text, timestamp, boolean, index, uniqueIndex, primaryKey, check } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, boolean, index, uniqueIndex, primaryKey, check, date, integer } from "drizzle-orm/pg-core";
+import { organization } from "./organizations";
 import { category } from "./professionals";
 import { sql } from "drizzle-orm";
 import { user } from "./auth";
@@ -287,4 +288,64 @@ export const buddyMatch = pgTable(
     index("buddy_match_high_idx").on(t.userHigh),
     check("buddy_match_order_chk", sql`${t.userLow} < ${t.userHigh}`),
   ],
+);
+
+// ---------- Challenges ----------
+
+export const CHALLENGE_UNITS = ["steps", "minutes", "km", "days"] as const;
+
+/**
+ * A time-boxed group goal ("10,000 steps a day this week", "meditate 5 days").
+ * Platform challenges (orgId null) are open to every member; company challenges
+ * only to that company's active members. Everyone sees only their own numbers;
+ * others see totals across all participants.
+ */
+export const challenge = pgTable(
+  "challenge",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    title: text("title").notNull(),
+    about: text("about").notNull().default(""),
+    unit: text("unit", { enum: CHALLENGE_UNITS }).notNull(),
+    goal: integer("goal").notNull(),
+    dailyMax: integer("daily_max").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    orgId: uuid("org_id").references(() => organization.id, { onDelete: "cascade" }),
+    createdBy: uuid("created_by").references(() => user.id, { onDelete: "set null" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("challenge_org_idx").on(t.orgId),
+    index("challenge_dates_idx").on(t.endsOn),
+    check("challenge_dates_chk", sql`${t.endsOn} >= ${t.startsOn}`),
+    check("challenge_goal_chk", sql`${t.goal} > 0 and ${t.dailyMax} > 0`),
+  ],
+);
+
+export const challengeParticipant = pgTable(
+  "challenge_participant",
+  {
+    challengeId: uuid("challenge_id").notNull().references(() => challenge.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    total: integer("total").notNull().default(0),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.challengeId, t.userId] }), index("challenge_participant_user_idx").on(t.userId)],
+);
+
+/** One number per person per day (logging again replaces it). */
+export const challengeLog = pgTable(
+  "challenge_log",
+  {
+    challengeId: uuid("challenge_id").notNull().references(() => challenge.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    day: date("day").notNull(),
+    amount: integer("amount").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.challengeId, t.userId, t.day] }), check("challenge_log_amount_chk", sql`${t.amount} >= 0`)],
 );
