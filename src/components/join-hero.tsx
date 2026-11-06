@@ -17,7 +17,7 @@ const COPY: Record<JoinRole, { title: string; body: string; points: string[] }> 
 };
 
 /** Home page hero: choosing a role changes the promise and what the join card sets up. */
-export function JoinHero({ providers, initialMode, initialRole = "member", photos }: { providers: Providers; initialMode: "join" | "signin"; initialRole?: JoinRole; photos?: React.ReactNode }) {
+export function JoinHero({ providers, initialMode, initialRole = "member", photos, cardFirst = false }: { providers: Providers; initialMode: "join" | "signin"; initialRole?: JoinRole; photos?: React.ReactNode; cardFirst?: boolean }) {
   const [role, setRole] = useState<JoinRole>(initialRole);
   const c = COPY[role];
   return (
@@ -37,7 +37,8 @@ export function JoinHero({ providers, initialMode, initialRole = "member", photo
           ))}
         </ul>
       </div>
-      <div id="join" className={`scroll-mt-6 rounded-[28px] border border-line bg-white p-6 shadow-[0_30px_60px_-40px_rgba(24,33,29,0.35)] sm:p-8 ${initialMode === "signin" ? "order-first lg:order-none" : ""}`}>
+      <div id="join" className={`scroll-mt-6 rounded-[28px] border border-line bg-white p-6 shadow-[0_30px_60px_-40px_rgba(24,33,29,0.35)] sm:p-8 ${cardFirst ? "order-first lg:order-none" : ""}`}>
+        <span id="signin" aria-hidden className="block scroll-mt-6" />
         <JoinPanel providers={providers} initialMode={initialMode} initialRole={initialRole} onRoleChange={setRole} />
       </div>
     </section>

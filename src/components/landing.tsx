@@ -146,7 +146,7 @@ export function LandingHeader({ home = true, signedIn = false }: { home?: boolea
           <Link href="/app" className="rounded-full bg-ink px-4 py-2.5 text-white hover:bg-brand-dark">Open {BRAND.name}</Link>
         ) : (
           <>
-            <Link href="/sign-in" className="rounded-lg px-3 py-2 text-ink hover:bg-white">Sign in</Link>
+            <Link href={home ? "#signin" : "/sign-in"} className="rounded-lg px-3 py-2 text-ink hover:bg-white">Sign in</Link>
             <Link href={home ? "#join" : "/sign-up"} className="rounded-full bg-ink px-4 py-2.5 text-white hover:bg-brand-dark">Join free</Link>
           </>
         )}

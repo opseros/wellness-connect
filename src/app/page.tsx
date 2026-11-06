@@ -6,6 +6,7 @@ import { HeroPhotos } from "@/components/hero-photos";
 import { BrandMark } from "@/components/brand-mark";
 import { AlsoOn } from "@/components/also-on";
 import { ExploreSection } from "@/components/explore-section";
+import { Faq } from "@/components/faq";
 import { BRAND } from "@/lib/brand";
 import { enabledProviders } from "@/lib/providers";
 import { getCurrentUser } from "@/modules/identity/session";
@@ -69,9 +70,9 @@ function footerLinks(hospitals: boolean) {
   ];
 }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; next?: string; as?: string }> }) {
+export default async function Home({ searchParams }: { searchParams: Promise<{ reset?: string; next?: string; as?: string; join?: string }> }) {
   const user = await getCurrentUser();
-  const { reset, next, as } = await searchParams;
+  const { reset, next, as, join } = await searchParams;
   if (user) redirect(next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/app");
   const returning = Boolean(reset || next);
   const [verified, counts, showHospitals] = await Promise.all([countVerifiedProfessionals(), directoryCounts(), hospitalsVisible(null)]);
@@ -83,7 +84,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
     <div className="overflow-x-clip bg-ground">
       <LandingHeader />
       {reset && <p role="status" className="mx-auto max-w-[1200px] px-4 sm:px-8"><span className="block rounded-xl bg-brand-soft px-4 py-3 text-sm text-brand-dark">Password changed. Sign in with your new password.</span></p>}
-      <JoinHero providers={enabledProviders()} initialMode={returning ? "signin" : "join"} initialRole={as === "pro" ? "pro" : "member"} photos={<HeroPhotos />} />
+      <JoinHero providers={enabledProviders()} initialMode={!returning && (join || as === "pro") ? "join" : "signin"} cardFirst={returning} initialRole={as === "pro" ? "pro" : "member"} photos={<HeroPhotos />} />
 
       <section aria-label="Why people trust us" className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-8">
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -190,11 +191,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
 
       <AlsoOn care={care} counts={counts} hospitals={showHospitals} />
 
+      <Faq />
+
       <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-8 sm:py-20">
         <div className="flex flex-wrap items-center justify-between gap-6 rounded-[28px] bg-brand p-8 text-white sm:p-12">
           <div className="flex max-w-[560px] flex-col gap-2">
             <h2 className="font-display text-[30px] leading-tight font-extrabold tracking-[-0.02em] sm:text-[38px]">Your profile takes a minute.</h2>
-            <p className="text-[16px] text-white/85">Join free with Google, Microsoft or your email.</p>
+            <p className="text-[16px] text-white/85">Join free with Google, Microsoft or your email. Already a member? <a href="#signin" className="font-semibold text-white underline underline-offset-4">Sign in</a></p>
           </div>
           <span className="flex flex-wrap gap-3">
             <a href="#join" className="btn bg-white px-6 text-brand-dark hover:bg-brand-soft">Join free</a>

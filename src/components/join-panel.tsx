@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SignInForm, SignUpForm, type Providers } from "./auth-forms";
 
 export type JoinRole = "member" | "pro";
@@ -28,6 +28,27 @@ export function JoinPanel({
 }) {
   const [mode, setMode] = useState(initialMode);
   const [role, setRole] = useState<JoinRole>(initialRole);
+  // Links to #join / #signin anywhere on the page switch this card (e.g. "Join free" buttons).
+  useEffect(() => {
+    const fromHash = () => {
+      if (location.hash === "#join") setMode("join");
+      else if (location.hash === "#signin") setMode("signin");
+    };
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as Element | null)?.closest?.("a[href]");
+      const href = a?.getAttribute("href") ?? "";
+      if (href.endsWith("#join")) setMode("join");
+      else if (href.endsWith("#signin")) setMode("signin");
+    };
+    const t = setTimeout(fromHash, 0);
+    window.addEventListener("hashchange", fromHash);
+    document.addEventListener("click", onClick);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("hashchange", fromHash);
+      document.removeEventListener("click", onClick);
+    };
+  }, []);
   const pick = (r: JoinRole) => {
     setRole(r);
     onRoleChange?.(r);
@@ -56,7 +77,30 @@ export function JoinPanel({
       {mode === "join" ? (
         <SignUpForm key={role} providers={providers} next={NEXT_FOR[role]} onSwitch={() => setMode("signin")} />
       ) : (
-        <SignInForm providers={providers} onSwitch={() => setMode("join")} />
+        <>
+          <SignInForm providers={providers} onSwitch={() => setMode("join")} />
+          {showRoles && (
+            <div className="flex flex-col gap-3 border-t border-line pt-5">
+              <p className="text-[14px] font-semibold">Or join free as</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {ROLES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => {
+                      pick(r.key);
+                      setMode("join");
+                    }}
+                    className="flex flex-col gap-1 rounded-2xl border border-line bg-ground px-4 py-3 text-left hover:border-brand hover:bg-brand-soft"
+                  >
+                    <span className="text-[14px] font-bold leading-snug">{r.key === "member" ? "A working professional" : "A wellness professional"}</span>
+                    <span className="text-[12.5px] leading-snug text-muted">{r.line}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

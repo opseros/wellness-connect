@@ -61,10 +61,10 @@ function tabs(counts: { professionals: number; homestays: number; facilities: nu
       eyebrow: "Coaches, nutritionists and therapists",
       eyebrowTone: "text-wellness-ink",
       title: "Learn from experts whose credentials we've checked.",
-      body: "Yoga teachers, nutritionists, physiotherapists, coaches and therapists for you or your team, in person or online, with prices in rupees.",
+      body: "Book a one-to-one session with a yoga teacher, nutritionist, physiotherapist, coach or therapist, online or in person, or bring them in for your team.",
       photo: { src: "https://images.unsplash.com/photo-1758274525946-2d3a5be67b5d", alt: "An instructor leading a small yoga group in a park" },
       photoTone: "bg-wellness",
-      points: ["Verified credentials", "In person or online", "Workshops and programmes for teams"],
+      points: ["Verified credentials", "Book one-to-one sessions", "Workshops for teams"],
       primary: { label: browse(counts.professionals, counts.professionals === 1 ? "professional" : "professionals", "Find professionals"), href: "/professionals" },
       secondary: { label: "Are you a professional? Join free →", href: join("pro") },
       tiles: [
