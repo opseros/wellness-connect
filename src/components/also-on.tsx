@@ -135,6 +135,7 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
       body: "Host guests who come to rest, recover or hold a small team retreat.",
       points: ["Calendar with your own nightly prices", "You accept each booking request", "Payouts after every stay"],
       primary: { label: "List your homestay", href: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dhomestay" },
+      secondary: { label: "Find homestays", href: "/homestays" },
       count: counts.homestays > 0 ? `${counts.homestays} verified` : undefined,
       tone: { bg: "bg-travel", ink: "text-travel-ink", ring: "ring-travel-ink/15", dot: "text-travel-ink" },
     },
@@ -145,6 +146,7 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
       body: "Reach working professionals nearby and companies looking for team memberships.",
       points: ["A verified listing with prices and timings", "Show free trials and women-only batches", "Get found by companies for team plans"],
       primary: { label: "List your facility", href: "/sign-up?next=%2Fapp%2Fonboarding%3Fas%3Dfacility" },
+      secondary: { label: "Find gyms and wellness centres", href: "/facilities" },
       count: counts.facilities > 0 ? `${counts.facilities} verified` : undefined,
       tone: { bg: "bg-move", ink: "text-move-ink", ring: "ring-move-ink/15", dot: "text-move-ink" },
     },
@@ -204,14 +206,14 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
                   <li key={p} className="flex gap-2.5"><Check className={c.tone.dot} />{p}</li>
                 ))}
               </ul>
-              {c.secondary && (
-                <Link href={c.secondary.href} className="inline-flex w-fit items-center gap-1 text-[14.5px] font-semibold text-brand underline-offset-4 hover:underline">
-                  {c.secondary.label}
-                  <span aria-hidden>→</span>
-                </Link>
-              )}
-              {/* Same footer on every card so the buttons line up across the row. */}
-              <div className="mt-auto border-t border-line pt-5">
+              {/* Same footer on every card so links and buttons line up across the row. */}
+              <div className="mt-auto flex flex-col gap-3 border-t border-line pt-5">
+                {c.secondary && (
+                  <Link href={c.secondary.href} className="inline-flex w-fit items-center gap-1 text-[14.5px] font-semibold text-brand underline-offset-4 hover:underline">
+                    {c.secondary.label}
+                    <span aria-hidden>→</span>
+                  </Link>
+                )}
                 <Link href={c.primary.href} className="btn w-full bg-ink px-5 text-white hover:bg-brand-dark">{c.primary.label}</Link>
               </div>
             </div>
