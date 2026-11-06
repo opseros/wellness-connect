@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FeedCollage, LandingHeader, SpaceIcon, SPACES } from "@/components/landing";
-import { JoinHero } from "@/components/join-hero";
-import { HeroPhotos } from "@/components/hero-photos";
-import { BrandMark } from "@/components/brand-mark";
+import { LandingHeader } from "@/components/landing";
+import { HomeHero } from "@/components/home/hero";
+import { Marquee } from "@/components/home/marquee";
+import { Bento } from "@/components/home/bento";
+import { Moments } from "@/components/home/moments";
+import { Steps } from "@/components/home/steps";
+import { BrandLockup } from "@/components/brand-mark";
 import { AlsoOn } from "@/components/also-on";
-import { ExploreSection } from "@/components/explore-section";
 import { Faq } from "@/components/faq";
 import { BRAND } from "@/lib/brand";
 import { enabledProviders } from "@/lib/providers";
@@ -14,15 +16,6 @@ import { countVerifiedProfessionals } from "@/modules/professionals/service";
 import { careTravelEnabled } from "@/modules/care/service";
 import { directoryCounts } from "@/modules/listings/service";
 import { hospitalsVisible } from "@/modules/platform/features";
-
-const tile: Record<string, string> = {
-  wellness: "bg-wellness text-wellness-ink",
-  travel: "bg-travel text-travel-ink",
-  meetup: "bg-meetup text-meetup-ink",
-  move: "bg-move text-move-ink",
-  food: "bg-food text-food-ink",
-  career: "bg-career text-career-ink",
-};
 
 const TRUST = [
   { title: "Credentials checked", line: "Professionals get a verified badge only after we've seen their certificate.", tone: "bg-wellness text-wellness-ink", d: "M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3Zm-3 9 2 2 4-4" },
@@ -81,12 +74,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
   const FOOTER = footerLinks(showHospitals);
 
   return (
-    <div className="overflow-x-clip bg-ground">
+    <div className="overflow-x-clip bg-[#f7f3ec]">
       <LandingHeader />
       {reset && <p role="status" className="mx-auto max-w-[1200px] px-4 sm:px-8"><span className="block rounded-xl bg-brand-soft px-4 py-3 text-sm text-brand-dark">Password changed. Sign in with your new password.</span></p>}
-      <JoinHero providers={enabledProviders()} initialMode={!returning && (join || as === "pro") ? "join" : "signin"} cardFirst={returning} initialRole={as === "pro" ? "pro" : "member"} photos={<HeroPhotos />} />
+      <HomeHero providers={enabledProviders()} initialMode={!returning && (join || as === "pro") ? "join" : "signin"} cardFirst={returning} initialRole={as === "pro" ? "pro" : "member"} />
+      <Marquee />
+      <Bento counts={{ professionals: verified, homestays: counts.homestays, facilities: counts.facilities }} />
+      <Moments />
+      <Steps />
 
-      <section aria-label="Why people trust us" className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-8">
+      <section aria-label="Why people trust us" className="mx-auto max-w-[1280px] px-4 pb-16 sm:px-8 sm:pb-20">
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {TRUST.map((t) => (
             <li key={t.title} className="flex gap-3.5 rounded-[22px] bg-white p-5 ring-1 ring-line">
@@ -102,48 +99,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
         </ul>
       </section>
 
-      <section aria-labelledby="inside-h" className="border-y border-line bg-white">
-        <div className="mx-auto grid max-w-[1200px] items-center gap-12 px-4 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-          <div className="flex max-w-[480px] flex-col gap-5">
-            <h2 id="inside-h" className="font-display text-[34px] leading-[1.08] font-extrabold tracking-[-0.02em] sm:text-[44px]">A feed about the life around work, not just the work.</h2>
-            <p className="text-[17px] leading-relaxed text-[#3d4842]">Share what keeps you going, ask the people who&apos;ve been there, and turn a good idea into a Saturday walk. Your feed comes from your connections, the people you follow and the spaces you join.</p>
-            <ul className="flex flex-col gap-3 text-[15.5px]">
-              <li><span className="font-semibold">Connections and messages.</span> Only people you&apos;re connected with can message you.</li>
-              <li><span className="font-semibold">Meet-ups.</span> Walks, runs and chai circles in your city, with an &ldquo;I&apos;m going&rdquo; list.</li>
-              <li><span className="font-semibold">Experts you can trust.</span> Wellness professionals show a verified badge once our team has checked their credentials.</li>
-            </ul>
-          </div>
-          <div className="flex flex-col gap-3">
-            <FeedCollage />
-            <p className="text-center text-[12.5px] text-muted">Examples of posts in Connect.</p>
-          </div>
-        </div>
-      </section>
 
-      <ExploreSection counts={{ professionals: verified, homestays: counts.homestays, facilities: counts.facilities }} />
 
-      <section id="spaces" aria-labelledby="spaces-h" className="scroll-mt-6 border-t border-line bg-white">
-        <div className="mx-auto max-w-[1200px] px-4 py-16 sm:px-8 sm:py-20">
-          <div className="flex max-w-[640px] flex-col gap-3">
-            <h2 id="spaces-h" className="font-display text-[34px] leading-[1.08] font-extrabold tracking-[-0.02em] sm:text-[44px]">Spaces to start with</h2>
-            <p className="text-[17px] leading-relaxed text-[#3d4842]">Join the ones you care about. Your feed fills with posts, questions and plans from people who share them.</p>
-          </div>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {SPACES.map((s) => (
-              <li key={s.key} className={`flex flex-col gap-4 rounded-[24px] p-6 ${tile[s.key]}`}>
-                <span className="grid size-11 place-items-center rounded-2xl bg-white/70">
-                  <SpaceIcon k={s.key} className="size-6" />
-                </span>
-                <div>
-                  <h3 className="font-display text-[22px] font-bold tracking-tight">{s.name}</h3>
-                  <p className="mt-1.5 text-[15px] leading-relaxed opacity-90">{s.line}</p>
-                </div>
-                <p className="mt-auto rounded-2xl bg-white/75 px-4 py-3 text-[14px] text-ink">“{s.prompt}”</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
+
+
+
+
 
       <section aria-labelledby="pro-h" className="mx-auto max-w-[1200px] px-4 py-16 sm:px-8 sm:py-20">
         <div className="mb-8 flex max-w-[640px] flex-col gap-3">
@@ -209,13 +170,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ r
       <footer className="border-t border-line bg-white">
         <div className="mx-auto grid max-w-[1200px] gap-10 px-4 py-12 sm:px-8 md:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
           <div className="flex flex-col gap-3">
-            <span className="flex items-center gap-2.5">
-              <BrandMark size={36} />
-              <span className="flex flex-col leading-none">
-                <span className="font-display text-[18px] font-extrabold">{BRAND.name}</span>
-                <span className="mt-1 text-[11px] font-semibold text-muted">{BRAND.tagline}</span>
-              </span>
-            </span>
+            <BrandLockup size="md" name={BRAND.name} tag={BRAND.tagline} />
             <p className="max-w-[320px] text-[14px] leading-relaxed text-muted">The professional network for a better working life. Everything listed here is checked by our team.</p>
             <p className="text-[12.5px] text-muted">Connect is for everyday wellbeing, not medical advice. Photos: Unsplash.</p>
           </div>

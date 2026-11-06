@@ -6,6 +6,7 @@ import { navOptions } from "@/components/nav-options";
 import { getCurrentUser } from "@/modules/identity/session";
 import Link from "next/link";
 import { connectBadges, connectSnapshot } from "@/modules/connect/service";
+import { pendingBuddyCount } from "@/modules/connect/social";
 import { Avatar } from "../avatar";
 import { ConnectNav } from "../connect-nav";
 
@@ -15,7 +16,8 @@ export default async function ConnectLayout({ children }: { children: React.Reac
   const me = await getCurrentUser();
   if (!me) redirect("/sign-in?next=/connect");
   if (!me.emailVerified) redirect(`/check-email?email=${encodeURIComponent(me.email)}`);
-  const [nav, badges, snap] = await Promise.all([navOptions(me.id), connectBadges(me.id), connectSnapshot(me.id)]);
+  const [nav, base, buddies, snap] = await Promise.all([navOptions(me.id), connectBadges(me.id), pendingBuddyCount(me.id), connectSnapshot(me.id)]);
+  const badges = { ...base, buddies };
   return (
     <div>
       <AppHeader name={me.name} nav={mainNav(me, "connect", nav)} />

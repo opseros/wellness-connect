@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppError } from "@/lib/errors";
 import { getCurrentUser } from "@/modules/identity/session";
-import { commentsForPosts, getMemberPage } from "@/modules/connect/service";
+import { OPEN_TO_LABEL, commentsForPosts, getMemberPage } from "@/modules/connect/service";
 import { blockAction, connectAction, followAction, removeConnectionAction, respondAction } from "../../../actions";
 import { listInvitations } from "@/modules/connect/service";
 import { Avatar, Flash, PostCard, ReportForm } from "../../../ui";
@@ -31,6 +31,13 @@ export default async function Member({ params, searchParams }: { params: Promise
           <h1 className="font-display text-[28px] font-extrabold leading-tight">{m.name}</h1>
           <p className="text-[16px]">{m.headline || "Member"}</p>
           <p className="text-sm text-muted">{[m.jobTitle && m.company ? `${m.jobTitle} at ${m.company}` : m.jobTitle || m.company, m.city].filter(Boolean).join(" · ")}</p>
+          {m.intro && <p className="mt-1 max-w-[560px] text-[15px] leading-relaxed text-[#3d4842]">{m.intro}</p>}
+          {m.openTo.length > 0 && (
+            <p className="flex flex-wrap items-center gap-1.5 text-[13px]">
+              <span className="font-semibold text-muted">Open to</span>
+              {m.openTo.map((o) => <span key={o} className="rounded-full bg-brand-soft px-2.5 py-0.5 font-semibold text-brand-dark">{OPEN_TO_LABEL[o as keyof typeof OPEN_TO_LABEL] ?? o}</span>)}
+            </p>
+          )}
           <p className="text-sm text-muted">{m.connections} connection{m.connections === 1 ? "" : "s"} · {m.followers} follower{m.followers === 1 ? "" : "s"}</p>
           {m.topics.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1.5">

@@ -33,6 +33,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 <p className="mt-1.5 text-muted">No longer available</p>
               )}
               {(r.content?.deletedAt || r.target?.archived) && <span className="text-xs text-muted">Removed</span>}
+              {r.content?.hiddenAt && !r.content.deletedAt && <span className="block text-xs font-semibold text-[#9b5a00]">Hidden automatically after several reports. Dismiss to show it again.</span>}
               {r.targetType === "message" && <span className="block text-xs text-muted">Messages stay private; talk to the reporter or suspend a member if needed.</span>}
             </td>
             <td>{r.reason}</td>
@@ -55,7 +56,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </tr>
         ))}
       </Table>
-      <p className="text-[13px] text-muted">For repeated abuse, suspend the member from their page under Users.</p>
+      <p className="text-[13px] text-muted">Removing or dismissing settles every open report on the same item. For repeated abuse, suspend the member from their page under Users.</p>
     </>
   );
 }

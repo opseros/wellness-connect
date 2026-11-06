@@ -50,28 +50,13 @@ body {
   @apply text-sm font-semibold;
 }
 
-/* Landing page: one orchestrated entrance for the hero collage. */
-@keyframes deal-in {
-  from {
-    opacity: 0;
-    transform: translateY(18px) rotate(var(--tilt, 0deg)) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) rotate(var(--tilt, 0deg)) scale(1);
-  }
-}
-.deal {
-  transform: rotate(var(--tilt, 0deg));
-  animation: deal-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  animation-delay: var(--delay, 0ms);
-}
-@media (prefers-reduced-motion: reduce) {
-  .deal {
-    animation: none;
-  }
-}
 :focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
+}
+
+/* Home page strip of everyday moments (two copies of the list, so -50% loops seamlessly). */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }

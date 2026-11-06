@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { BRAND } from "@/lib/brand";
 
-// Installable PWA (blueprint section 11). Icons: the Seasons mark (public/icons).
+// Installable PWA (blueprint section 11). Icons: the Two leaves mark (public/icons).
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: `${BRAND.name} · ${BRAND.tagline}`,

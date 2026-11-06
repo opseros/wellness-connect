@@ -8,6 +8,7 @@ import { requireUser } from "@/modules/identity/session";
 import {
   addComment,
   blockMember,
+  checkIn,
   createGroup,
   createMeetup,
   createPost,
@@ -29,6 +30,7 @@ import {
   unfollowMember,
   updateReferral,
 } from "@/modules/connect/service";
+import { answerBuddyMatch, closeBuddyRequest, requestBuddy } from "@/modules/connect/social";
 
 // Each action re-checks the session; the Connect service checks visibility, blocks and roles.
 
@@ -67,6 +69,58 @@ export async function meetupAction(form: FormData) {
       groupId: str(form, "groupId") || undefined,
     }),
   );
+}
+
+export async function checkInAction(form: FormData) {
+  const me = await requireUser();
+  const postId = str(form, "postId");
+  await run(back(form), "You're checked in. Say hi to the people around you.", () => checkIn(me.id, postId), `/connect/posts/${postId}#met`);
+}
+
+/** Like `run`, but the success message depends on the result. */
+async function runWithMessage(to: string, fn: () => Promise<string>) {
+  let target: string;
+  try {
+    const ok = await fn();
+    revalidatePath("/connect", "layout");
+    target = withMessage(to, "msg", ok);
+  } catch (e) {
+    const text = e instanceof AppError ? e.message : e instanceof ZodError ? (e.issues[0]?.message ?? "Check the form") : "Something went wrong. Please try again.";
+    if (!(e instanceof AppError) && !(e instanceof ZodError)) console.error(e);
+    target = withMessage(to, "error", text);
+  }
+  redirect(target);
+}
+
+export async function requestBuddyAction(form: FormData) {
+  const me = await requireUser();
+  await runWithMessage("/connect/buddies", async () => {
+    const { suggested } = await requestBuddy(me.id, {
+      activity: str(form, "activity") as "walk",
+      city: str(form, "city"),
+      times: form.getAll("times").map(String) as "early"[],
+      pace: (str(form, "pace") || "steady") as "steady",
+      note: str(form, "note"),
+    });
+    return suggested
+      ? `We found ${suggested === 1 ? "someone" : `${suggested} people`} for you. Say yes or no below.`
+      : "You're on the list. We'll let you know when someone nearby is looking too.";
+  });
+}
+
+export async function closeBuddyAction(form: FormData) {
+  const me = await requireUser();
+  await run("/connect/buddies", "Stopped looking for that one.", () => closeBuddyRequest(me.id, str(form, "requestId")));
+}
+
+export async function answerBuddyAction(form: FormData) {
+  const me = await requireUser();
+  const answer = str(form, "answer") === "yes" ? "yes" : "no";
+  await runWithMessage("/connect/buddies", async () => {
+    const { status } = await answerBuddyMatch(me.id, str(form, "matchId"), { answer });
+    if (status === "matched") return "It's a match! You're now connected, so you can message to plan your first session.";
+    return answer === "yes" ? "Nice. We'll tell you if they say yes too." : "Skipped. They won't be told.";
+  });
 }
 
 export async function deletePostAction(form: FormData) {

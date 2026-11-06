@@ -13,6 +13,9 @@ export const memberProfile = pgTable("member_profile", {
   topics: text("topics").array().notNull().default([]),
   visibility: text("visibility", { enum: ["members", "connections"] }).notNull().default("members"),
   messagesFromConnectionsOnly: boolean("messages_from_connections_only").notNull().default(true),
+  // A line about yourself and what you're open to (buddy, mentoring, group sessions, referrals).
+  intro: text("intro").notNull().default(""),
+  openTo: text("open_to").array().notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -63,6 +66,9 @@ export const SPACE_KEYS = ["wellness", "travel", "meetup", "move", "food", "care
 /**
  * Groups. The six home-page spaces are groups with kind "space" (seeded, no
  * creator, open to all); members start "community" groups themselves.
+ * "circle" groups are made and joined automatically: one per city (public)
+ * and one per company (members of that company only). `circleKey` is
+ * "city:<name>" or "org:<orgId>".
  */
 export const group = pgTable("group", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -70,7 +76,8 @@ export const group = pgTable("group", {
   name: text("name").notNull(),
   about: text("about").notNull().default(""),
   privacy: text("privacy", { enum: ["public", "approval"] }).notNull().default("public"),
-  kind: text("kind", { enum: ["space", "community"] }).notNull().default("community"),
+  kind: text("kind", { enum: ["space", "community", "circle"] }).notNull().default("community"),
+  circleKey: text("circle_key").unique(),
   spaceKey: text("space_key", { enum: SPACE_KEYS }),
   city: text("city").notNull().default(""),
   createdBy: uuid("created_by").references(() => user.id),
@@ -105,6 +112,8 @@ export const post = pgTable(
     eventCity: text("event_city"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    // Set when enough people report it; hidden until staff review.
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
   },
   (t) => [
     index("post_author_idx").on(t.authorId),
@@ -112,6 +121,17 @@ export const post = pgTable(
     index("post_created_idx").on(t.createdAt),
     index("post_event_idx").on(t.eventAt),
   ],
+);
+
+/** "I'm here": a check-in at a meet-up, from shortly before it starts until a few hours after. */
+export const meetupCheckin = pgTable(
+  "meetup_checkin",
+  {
+    postId: uuid("post_id").notNull().references(() => post.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.postId, t.userId] }), index("meetup_checkin_user_idx").on(t.userId)],
 );
 
 export const meetupRsvp = pgTable(
@@ -143,6 +163,7 @@ export const comment = pgTable(
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
   },
   (t) => [index("comment_post_idx").on(t.postId)],
 );
@@ -217,3 +238,53 @@ export const report = pgTable("report", {
   status: text("status", { enum: ["open", "actioned", "dismissed"] }).notNull().default("open"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------- Buddy match ----------
+
+export const BUDDY_ACTIVITIES = ["walk", "run", "gym", "yoga", "meditation", "cycling", "sports", "swim"] as const;
+export const BUDDY_TIMES = ["early", "lunch", "evening", "weekend"] as const;
+export const BUDDY_PACES = ["easy", "steady", "push"] as const;
+
+/** "Find me a buddy": one open request per activity. No contact details, ever. */
+export const buddyRequest = pgTable(
+  "buddy_request",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    activity: text("activity", { enum: BUDDY_ACTIVITIES }).notNull(),
+    city: text("city").notNull(),
+    times: text("times").array().notNull(),
+    pace: text("pace", { enum: BUDDY_PACES }).notNull().default("steady"),
+    note: text("note").notNull().default(""),
+    status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("buddy_request_match_idx").on(t.activity, t.status),
+    uniqueIndex("buddy_request_open_uq").on(t.userId, t.activity).where(sql`${t.status} = 'open'`),
+  ],
+);
+
+/**
+ * A suggested pair. Each side answers yes or no; only when both say yes are
+ * they connected (and can message). Neither sees the other's answer.
+ */
+export const buddyMatch = pgTable(
+  "buddy_match",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userLow: uuid("user_low").notNull().references(() => user.id, { onDelete: "cascade" }),
+    userHigh: uuid("user_high").notNull().references(() => user.id, { onDelete: "cascade" }),
+    activity: text("activity", { enum: BUDDY_ACTIVITIES }).notNull(),
+    lowAnswer: text("low_answer", { enum: ["yes", "no"] }),
+    highAnswer: text("high_answer", { enum: ["yes", "no"] }),
+    status: text("status", { enum: ["proposed", "matched", "passed"] }).notNull().default("proposed"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("buddy_match_pair_uq").on(t.userLow, t.userHigh, t.activity),
+    index("buddy_match_high_idx").on(t.userHigh),
+    check("buddy_match_order_chk", sql`${t.userLow} < ${t.userHigh}`),
+  ],
+);

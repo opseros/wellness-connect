@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/modules/identity/session";
 import { listGroups } from "@/modules/connect/service";
+import { cityCircles, myCircles, syncCircles } from "@/modules/connect/social";
 import { SpaceIcon } from "@/components/landing";
 import { createGroupAction, joinGroupAction } from "../../actions";
 import { Flash } from "../../ui";
@@ -19,7 +20,9 @@ const tint: Record<string, string> = {
 
 export default async function Groups({ searchParams }: { searchParams: Promise<{ msg?: string; error?: string }> }) {
   const me = (await getCurrentUser())!;
-  const [rows, sp] = await Promise.all([listGroups(me.id), searchParams]);
+  await syncCircles(me.id);
+  const [rows, sp, mine, cities] = await Promise.all([listGroups(me.id), searchParams, myCircles(me.id), cityCircles(8)]);
+  const otherCities = cities.filter((c) => !mine.some((m) => m.id === c.id));
   const spaces = rows.filter((r) => r.group.kind === "space");
   const communities = rows.filter((r) => r.group.kind === "community");
   const join = (r: (typeof rows)[number]) =>
@@ -39,6 +42,40 @@ export default async function Groups({ searchParams }: { searchParams: Promise<{
     <>
       <h1 className="text-[26px] font-bold">Groups &amp; spaces</h1>
       <Flash msg={sp.msg} error={sp.error} />
+      <section id="circles" aria-labelledby="circles-h" className="flex scroll-mt-24 flex-col gap-3">
+        <div>
+          <h2 id="circles-h" className="text-lg font-bold">Your circles</h2>
+          <p className="text-[14px] text-muted">You join these automatically: one for your city, and a private one for your company.</p>
+        </div>
+        {mine.length === 0 ? (
+          <p className="card p-5 text-sm text-muted">
+            Add your city to <Link href="/connect/setup" className="font-semibold text-brand hover:underline">your profile</Link> to join its circle.
+          </p>
+        ) : (
+          <ul className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
+            {mine.map((c) => (
+              <li key={c.id} className={`flex flex-col gap-2 rounded-[22px] p-5 ${c.company ? "bg-[#e3ecf5] text-[#163a5a]" : "bg-brand-soft text-brand-dark"}`}>
+                <span className="text-[12px] font-bold uppercase tracking-[0.12em] opacity-80">{c.company ? "Company · private" : "City"}</span>
+                <Link href={`/connect/groups/${c.slug}`} className="font-display text-[20px] font-bold hover:underline">{c.name}</Link>
+                <span className="text-[13px]">
+                  {c.members} member{c.members === 1 ? "" : "s"}
+                  {c.postsThisWeek ? ` · ${c.postsThisWeek} new this week` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {otherCities.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted">Travelling? Other city circles:</span>
+            {otherCities.map((c) => (
+              <Link key={c.id} href={`/connect/groups/${c.slug}`} className="rounded-full border border-line bg-white px-3 py-1 font-semibold hover:border-ink">
+                {c.name.replace(/ circle$/, "")} <span className="font-normal text-muted">{c.members}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-bold">Spaces</h2>
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">

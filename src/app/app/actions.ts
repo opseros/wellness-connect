@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/modules/identity/session";
 import { createOrganization } from "@/modules/organizations/service";
 import { upsertProfessionalProfile } from "@/modules/professionals/service";
-import { createPost, toggleLike, updateMemberProfile } from "@/modules/connect/service";
+import { OPEN_TO, createPost, toggleLike } from "@/modules/connect/service";
+import { saveProfileAndCircles } from "@/modules/connect/social";
+import { withMessage } from "@/lib/flash";
 import { ZodError } from "zod";
 import { AppError } from "@/lib/errors";
 import { createListingOrg } from "@/modules/listings/service";
@@ -41,11 +43,20 @@ export async function startProfessionalAction(_: string | null, form: FormData):
 export async function saveConnectProfileAction(form: FormData) {
   const me = await requireUser();
   const topics = String(form.get("topics") ?? "").split(",").map((t) => t.trim()).filter(Boolean);
-  await updateMemberProfile(me.id, {
-    headline: String(form.get("headline") ?? ""),
-    city: String(form.get("city") ?? ""),
-    topics,
-  });
+  const openTo = form.getAll("openTo").map(String).filter((v): v is (typeof OPEN_TO)[number] => (OPEN_TO as readonly string[]).includes(v));
+  try {
+    await saveProfileAndCircles(me.id, {
+      headline: String(form.get("headline") ?? ""),
+      city: String(form.get("city") ?? ""),
+      intro: String(form.get("intro") ?? ""),
+      openTo,
+      topics,
+    });
+  } catch (e) {
+    const text = e instanceof AppError ? e.message : e instanceof ZodError ? (e.issues[0]?.message ?? "Check the form") : "Something went wrong. Please try again.";
+    if (!(e instanceof AppError) && !(e instanceof ZodError)) console.error(e);
+    redirect(withMessage("/connect/setup", "error", text));
+  }
   revalidatePath("/", "layout");
   redirect("/connect");
 }

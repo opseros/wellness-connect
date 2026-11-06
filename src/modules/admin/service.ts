@@ -553,8 +553,8 @@ export async function listReports(actor: StaffActor, status: "open" | "actioned"
   const groupIds = ids("group");
   const convIds = ids("message");
   const [posts, comments, users, groups, parts] = await Promise.all([
-    postIds.length ? db.select({ id: post.id, body: post.body, deletedAt: post.deletedAt }).from(post).where(inArray(post.id, postIds)) : [],
-    commentIds.length ? db.select({ id: comment.id, body: comment.body, deletedAt: comment.deletedAt }).from(comment).where(inArray(comment.id, commentIds)) : [],
+    postIds.length ? db.select({ id: post.id, body: post.body, deletedAt: post.deletedAt, hiddenAt: post.hiddenAt }).from(post).where(inArray(post.id, postIds)) : [],
+    commentIds.length ? db.select({ id: comment.id, body: comment.body, deletedAt: comment.deletedAt, hiddenAt: comment.hiddenAt }).from(comment).where(inArray(comment.id, commentIds)) : [],
     userIds.length ? db.select({ id: user.id, name: user.name }).from(user).where(inArray(user.id, userIds)) : [],
     groupIds.length ? db.select({ id: group.id, name: group.name, slug: group.slug, archivedAt: group.archivedAt }).from(group).where(inArray(group.id, groupIds)) : [],
     convIds.length
@@ -588,7 +588,16 @@ export async function resolveReport(actor: StaffActor, reportId: string, input: 
       }
       else throw badRequest("Only posts, comments and communities can be removed here; suspend the member instead");
     }
-    await tx.update(report).set({ status: action === "dismiss" ? "dismissed" : "actioned" }).where(eq(report.id, r.id));
+    // One decision settles every open report on the same item.
+    await tx
+      .update(report)
+      .set({ status: action === "dismiss" ? "dismissed" : "actioned" })
+      .where(and(eq(report.targetType, r.targetType), eq(report.targetId, r.targetId), eq(report.status, "open")));
+    // Dismissed: anything hidden automatically by reports comes back.
+    if (action === "dismiss") {
+      if (r.targetType === "post") await tx.update(post).set({ hiddenAt: null }).where(eq(post.id, r.targetId));
+      if (r.targetType === "comment") await tx.update(comment).set({ hiddenAt: null }).where(eq(comment.id, r.targetId));
+    }
     await audit(tx, { actorId: actor.id, action: `report.${action}`, targetType: r.targetType, targetId: r.targetId, metadata: { reportId: r.id } });
   });
 }

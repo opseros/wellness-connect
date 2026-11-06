@@ -2,7 +2,7 @@
 import { IntentLink } from "@/components/intent-link";
 import { usePathname } from "next/navigation";
 
-export function ConnectNav({ badges, professional }: { badges: { invites: number; unread: number; referrals: number }; professional: boolean }) {
+export function ConnectNav({ badges, professional }: { badges: { invites: number; unread: number; referrals: number; buddies: number }; professional: boolean }) {
   const path = usePathname();
   const items = [
     { href: "/connect", label: "Feed", match: (p: string) => p === "/connect" },
@@ -10,6 +10,7 @@ export function ConnectNav({ badges, professional }: { badges: { invites: number
     { href: "/connect/messages", label: "Messages", badge: badges.unread, match: (p: string) => p.startsWith("/connect/messages") },
     { href: "/connect/groups", label: "Groups & spaces", match: (p: string) => p.startsWith("/connect/groups") },
     { href: "/connect/meetups", label: "Meet-ups", match: (p: string) => p.startsWith("/connect/meetups") },
+    { href: "/connect/buddies", label: "Find a buddy", badge: badges.buddies, match: (p: string) => p.startsWith("/connect/buddies") },
     ...(professional ? [{ href: "/connect/referrals", label: "Referrals", badge: badges.referrals, match: (p: string) => p.startsWith("/connect/referrals") }] : []),
     { href: "/connect/setup", label: "Edit my profile", match: () => false },
   ];

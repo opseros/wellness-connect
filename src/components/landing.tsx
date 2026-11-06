@@ -2,7 +2,7 @@
 // looks like (fictional people, no counts), not real activity.
 import Link from "next/link";
 import { BRAND } from "@/lib/brand";
-import { BrandMark } from "./brand-mark";
+import { BrandLockup } from "./brand-mark";
 
 export type SpaceKey = "wellness" | "travel" | "meetup" | "move" | "food" | "career";
 
@@ -62,82 +62,16 @@ export function SpaceTag({ k }: { k: SpaceKey }) {
   );
 }
 
-function Avatar({ initials, tone }: { initials: string; tone: SpaceKey }) {
-  return <span className={`grid size-9 shrink-0 place-items-center rounded-full text-[13px] font-bold ${tint[tone]}`} aria-hidden>{initials}</span>;
-}
-
-/** The hero's memorable element: a hand of Connect posts dealt onto the page. */
-export function FeedCollage() {
-  return (
-    <div className="mx-auto flex w-full max-w-[520px] flex-col gap-3 sm:relative sm:block sm:h-[460px]" role="img" aria-label="Examples of posts in Connect: a mindfulness tip, a Saturday walk meet-up and a travel question">
-      <article className="deal w-full rounded-[22px] sm:absolute sm:top-0 sm:left-0 border border-line bg-white p-4 shadow-[0_18px_40px_-24px_rgba(15,107,92,0.45)] sm:w-[78%]" style={{ ["--tilt" as string]: "-2.5deg", ["--delay" as string]: "80ms" }}>
-        <div className="flex items-center gap-3">
-          <Avatar initials="MI" tone="wellness" />
-          <div className="min-w-0">
-            <p className="text-[14px] font-bold">Meera Iyer</p>
-            <p className="text-[12px] text-muted">Mindfulness coach, Bengaluru</p>
-          </div>
-        </div>
-        <p className="mt-3 text-[14.5px] leading-relaxed">Trying a 5-minute breathing reset before stand-ups this week. Anyone want to try it with me and compare notes on Friday?</p>
-        <div className="mt-3 flex items-center justify-between">
-          <SpaceTag k="wellness" />
-          <span className="text-[12px] font-semibold text-muted">Like · Reply</span>
-        </div>
-      </article>
-
-      <article className="deal ml-auto w-[92%] overflow-hidden sm:absolute sm:top-[150px] sm:right-0 sm:ml-0 rounded-[22px] border border-line bg-white shadow-[0_18px_40px_-24px_rgba(107,67,0,0.5)] sm:w-[64%]" style={{ ["--tilt" as string]: "2deg", ["--delay" as string]: "220ms" }}>
-        <div className="flex gap-3 bg-meetup p-4 text-meetup-ink">
-          <div className="flex w-12 shrink-0 flex-col items-center rounded-xl bg-white py-1.5 leading-none">
-            <span className="text-[11px] font-semibold">Sat</span>
-            <span className="font-display text-[22px] font-extrabold">14</span>
-          </div>
-          <div>
-            <p className="font-display text-[17px] font-bold leading-tight">Sunrise walk and chai</p>
-            <p className="mt-1 text-[12.5px]">7:00 am, Cubbon Park, Bengaluru</p>
-          </div>
-        </div>
-        <div className="flex items-center justify-between p-3.5">
-          <span className="flex -space-x-2">
-            {(["AR", "KM", "SN"] as const).map((i, n) => (
-              <span key={i} className={`grid size-7 place-items-center rounded-full border-2 border-white text-[10px] font-bold ${[tint.travel, tint.career, tint.move][n]}`}>{i}</span>
-            ))}
-          </span>
-          <span className="rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-semibold text-white">I&apos;m going</span>
-        </div>
-      </article>
-
-      <article className="deal w-[96%] rounded-[22px] sm:absolute sm:bottom-0 sm:left-[6%] border border-line bg-white p-4 shadow-[0_18px_40px_-24px_rgba(29,79,122,0.5)] sm:w-[70%]" style={{ ["--tilt" as string]: "-1deg", ["--delay" as string]: "360ms" }}>
-        <div className="flex items-center gap-3">
-          <Avatar initials="FS" tone="travel" />
-          <div className="min-w-0">
-            <p className="text-[14px] font-bold">Farah Siddiqui</p>
-            <p className="text-[12px] text-muted">Product designer, Pune</p>
-          </div>
-        </div>
-        <p className="mt-3 text-[14.5px] leading-relaxed">Taking my first proper break in a year. Quiet homestays in Coorg with no Wi-Fi guilt?</p>
-        <div className="mt-3 flex items-center justify-between">
-          <SpaceTag k="travel" />
-          <span className="text-[12px] font-semibold text-muted">6 replies</span>
-        </div>
-      </article>
-    </div>
-  );
-}
-
 export function LandingHeader({ home = true, signedIn = false }: { home?: boolean; signedIn?: boolean }) {
   const link = "shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-ink hover:bg-white";
   return (
     <header className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-4 sm:px-8">
-      <Link href="/" aria-label={`${BRAND.name}, ${BRAND.tagline}`} className="flex items-center gap-2.5">
-        <BrandMark size={38} />
-        <span aria-hidden className="flex flex-col leading-none">
-          <span className="font-display text-[20px] font-extrabold tracking-tight">{BRAND.name}</span>
-          <span className="mt-1 text-[11px] font-semibold text-muted">{BRAND.tagline}</span>
-        </span>
+      <Link href="/" aria-label={`${BRAND.name}, ${BRAND.tagline}`} className="flex items-center">
+        <BrandLockup size="md" name={BRAND.name} tag={BRAND.tagline} />
       </Link>
       <nav aria-label="Explore" className="order-last flex w-full gap-1 overflow-x-auto text-sm font-semibold md:order-none md:w-auto">
         <Link href="/professionals" className={link}>Find professionals</Link>
-        <a href={home ? "#explore" : "/#explore"} className={link}>Explore</a>
+        <a href={home ? "#inside" : "/#inside"} className={link}>Explore</a>
         <a href={home ? "#spaces" : "/#spaces"} className={link}>Spaces</a>
         <a href={home ? "#more" : "/#more"} className={link}>For organisations</a>
       </nav>

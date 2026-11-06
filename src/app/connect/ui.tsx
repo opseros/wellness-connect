@@ -2,7 +2,8 @@
 export { Avatar } from "./avatar";
 import Link from "next/link";
 import { SPACE_TINT, SpaceIcon, type SpaceKey } from "@/components/landing";
-import { deleteCommentAction, deletePostAction, reportAction } from "./actions";
+import { checkInAction, deleteCommentAction, deletePostAction, reportAction } from "./actions";
+import { checkinWindow } from "@/modules/connect/service";
 import { Avatar } from "./avatar";
 import { CommentBox, CommentButton, CopyLinkButton, ExpandableText, GoingButton, LikeButton } from "./post-actions";
 
@@ -36,6 +37,9 @@ export type FeedPost = {
   comments: number;
   going: number;
   goingByMe: boolean;
+  hidden?: boolean;
+  here?: number;
+  hereByMe?: boolean;
 };
 
 type Comment = { id: string; body: string; authorId: string; authorName: string; createdAt: Date };
@@ -99,6 +103,7 @@ export function PostCard({ p, me, back, comments = [], canComment = true, full =
   const ev = p.eventAt ? dayParts(new Date(p.eventAt)) : null;
   const past = p.eventAt ? isPast(p.eventAt) : false;
   const hiddenComments = p.comments - comments.length;
+  const checkin = p.kind === "meetup" ? checkinWindow(p.eventAt ? new Date(p.eventAt) : null) : "closed";
   return (
     <article id={`p-${p.id}`} className="card flex scroll-mt-24 flex-col gap-3.5 p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -127,6 +132,12 @@ export function PostCard({ p, me, back, comments = [], canComment = true, full =
         </div>
       </div>
 
+      {p.hidden && p.authorId === me && (
+        <p role="status" className="rounded-xl bg-[#fff4dc] px-3.5 py-2.5 text-[13.5px] text-[#7a4a00]">
+          Hidden while our team looks at reports about it. Only you can see it for now.
+        </p>
+      )}
+
       {p.kind === "meetup" && ev ? (
         <div className="flex gap-4 rounded-2xl bg-meetup p-4 text-meetup-ink">
           <div className="flex w-14 shrink-0 flex-col items-center rounded-xl bg-white py-1.5 leading-tight shadow-sm">
@@ -137,8 +148,24 @@ export function PostCard({ p, me, back, comments = [], canComment = true, full =
           <div className="flex min-w-0 flex-col gap-1">
             <span className="font-display text-[19px] font-bold leading-tight">{p.title}</span>
             <span className="text-sm font-medium">{ev.time} · {p.eventPlace}, {p.eventCity}</span>
-            <span className="text-[13px]">{p.going} going{past ? " · this has happened" : ""}</span>
+            <span className="text-[13px]">
+              {p.going} going{p.here ? ` · ${p.here} checked in` : ""}
+              {past && checkin === "closed" ? " · this has happened" : ""}
+            </span>
             {p.body && p.body !== p.title && <span className="mt-1 whitespace-pre-line text-sm text-ink">{p.body}</span>}
+            {checkin === "open" &&
+              (p.hereByMe ? (
+                <Link href={`/connect/posts/${p.id}#met`} className="mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[13.5px] font-semibold text-brand-dark shadow-sm hover:underline">
+                  <svg aria-hidden viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                  You&apos;re here · see who else came
+                </Link>
+              ) : (
+                <form action={checkInAction} className="mt-2">
+                  <input type="hidden" name="postId" value={p.id} />
+                  <input type="hidden" name="back" value={back} />
+                  <button className="btn min-h-10 rounded-full bg-ink px-4 text-[14px] text-white hover:bg-black">I&apos;m here: check in</button>
+                </form>
+              ))}
           </div>
         </div>
       ) : (

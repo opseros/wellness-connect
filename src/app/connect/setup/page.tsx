@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/modules/identity/session";
-import { getMemberProfile } from "@/modules/connect/service";
+import { OPEN_TO, OPEN_TO_LABEL, getMemberProfile } from "@/modules/connect/service";
+import { Flash } from "@/components/ui";
 import { Logo } from "@/components/brand";
 import { saveConnectProfileAction } from "@/app/app/actions";
 
-export default async function ConnectSetupPage() {
+export default async function ConnectSetupPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const sp = await searchParams;
   const me = await getCurrentUser();
   if (!me) redirect("/");
   if (!me.emailVerified) redirect("/check-email");
@@ -18,6 +20,7 @@ export default async function ConnectSetupPage() {
         <h1 className="text-[30px] font-bold">Your Connect profile</h1>
         <p className="text-[15px] text-muted">This is what other members see when you connect, post or comment.</p>
       </div>
+      <div className="w-full max-w-[720px]"><Flash error={sp.error} /></div>
       <form action={saveConnectProfileAction} className="card flex w-full max-w-[720px] flex-col gap-5 p-7">
         <div className="flex flex-col gap-1.5">
           <label htmlFor="headline" className="label">Headline</label>
@@ -25,8 +28,25 @@ export default async function ConnectSetupPage() {
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="city" className="label">City</label>
-          <input id="city" name="city" maxLength={80} defaultValue={profile?.city} className="input" />
+          <input id="city" name="city" maxLength={80} defaultValue={profile?.city} className="input" aria-describedby="city-hint" />
+          <span id="city-hint" className="text-[13px] text-muted">You&apos;ll join your city&apos;s circle, where members plan walks, meet-ups and share local tips.</span>
         </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="intro" className="label">A line about you <span className="font-medium text-muted">(optional)</span></label>
+          <textarea id="intro" name="intro" maxLength={280} rows={2} defaultValue={profile?.intro} className="input min-h-20 py-2.5" placeholder="Weekend trekker, learning to meditate, always up for a chai walk." />
+          <span className="text-[13px] text-muted">Please don&apos;t add phone numbers or email addresses here.</span>
+        </div>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="label mb-1.5">I&apos;m open to</legend>
+          <div className="flex flex-wrap gap-2">
+            {OPEN_TO.map((o) => (
+              <label key={o} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-line bg-white px-4 text-[14.5px] font-semibold has-[:checked]:border-brand has-[:checked]:bg-brand-soft has-[:checked]:text-brand-dark">
+                <input type="checkbox" name="openTo" value={o} defaultChecked={profile?.openTo.includes(o)} className="size-4 accent-[var(--color-brand)]" />
+                {OPEN_TO_LABEL[o]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="topics" className="label">Topics you care about <span className="font-medium text-muted">(comma separated)</span></label>
           <input id="topics" name="topics" defaultValue={profile?.topics.join(", ")} className="input" placeholder="Mindfulness, Leadership, Workplace wellbeing" />

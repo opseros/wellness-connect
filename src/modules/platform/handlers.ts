@@ -1,5 +1,5 @@
 // Outbox event handlers. Imported once by the cron route.
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { appointment, careQuote, credential, enquiry, group, groupMember, invoice, listing, organization, stay, stayInvoice, professionalProfile, proposal, user } from "@/db/schema";
 import { sendEmail } from "@/lib/email";
 import { registerOutboxHandler } from "./outbox";
@@ -191,6 +191,23 @@ const REFERRAL_SUBJECT: Record<string, string> = {
   completed: "A referral was completed",
   withdrawn: "A referral was withdrawn",
 };
+
+// Buddy match: no names or details in email, just a nudge to open Connect.
+registerOutboxHandler("buddy.suggested", async (tx, p) => {
+  const ids = (p.userIds as string[]) ?? [];
+  const people = ids.length ? await tx.select({ email: user.email }).from(user).where(inArray(user.id, ids)) : [];
+  for (const u of people) {
+    await sendEmail({ to: u.email, subject: "You have a new buddy suggestion", text: `Someone nearby is looking for a buddy too. Say yes or no (they won't see a no): ${appUrl()}/connect/buddies` });
+  }
+});
+
+registerOutboxHandler("buddy.matched", async (tx, p) => {
+  const ids = (p.userIds as string[]) ?? [];
+  const people = ids.length ? await tx.select({ email: user.email }).from(user).where(inArray(user.id, ids)) : [];
+  for (const u of people) {
+    await sendEmail({ to: u.email, subject: "It's a match: you have a new buddy", text: `You both said yes, so you're now connected and can message to plan your first session: ${appUrl()}/connect/buddies` });
+  }
+});
 
 registerOutboxHandler("referral.updated", async (tx, p) => {
   await emailPro(tx, p.toUserId, REFERRAL_SUBJECT[String(p.status)] ?? "Referral update", `See the details and the full history: ${appUrl()}/connect/referrals`);

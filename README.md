@@ -36,7 +36,7 @@ Without Resend configured, verification and reset links appear in the terminal r
 Google/Microsoft buttons appear only when their keys are set.
 
 ```bash
-npm test          # 109 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
+npm test          # 145 tests: matching, tenant isolation, auth, company flow, payments, professionals, admin, Connect
 npm run typecheck && npm run lint && npm run build
 ```
 
@@ -102,8 +102,13 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
   - Messages: conversation list with unread counts, threads that refresh every few seconds, nav badges. Only connections (or members who opened messages to everyone) can message; blocking hides the conversation and stops replies both ways.
   - Six spaces (wellness, travel, meet-ups, fitness, food, careers) as real groups, plus member-created communities (open or moderator-approved) with moderators who approve, decline, remove and promote.
   - Meet-ups: date, time (IST), place and city, with RSVP; listed for your network, your groups and your city.
+  - Circles (`kind = "circle"` groups, made and joined automatically): one public circle per city (spellings like Bangalore/Bengaluru are merged) joined when you save your city, and one private circle per company you're an active member of (hidden from everyone else; leaving the company takes you out).
+  - Buddy match (`/connect/buddies`): ask for a walking, running, gym, yoga, meditation, cycling, sports or swimming buddy with city, times and pace; up to three suggestions per request (same activity, city and overlapping time; never blocked people or existing connections). Each side says yes or no privately; two yeses connect you. Only first name, headline and note show before that, and notes can't hold contact details.
+  - Meet-up check-in: "I'm here" from 30 minutes before to 4 hours after the start; people who checked in see who else came and can connect ("People you met" also shows on the feed).
+  - Profile extras: a one-line intro and "open to" (buddy, mentoring, group sessions, referrals).
+  - Safety: no phone numbers or email addresses in posts, comments, intros or buddy notes; daily limits on posts, comments, connection requests and new conversations, lower for accounts in their first week; a post or comment reported by 3 people is hidden (except to its author) until staff decide, and one decision settles all reports on that item.
   - Referrals between connected professionals with minimum information (phone numbers and emails are rejected), a status trail (sent → accepted/declined → completed, or withdrawn) and email notifications.
-  - REST under `/api/v1/connect/*` for all of the above (members, follow, blocks, suggestions, conversations, comments, RSVP, meet-ups, groups and membership, referrals, reports, badges).
+  - REST under `/api/v1/connect/*` for all of the above (members, follow, blocks, suggestions, conversations, comments, RSVP, meet-ups and check-in, groups and membership, circles, buddies and buddy matches, people met, profile, referrals, reports, badges).
 - Account types (M6): one login per person; companies, homestays and hospitals are organisations with members and roles. "Join as" (`/app/onboarding?as=member|pro|company|homestay|hospital`) at sign-up or later from Home.
   - Homestay and hospital workspaces (`/listing/<orgId>`): details (rooms, price from, recovery-friendly features; or specialties, accreditations, international desk, visa letters), photos, verification documents per checklist, team and invitations, submit for verification.
   - Documents are private (row-level security on `org_document`, private storage); staff opens are audited. Contact email and phone are for verification only.

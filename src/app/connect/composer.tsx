@@ -4,7 +4,7 @@ import { useFormStatus } from "react-dom";
 import { meetupAction, postInline } from "./actions";
 import { Avatar } from "./avatar";
 
-type GroupOption = { id: string; name: string; kind: "space" | "community" };
+type GroupOption = { id: string; name: string; kind: "space" | "community" | "circle" };
 
 const STARTERS = [
   { label: "Share a small win", text: "Small win this week: " },

@@ -9,11 +9,13 @@ import {
   listGroups,
   listInvitations,
   listUpcomingMeetups,
+  peopleYouMet,
   postableGroups,
   suggestMembers,
   type FeedFilter,
 } from "@/modules/connect/service";
 import { SPACE_TINT, SpaceIcon, type SpaceKey } from "@/components/landing";
+import { myCircles, pendingBuddyCount, syncCircles } from "@/modules/connect/social";
 import { connectAction, joinGroupAction, respondAction } from "../actions";
 import { Composer } from "../composer";
 import { Avatar, Flash, PostCard } from "../ui";
@@ -47,7 +49,9 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
   const me = (await getCurrentUser())!;
   const sp = await searchParams;
   const q = feedQuery.parse({ show: sp.show, before: sp.before, limit: PAGE });
-  const [feed, invites, suggestions, profile, snap, groups, meetups, allGroups] = await Promise.all([
+  // Company circles follow your workplaces (joining or leaving a company).
+  await syncCircles(me.id);
+  const [feed, invites, suggestions, profile, snap, groups, meetups, allGroups, circles, met, buddySuggestions] = await Promise.all([
     getFeed(me.id, q),
     listInvitations(me.id),
     suggestMembers(me.id, 4),
@@ -56,6 +60,9 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
     postableGroups(me.id),
     listUpcomingMeetups(me.id, 3),
     listGroups(me.id),
+    myCircles(me.id),
+    peopleYouMet(me.id, { onlyNew: true, limit: 3 }),
+    pendingBuddyCount(me.id),
   ]);
   const comments = await commentsForPosts(me.id, feed.map((p) => p.id), 2);
   const spacesToJoin = allGroups.filter((g) => g.group.kind === "space" && !g.myStatus).slice(0, 4);
@@ -165,6 +172,65 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
                 </div>
               </div>
             ))}
+          </RailCard>
+        )}
+
+        <RailCard title="Your circles" href="/connect/groups#circles" link="All circles">
+          {circles.length === 0 ? (
+            <p className="text-sm text-muted">Add your city to <Link href="/connect/setup" className="font-semibold text-brand hover:underline">your profile</Link> and you&apos;ll join its circle. Your company&apos;s circle appears once you join it here.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {circles.map((c) => (
+                <li key={c.id}>
+                  <Link href={`/connect/groups/${c.slug}`} className="-mx-1 flex items-center gap-2.5 rounded-xl p-1 hover:bg-ground">
+                    <span aria-hidden className={`grid size-9 shrink-0 place-items-center rounded-full font-display text-[15px] font-extrabold ${c.company ? "bg-[#e3ecf5] text-[#1d4f7a]" : "bg-brand-soft text-brand-dark"}`}>{c.name.charAt(0)}</span>
+                    <span className="flex min-w-0 flex-col text-sm">
+                      <span className="truncate font-semibold">{c.name}</span>
+                      <span className="text-[12.5px] text-muted">
+                        {c.members} member{c.members === 1 ? "" : "s"}
+                        {c.postsThisWeek ? ` · ${c.postsThisWeek} new this week` : ""}
+                        {c.company ? " · private" : ""}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </RailCard>
+
+        <section aria-labelledby="buddy-h" className="relative overflow-hidden rounded-[22px] bg-[#0f1f1a] p-4 text-[#f4efe6]">
+          <h2 id="buddy-h" className="font-display text-[18px] font-bold">{buddySuggestions ? `${buddySuggestions} buddy suggestion${buddySuggestions === 1 ? "" : "s"}` : "Find a buddy"}</h2>
+          <p className="mt-1 text-[13.5px] text-[#f4efe6]/75">
+            {buddySuggestions ? "People nearby want to walk, run or train at the same time as you." : "Someone to walk, run, train or meditate with, near you and at your times."}
+          </p>
+          <Link href="/connect/buddies" className="btn mt-3 min-h-10 rounded-full bg-[#f2c46d] px-4 text-sm text-ink hover:bg-[#f6d48e]">{buddySuggestions ? "See who" : "Get matched"}</Link>
+        </section>
+
+        {met.length > 0 && (
+          <RailCard title="People you met">
+            <ul className="flex flex-col gap-2.5">
+              {met.map((m) => (
+                <li key={m.userId} className="flex items-center justify-between gap-2">
+                  <Link href={`/connect/members/${m.userId}`} className="flex min-w-0 items-center gap-2.5">
+                    <Avatar name={m.name} size={36} />
+                    <span className="flex min-w-0 flex-col text-sm">
+                      <span className="truncate font-semibold">{m.name}</span>
+                      <span className="truncate text-[12.5px] text-muted">At {m.meetupTitle}</span>
+                    </span>
+                  </Link>
+                  {m.state === "none" ? (
+                    <form action={connectAction}>
+                      <input type="hidden" name="userId" value={m.userId} />
+                      <input type="hidden" name="back" value={back} />
+                      <button className="btn-outline min-h-9 rounded-full px-3 text-sm">Connect</button>
+                    </form>
+                  ) : (
+                    <span className="text-[12.5px] text-muted">{m.state === "sent" ? "Requested" : "Wants to connect"}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </RailCard>
         )}
 

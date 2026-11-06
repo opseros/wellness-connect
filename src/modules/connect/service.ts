@@ -11,6 +11,7 @@ import {
   follow,
   group,
   groupMember,
+  meetupCheckin,
   meetupRsvp,
   memberProfile,
   message,
@@ -23,11 +24,83 @@ import {
   user,
 } from "@/db/schema";
 import { getDb, type Executor } from "@/db/client";
-import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
+import { AppError, assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { enqueue } from "@/modules/platform/outbox";
 
 // Connect: the free network every account gets. No RLS here (these are not
 // tenant tables); every function checks visibility, blocks and roles itself.
+
+// ---------- Safety: limits and contact details ----------
+
+/** Accounts younger than this get tighter daily limits (spam and scam protection). */
+const NEW_ACCOUNT_DAYS = 7;
+export const DAILY_LIMITS = {
+  post: { fresh: 5, settled: 25 },
+  comment: { fresh: 30, settled: 150 },
+  connection: { fresh: 10, settled: 40 },
+  conversation: { fresh: 5, settled: 30 },
+} as const;
+type LimitKind = keyof typeof DAILY_LIMITS;
+
+/** Phone numbers and email addresses. Public posts and comments may not carry them. */
+export const CONTACT_DETAILS = /(\+?\d[\d\s-]{8,}\d)|([a-z0-9._%+-]+@[a-z0-9-]+\.[a-z]{2,})/i;
+const NO_CONTACT_MESSAGE = "Please leave out phone numbers and email addresses; everyone can see this. Share them in a private message once you're connected.";
+function assertNoContactDetails(...texts: (string | undefined | null)[]) {
+  if (texts.some((t) => t && CONTACT_DETAILS.test(t))) throw badRequest(NO_CONTACT_MESSAGE);
+}
+
+async function countToday(db: Executor, kind: LimitKind, userId: string, since: Date) {
+  const q =
+    kind === "post"
+      ? db.select({ n: count() }).from(post).where(and(eq(post.authorId, userId), gte(post.createdAt, since)))
+      : kind === "comment"
+        ? db.select({ n: count() }).from(comment).where(and(eq(comment.authorId, userId), gte(comment.createdAt, since)))
+        : kind === "connection"
+          ? db.select({ n: count() }).from(connection).where(and(eq(connection.requestedBy, userId), gte(connection.createdAt, since)))
+          : db
+              .select({ n: sql<number>`count(distinct ${conversationParticipant.conversationId})::int` })
+              .from(conversationParticipant)
+              .innerJoin(conversation, eq(conversation.id, conversationParticipant.conversationId))
+              .where(and(eq(conversationParticipant.userId, userId), gte(conversation.createdAt, since), sql`exists(select 1 from ${message} m where m.conversation_id = ${conversation.id} and m.sender_id = ${userId} and m.created_at = (select min(created_at) from ${message} m2 where m2.conversation_id = ${conversation.id}))`));
+  const [{ n }] = await q;
+  return Number(n);
+}
+
+/** Throws 429 once a member hits today's limit. Newer accounts get lower limits. */
+export async function assertWithinLimit(kind: LimitKind, userId: string, db: Executor = getDb()) {
+  const u = await db.query.user.findFirst({ where: eq(user.id, userId), columns: { createdAt: true } });
+  const fresh = !u || Date.now() - u.createdAt.getTime() < NEW_ACCOUNT_DAYS * 86_400_000;
+  const max = DAILY_LIMITS[kind][fresh ? "fresh" : "settled"];
+  if ((await countToday(db, kind, userId, new Date(Date.now() - 86_400_000))) >= max) {
+    const what = { post: "posts", comment: "comments", connection: "connection requests", conversation: "new conversations" }[kind];
+    throw new AppError(429, "rate_limited", `You've reached today's limit for ${what}${fresh ? " (new accounts have lower limits for their first week)" : ""}. Try again tomorrow.`);
+  }
+}
+
+// ---------- Cities ----------
+
+const CITY_ALIASES: Record<string, string> = {
+  bangalore: "bengaluru",
+  bombay: "mumbai",
+  madras: "chennai",
+  calcutta: "kolkata",
+  gurgaon: "gurugram",
+  "new delhi": "delhi",
+  poona: "pune",
+  trivandrum: "thiruvananthapuram",
+};
+
+/** "  Bangalore " → "bengaluru". Used for circles, buddy matching and "near you". */
+export function cityKey(city: string) {
+  const k = city.trim().toLowerCase().replace(/\s+/g, " ");
+  return CITY_ALIASES[k] ?? k;
+}
+
+/** Every lower-case spelling that means the same city ("bengaluru", "bangalore"). */
+function citySpellings(city: string) {
+  const k = cityKey(city);
+  return k ? [k, ...Object.keys(CITY_ALIASES).filter((a) => CITY_ALIASES[a] === k)] : [];
+}
 
 const pair = (a: string, b: string) => (a < b ? { userLow: a, userHigh: b } : { userLow: b, userHigh: a });
 
@@ -42,7 +115,7 @@ export async function isBlockedEitherWay(a: string, b: string, db: Executor = ge
 }
 
 /** Everyone `userId` has blocked or been blocked by (deduplicated per page render when no executor is given). */
-async function blockedIds(userId: string, db?: Executor) {
+export async function blockedIds(userId: string, db?: Executor) {
   return db ? queryBlocked(userId, db) : blockedForRender(userId);
 }
 const blockedForRender = cache((userId: string) => queryBlocked(userId, getDb()));
@@ -70,7 +143,17 @@ export async function areConnected(a: string, b: string) {
 
 // ---------- Profile ----------
 
+export const OPEN_TO = ["buddy", "mentoring", "group_sessions", "referrals"] as const;
+export const OPEN_TO_LABEL: Record<(typeof OPEN_TO)[number], string> = {
+  buddy: "A workout or walking buddy",
+  mentoring: "Mentoring",
+  group_sessions: "Group sessions",
+  referrals: "Referrals",
+};
+
 export const profileInput = z.object({
+  intro: z.string().trim().max(280).optional().refine((v) => !v || !CONTACT_DETAILS.test(v), NO_CONTACT_MESSAGE),
+  openTo: z.array(z.enum(OPEN_TO)).max(OPEN_TO.length).optional(),
   headline: z.string().trim().max(160).optional(),
   city: z.string().trim().max(80).optional(),
   jobTitle: z.string().trim().max(120).optional(),
@@ -124,6 +207,8 @@ export async function getMemberPage(viewerId: string, memberId: string) {
     jobTitle: open ? (row.profile?.jobTitle ?? "") : "",
     company: open ? (row.profile?.company ?? "") : "",
     topics: open ? (row.profile?.topics ?? []) : [],
+    intro: open ? (row.profile?.intro ?? "") : "",
+    openTo: open ? (row.profile?.openTo ?? []) : [],
     limited: !open,
     state,
     following,
@@ -155,6 +240,7 @@ export async function requestConnection(fromUserId: string, toUserId: string) {
       return row;
     }
     if (existing?.status === "pending") return existing;
+    await assertWithinLimit("connection", fromUserId, tx);
     const [row] = existing
       ? await tx.update(connection).set({ status: "pending", requestedBy: fromUserId, createdAt: new Date(), respondedAt: null }).where(eq(connection.id, existing.id)).returning()
       : await tx.insert(connection).values({ ...p, requestedBy: fromUserId }).returning();
@@ -313,7 +399,9 @@ async function assertCanPostIn(db: Executor, userId: string, groupId: string | u
 
 export async function createPost(authorId: string, input: z.input<typeof postInput>) {
   const d = postInput.parse(input);
+  assertNoContactDetails(d.title, d.body);
   await assertCanPostIn(getDb(), authorId, d.groupId);
+  await assertWithinLimit("post", authorId);
   const [row] = await getDb().insert(post).values({ authorId, body: d.body, title: d.title, groupId: d.groupId }).returning();
   return row;
 }
@@ -323,7 +411,9 @@ export async function createMeetup(authorId: string, input: z.input<typeof meetu
   const d = meetupInput.parse(input);
   const at = new Date(d.eventAt);
   if (at.getTime() < Date.now() + 30 * 60_000) throw badRequest("Pick a time at least 30 minutes from now");
+  assertNoContactDetails(d.title, d.body);
   await assertCanPostIn(getDb(), authorId, d.groupId);
+  await assertWithinLimit("post", authorId);
   return getDb().transaction(async (tx) => {
     const [row] = await tx
       .insert(post)
@@ -352,6 +442,7 @@ function visiblePostsFor(viewerId: string, blocked: string[], friends: string[],
   )!;
   return and(
     isNull(post.deletedAt),
+    or(isNull(post.hiddenAt), eq(post.authorId, viewerId)),
     activeUser,
     blocked.length ? notInArray(post.authorId, blocked) : undefined,
     sql`(case when ${post.groupId} is null then ${personalOk} else ${groupOk} end)`,
@@ -381,6 +472,7 @@ function postColumns(viewerId: string) {
     eventPlace: post.eventPlace,
     eventCity: post.eventCity,
     createdAt: post.createdAt,
+    hidden: sql<boolean>`${post.hiddenAt} is not null`,
     authorId: post.authorId,
     authorName: user.name,
     authorHeadline: memberProfile.headline,
@@ -389,6 +481,8 @@ function postColumns(viewerId: string) {
     comments: sql<number>`(select count(*)::int from ${comment} where ${comment.postId} = ${post.id} and ${comment.deletedAt} is null)`,
     going: sql<number>`(select count(*)::int from ${meetupRsvp} where ${meetupRsvp.postId} = ${post.id})`,
     goingByMe: sql<boolean>`exists(select 1 from ${meetupRsvp} where ${meetupRsvp.postId} = ${post.id} and ${meetupRsvp.userId} = ${viewerId})`,
+    here: sql<number>`(select count(*)::int from ${meetupCheckin} where ${meetupCheckin.postId} = ${post.id})`,
+    hereByMe: sql<boolean>`exists(select 1 from ${meetupCheckin} where ${meetupCheckin.postId} = ${post.id} and ${meetupCheckin.userId} = ${viewerId})`,
   };
 }
 
@@ -500,22 +594,22 @@ async function listMemberPosts(viewerId: string, memberId: string) {
     .limit(20);
 }
 
-/** Upcoming meet-ups you can see: from your network and groups, plus open ones in your city. */
+/** Upcoming (and still-running, for check-in) meet-ups you can see: from your network and groups, plus open ones in your city. */
 export async function listUpcomingMeetups(userId: string, limit = 30) {
   const ctx = await viewerContext(userId);
   const me = await getMemberProfile(userId);
-  const city = (me?.city ?? "").trim().toLowerCase();
+  const cities = citySpellings(me?.city ?? "");
   const scope = or(
     inArray(post.authorId, [userId, ...ctx.friends, ...ctx.followed]),
     ctx.groups.length ? inArray(post.groupId, ctx.groups) : sql`false`,
-    city ? sql`lower(${post.eventCity}) = ${city}` : sql`false`,
+    cities.length ? inArray(sql`lower(trim(${post.eventCity}))`, cities) : sql`false`,
   );
   return getDb()
     .select(postColumns(userId))
     .from(post)
     .innerJoin(user, eq(user.id, post.authorId))
     .leftJoin(memberProfile, eq(memberProfile.userId, post.authorId))
-    .where(and(eq(post.kind, "meetup"), gte(post.eventAt, new Date()), scope, visiblePostsFor(userId, ctx.blocked, ctx.friends, ctx.groups)))
+    .where(and(eq(post.kind, "meetup"), gte(post.eventAt, new Date(Date.now() - CHECKIN_CLOSES_MIN * 60_000)), scope, visiblePostsFor(userId, ctx.blocked, ctx.friends, ctx.groups)))
     .orderBy(asc(post.eventAt))
     .limit(limit);
 }
@@ -554,12 +648,77 @@ export async function toggleRsvp(userId: string, postId: string) {
   return { going: true };
 }
 
+// ---------- Meet-up check-ins and "people you met" ----------
+
+/** Check-ins open 30 minutes before a meet-up and close 4 hours after it starts. */
+export const CHECKIN_OPENS_MIN = 30;
+export const CHECKIN_CLOSES_MIN = 240;
+
+export function checkinWindow(eventAt: Date | null, now = new Date()): "early" | "open" | "closed" {
+  if (!eventAt) return "closed";
+  const t = now.getTime();
+  if (t < eventAt.getTime() - CHECKIN_OPENS_MIN * 60_000) return "early";
+  if (t > eventAt.getTime() + CHECKIN_CLOSES_MIN * 60_000) return "closed";
+  return "open";
+}
+
+/** "I'm here". Also marks you as going. Only while the check-in window is open. */
+export async function checkIn(userId: string, postId: string) {
+  const p = await requireVisiblePost(userId, postId);
+  if (p.kind !== "meetup") throw badRequest("Only meet-ups have check-ins");
+  const w = checkinWindow(p.eventAt);
+  if (w === "early") throw badRequest(`Check-in opens ${CHECKIN_OPENS_MIN} minutes before the start`);
+  if (w === "closed") throw badRequest("Check-in for this meet-up has closed");
+  await getDb().transaction(async (tx) => {
+    await tx.insert(meetupRsvp).values({ postId, userId }).onConflictDoNothing();
+    await tx.insert(meetupCheckin).values({ postId, userId }).onConflictDoNothing();
+  });
+  return { checkedIn: true };
+}
+
+type MetPerson = { userId: string; name: string; headline: string; state: Awaited<ReturnType<typeof connectionState>>; meetupId: string; meetupTitle: string | null };
+
+/**
+ * People who checked in at the same meet-ups as you (only if you checked in too),
+ * in the last `days` days, who aren't blocked either way. One row per person.
+ */
+export async function peopleYouMet(userId: string, opts: { postId?: string; days?: number; limit?: number; onlyNew?: boolean } = {}): Promise<MetPerson[]> {
+  if (opts.postId) assertUuid(opts.postId, "Meet-up");
+  const days = opts.days ?? 30;
+  const blocked = await blockedIds(userId);
+  const mine = getDb()
+    .select({ postId: meetupCheckin.postId })
+    .from(meetupCheckin)
+    .where(and(eq(meetupCheckin.userId, userId), opts.postId ? eq(meetupCheckin.postId, opts.postId) : gte(meetupCheckin.createdAt, new Date(Date.now() - days * 86_400_000))));
+  const rows = await getDb()
+    .select({ userId: user.id, name: user.name, headline: memberProfile.headline, meetupId: post.id, meetupTitle: post.title, at: meetupCheckin.createdAt })
+    .from(meetupCheckin)
+    .innerJoin(user, eq(user.id, meetupCheckin.userId))
+    .innerJoin(post, eq(post.id, meetupCheckin.postId))
+    .leftJoin(memberProfile, eq(memberProfile.userId, user.id))
+    .where(and(inArray(meetupCheckin.postId, mine), ne(meetupCheckin.userId, userId), activeUser, isNull(post.deletedAt), blocked.length ? notInArray(user.id, blocked) : undefined))
+    .orderBy(desc(meetupCheckin.createdAt));
+  const seen = new Set<string>();
+  const out: MetPerson[] = [];
+  for (const r of rows) {
+    if (seen.has(r.userId)) continue;
+    seen.add(r.userId);
+    const state = await connectionState(userId, r.userId);
+    if (opts.onlyNew && state === "connected") continue;
+    out.push({ userId: r.userId, name: r.name, headline: r.headline ?? "", state, meetupId: r.meetupId, meetupTitle: r.meetupTitle });
+    if (out.length >= (opts.limit ?? 50)) break;
+  }
+  return out;
+}
+
 export const commentInput = z.object({ body: z.string().trim().min(1, "Write a comment").max(1500) });
 
 export async function addComment(userId: string, postId: string, input: z.input<typeof commentInput>) {
   const { body } = commentInput.parse(input);
+  assertNoContactDetails(body);
   const p = await requireVisiblePost(userId, postId);
   if (p.groupId) await assertCanPostIn(getDb(), userId, p.groupId);
+  await assertWithinLimit("comment", userId);
   const [row] = await getDb().insert(comment).values({ postId, authorId: userId, body }).returning();
   return row;
 }
@@ -571,7 +730,7 @@ export async function listComments(userId: string, postId: string) {
     .select({ id: comment.id, body: comment.body, createdAt: comment.createdAt, authorId: comment.authorId, authorName: user.name })
     .from(comment)
     .innerJoin(user, eq(user.id, comment.authorId))
-    .where(and(eq(comment.postId, postId), isNull(comment.deletedAt), activeUser, blocked.length ? notInArray(comment.authorId, blocked) : undefined))
+    .where(and(eq(comment.postId, postId), isNull(comment.deletedAt), or(isNull(comment.hiddenAt), eq(comment.authorId, userId)), activeUser, blocked.length ? notInArray(comment.authorId, blocked) : undefined))
     .orderBy(asc(comment.createdAt))
     .limit(200);
 }
@@ -584,7 +743,7 @@ export async function commentsForPosts(userId: string, postIds: string[], perPos
     .select({ id: comment.id, postId: comment.postId, body: comment.body, createdAt: comment.createdAt, authorId: comment.authorId, authorName: user.name })
     .from(comment)
     .innerJoin(user, eq(user.id, comment.authorId))
-    .where(and(inArray(comment.postId, postIds), isNull(comment.deletedAt), activeUser, blocked.length ? notInArray(comment.authorId, blocked) : undefined))
+    .where(and(inArray(comment.postId, postIds), isNull(comment.deletedAt), or(isNull(comment.hiddenAt), eq(comment.authorId, userId)), activeUser, blocked.length ? notInArray(comment.authorId, blocked) : undefined))
     .orderBy(asc(comment.createdAt));
   const map = new Map<string, typeof rows>();
   for (const r of rows) map.set(r.postId, [...(map.get(r.postId) ?? []), r]);
@@ -616,15 +775,34 @@ export const reportInput = z.object({
   reason: z.string().trim().min(3, "Tell us briefly what's wrong").max(500),
 });
 
-/** Reports go to the admin portal's queue. One open report per person per item. */
+/** Posts and comments reported by this many different people are hidden until staff review them. */
+export const AUTO_HIDE_REPORTS = 3;
+
+/**
+ * Reports go to the admin portal's queue. One open report per person per item.
+ * Once AUTO_HIDE_REPORTS different members report the same post or comment, it is
+ * hidden from everyone but its author until staff decide.
+ */
 export async function reportContent(userId: string, input: z.input<typeof reportInput>) {
   const d = reportInput.parse(input);
-  const existing = await getDb().query.report.findFirst({
-    where: and(eq(report.reporterId, userId), eq(report.targetType, d.targetType), eq(report.targetId, d.targetId), eq(report.status, "open")),
+  return getDb().transaction(async (tx) => {
+    const existing = await tx.query.report.findFirst({
+      where: and(eq(report.reporterId, userId), eq(report.targetType, d.targetType), eq(report.targetId, d.targetId), eq(report.status, "open")),
+    });
+    if (existing) return existing;
+    const [row] = await tx.insert(report).values({ reporterId: userId, ...d }).returning();
+    if (d.targetType === "post" || d.targetType === "comment") {
+      const [{ n }] = await tx
+        .select({ n: sql<number>`count(distinct ${report.reporterId})::int` })
+        .from(report)
+        .where(and(eq(report.targetType, d.targetType), eq(report.targetId, d.targetId), eq(report.status, "open")));
+      if (n >= AUTO_HIDE_REPORTS) {
+        if (d.targetType === "post") await tx.update(post).set({ hiddenAt: new Date() }).where(and(eq(post.id, d.targetId), isNull(post.hiddenAt)));
+        else await tx.update(comment).set({ hiddenAt: new Date() }).where(and(eq(comment.id, d.targetId), isNull(comment.hiddenAt)));
+      }
+    }
+    return row;
   });
-  if (existing) return existing;
-  const [row] = await getDb().insert(report).values({ reporterId: userId, ...d }).returning();
-  return row;
 }
 
 // ---------- Messages ----------
@@ -656,6 +834,7 @@ export async function sendMessage(fromUserId: string, input: z.input<typeof mess
       .limit(1);
     let conversationId = shared[0]?.id;
     if (!conversationId) {
+      await assertWithinLimit("conversation", fromUserId, tx);
       const [c] = await tx.insert(conversation).values({}).returning();
       conversationId = c.id;
       await tx.insert(conversationParticipant).values([
@@ -754,9 +933,14 @@ async function isModerator(userId: string, groupId: string) {
   return Boolean(m);
 }
 
+export const isCompanyCircle = (g: { kind: string; circleKey: string | null }) => g.kind === "circle" && Boolean(g.circleKey?.startsWith("org:"));
+
 const memberCount = sql<number>`(select count(*)::int from ${groupMember} gm where gm.group_id = ${group.id} and gm.status = 'active')`;
 
-/** Spaces first, then communities; with your membership. */
+/**
+ * Spaces first, then communities; with your membership. Company circles are
+ * listed only to people in them (their names would reveal which companies use us).
+ */
 export async function listGroups(userId: string) {
   return getDb()
     .select({
@@ -766,7 +950,16 @@ export async function listGroups(userId: string) {
       myRole: sql<string | null>`(select gm.role from ${groupMember} gm where gm.group_id = ${group.id} and gm.user_id = ${userId})`,
     })
     .from(group)
-    .where(isNull(group.archivedAt))
+    .where(
+      and(
+        isNull(group.archivedAt),
+        or(
+          ne(group.kind, "circle"),
+          sql`${group.circleKey} like 'city:%'`,
+          sql`exists(select 1 from ${groupMember} gm where gm.group_id = ${group.id} and gm.user_id = ${userId} and gm.status = 'active')`,
+        ),
+      ),
+    )
     .orderBy(desc(sql`${group.kind} = 'space'`), desc(memberCount), asc(group.name));
 }
 
@@ -796,6 +989,7 @@ export async function getGroup(userId: string, slug: string) {
   const g = await getDb().query.group.findFirst({ where: and(eq(group.slug, slug), isNull(group.archivedAt)) });
   if (!g) throw notFound("Group not found");
   const me = await getDb().query.groupMember.findFirst({ where: and(eq(groupMember.groupId, g.id), eq(groupMember.userId, userId)) });
+  if (isCompanyCircle(g) && me?.status !== "active") throw notFound("Group not found");
   const isMember = me?.status === "active";
   const canSee = g.privacy === "public" || isMember;
   const ctx = await viewerContext(userId);
@@ -831,6 +1025,7 @@ export async function joinGroup(userId: string, groupId: string) {
   assertUuid(groupId, "Group");
   const g = await getDb().query.group.findFirst({ where: and(eq(group.id, groupId), isNull(group.archivedAt)) });
   if (!g) throw notFound("Group not found");
+  if (isCompanyCircle(g)) throw forbidden("Company circles are for people who work there; you join automatically");
   const status = g.privacy === "public" ? "active" : "pending";
   return getDb().transaction(async (tx) => {
     const [row] = await tx.insert(groupMember).values({ groupId, userId, status }).onConflictDoNothing().returning();
@@ -844,6 +1039,7 @@ export async function leaveGroup(userId: string, groupId: string) {
   assertUuid(groupId, "Group");
   const g = await getDb().query.group.findFirst({ where: eq(group.id, groupId) });
   if (!g) throw notFound("Group not found");
+  if (isCompanyCircle(g)) throw badRequest("You stay in your company's circle while you work there");
   if (g.kind === "community" && (await isModerator(userId, groupId))) {
     const [{ n }] = await getDb().select({ n: sql<number>`count(*)::int` }).from(groupMember).where(and(eq(groupMember.groupId, groupId), eq(groupMember.role, "moderator"), eq(groupMember.status, "active")));
     if (n <= 1) throw badRequest("Make someone else a moderator before you leave");
