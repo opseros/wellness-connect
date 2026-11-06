@@ -204,14 +204,15 @@ export function AlsoOn({ care, counts, hospitals = false }: { care: boolean; cou
                   <li key={p} className="flex gap-2.5"><Check className={c.tone.dot} />{p}</li>
                 ))}
               </ul>
-              <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-line pt-5">
-                <Link href={c.primary.href} className="btn bg-ink px-5 text-white hover:bg-brand-dark">{c.primary.label}</Link>
-                {c.secondary && (
-                  <Link href={c.secondary.href} className="inline-flex items-center gap-1 text-[14.5px] font-semibold text-brand underline-offset-4 hover:underline">
-                    {c.secondary.label}
-                    <span aria-hidden>→</span>
-                  </Link>
-                )}
+              {c.secondary && (
+                <Link href={c.secondary.href} className="inline-flex w-fit items-center gap-1 text-[14.5px] font-semibold text-brand underline-offset-4 hover:underline">
+                  {c.secondary.label}
+                  <span aria-hidden>→</span>
+                </Link>
+              )}
+              {/* Same footer on every card so the buttons line up across the row. */}
+              <div className="mt-auto border-t border-line pt-5">
+                <Link href={c.primary.href} className="btn w-full bg-ink px-5 text-white hover:bg-brand-dark">{c.primary.label}</Link>
               </div>
             </div>
           </article>
