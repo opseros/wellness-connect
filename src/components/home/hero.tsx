@@ -22,7 +22,7 @@ export function HomeHero({ providers, initialMode, initialRole, cardFirst }: { p
     <section aria-labelledby="hero-h" className="mx-auto max-w-[1280px] px-3 sm:px-6">
       <div className="relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#e4f1ea_0%,#eef4ec_55%,#f6efe0_100%)] text-ink ring-1 ring-[#0f6b5c]/10">
         <Leaves />
-        <div className="relative grid items-start gap-x-10 gap-y-8 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="relative grid items-start gap-x-10 lg:items-stretch gap-y-8 px-5 py-6 sm:px-8 sm:py-8 lg:grid-cols-[minmax(0,1fr)_420px]">
           <div className="flex min-w-0 flex-col gap-5">
             <p className="flex w-fit items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-[12px] font-bold uppercase tracking-[0.16em] text-brand-dark ring-1 ring-[#0f6b5c]/10">
               <BrandMark size={16} />
@@ -48,7 +48,10 @@ export function HomeHero({ providers, initialMode, initialRole, cardFirst }: { p
                 ))}
               </ul>
             </div>
-            <HeroSlider />
+            {/* On wide screens the slider grows to end level with the sign-in card. */}
+            <div className="lg:flex lg:min-h-[260px] lg:flex-1">
+              <HeroSlider />
+            </div>
           </div>
           <div id="join" className={`scroll-mt-6 rounded-[26px] bg-white p-5 text-ink shadow-[0_30px_60px_-36px_rgba(15,60,48,0.45)] ring-1 ring-black/5 sm:p-7 ${cardFirst ? "order-first lg:order-none" : ""}`}>
             <span id="signin" aria-hidden className="block scroll-mt-6" />

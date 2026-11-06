@@ -44,7 +44,7 @@ export function HeroSlider() {
     <section
       aria-roledescription="carousel"
       aria-label="Moments on Connect"
-      className="group relative aspect-[16/9] w-full overflow-hidden rounded-[24px] bg-wellness shadow-[0_24px_50px_-30px_rgba(15,60,48,0.55)] lg:aspect-auto lg:h-[270px]"
+      className="group relative aspect-[16/9] w-full overflow-hidden rounded-[24px] bg-wellness shadow-[0_24px_50px_-30px_rgba(15,60,48,0.55)] lg:aspect-auto lg:h-auto lg:min-h-[260px] lg:flex-1"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
