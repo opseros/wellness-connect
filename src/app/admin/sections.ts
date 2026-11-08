@@ -1,5 +1,5 @@
 // Admin information architecture (as in the Wellness Connect prototype):
-// Overview, Approvals, Organisations, Partners, Bookings, Reports, Settings.
+// Overview, Approvals, Organisations, Partners, Finance, Reports, Settings.
 // Every existing admin page lives in one section; sections with several pages
 // show them as tabs. URLs are unchanged.
 
@@ -39,13 +39,12 @@ export function adminSections(c: Counts, isSuper: boolean): AdminSection[] {
     },
     { key: "partners", href: "/admin/partners", label: "Partners", isNew: true, tabs: [{ href: "/admin/partners", label: "Partners" }] },
     {
-      key: "bookings",
+      key: "finance",
       href: "/admin/finance",
-      label: "Bookings",
-      isNew: true,
+      label: "Finance",
       badge: c.financeAttention,
       tabs: [
-        { href: "/admin/finance", label: "Company bookings & stays", badge: c.financeAttention },
+        { href: "/admin/finance", label: "Bookings & payouts", badge: c.financeAttention },
         { href: "/admin/credits", label: "Wellness credits" },
       ],
     },
