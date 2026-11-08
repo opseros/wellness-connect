@@ -9,10 +9,10 @@ import { Badge, Flash, PageTitle } from "../../ui";
 
 const KIND = { company: "Company", homestay: "Homestay", hospital: "Hospital · Care & Travel", facility: "Gym, studio or wellness centre", provider: "Provider" } as const;
 const BACK = {
-  company: "/admin/organizations#company",
-  homestay: "/admin/organizations#homestay",
-  hospital: "/admin/organizations#hospital",
-  facility: "/admin/organizations#facility",
+  company: "/admin/organizations",
+  homestay: "/admin/partners?kind=homestay&filter=all",
+  hospital: "/admin/partners?kind=hospital&filter=all",
+  facility: "/admin/partners?kind=facility&filter=all",
   provider: "/admin/organizations",
 } as const;
 const DIR = { homestay: "homestays", hospital: "hospitals", facility: "facilities" } as const;
@@ -47,7 +47,7 @@ export default async function OrganizationDetail({ params, searchParams }: { par
 
   return (
     <>
-      <Link href={BACK[kind]} className="text-sm font-semibold text-brand hover:underline">← Organizations</Link>
+      <Link href={BACK[kind]} className="text-sm font-semibold text-brand hover:underline">← {kind === "company" || kind === "provider" ? "Organisations" : "Partners"}</Link>
       <PageTitle title={org.name} subtitle={KIND[kind]} />
       <Flash msg={sp.msg} error={sp.error} />
       <div className="flex flex-wrap items-start gap-5">

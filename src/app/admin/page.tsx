@@ -74,10 +74,10 @@ export default async function AdminOverview() {
         <dl className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
           <Tile label="Members" value={o.users.toLocaleString("en-IN")} href="/admin/users" />
           <Tile label="Companies" value={o.companies} href="/admin/organizations" />
-          <Tile label="Verified professionals" value={o.professionals} href="/admin/professionals?status=approved" />
-          <Tile label="Homestays" value={o.homestays} href="/admin/homestays" />
-          <Tile label="Gyms & studios" value={o.facilities} href="/admin/facilities" />
-          {c.hospitals && <Tile label="Hospitals" value={o.hospitals} note={c.hospitalsOn ? undefined : "Switched off"} href="/admin/hospitals" />}
+          <Tile label="Verified professionals" value={o.professionals} href="/admin/partners" />
+          <Tile label="Homestays" value={o.homestays} href="/admin/partners?kind=homestay" />
+          <Tile label="Gyms & studios" value={o.facilities} href="/admin/partners?kind=facility" />
+          {c.hospitals && <Tile label="Hospitals" value={o.hospitals} note={c.hospitalsOn ? undefined : "Switched off"} href="/admin/partners?kind=hospital" />}
         </dl>
       </section>
     </>

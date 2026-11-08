@@ -5,7 +5,8 @@ import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import type { DB } from "@/db/client";
 import { withScope } from "@/db/client";
 import { creditEntry, membership, organization, service } from "@/db/schema";
-import { adminOverview, listDueCreditFundings, listPartners, partnerCounts, recordCreditFunding } from "@/modules/admin/service";
+import { adminOverview, listDueCreditFundings, listOrganizations, listPartners, partnerCounts, recordCreditFunding } from "@/modules/admin/service";
+import { createListingOrg } from "@/modules/listings/service";
 import { cancelSession, getSession, istDay, requestSession, respondToSession, saveBookingSettings, setWeeklyHours } from "@/modules/sessions/service";
 import { companyCredits, creditPeriod, ensureFunding, proMonthEarnings, proEarningsByMonth, myCoverage, myWallets, paySessionWithCredits, refundSessionCredits, savePolicy, splitFee } from "./credits";
 
@@ -145,6 +146,10 @@ describe("what HR sees", () => {
     expect(await listPartners(ops(), "professional")).toHaveLength(1);
     expect(await listPartners(ops(), "professional", "no-such-name")).toHaveLength(0);
     await expect(listPartners({ id: emp.id, platformRole: "user", twoFactorEnabled: false } as never, "facility")).rejects.toMatchObject({ status: 403 });
+    // Partners include listings not yet verified; Organisations lists companies only.
+    await createListingOrg({ ...(await makeUser(db, "host@credits.test")), emailVerified: true }, { kind: "homestay", name: "Draft Stay", city: "Coorg" });
+    expect(await listPartners(ops(), "homestay")).toMatchObject([{ name: "Draft Stay", verification: "draft" }]);
+    expect((await listOrganizations(ops(), "", "all", ["company"])).every((o) => o.kind === "company")).toBe(true);
     const c = await companyCredits(hr.id, orgId);
     expect(c.usedPaise).toBe(120000);
     expect(c.activePeople).toBe(1);

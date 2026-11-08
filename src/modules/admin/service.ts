@@ -115,44 +115,79 @@ export const PARTNER_KINDS = ["professional", "homestay", "facility", "hospital"
 export type PartnerKind = (typeof PARTNER_KINDS)[number];
 
 /**
- * Partners: everyone verified to offer services on Moosam (professionals,
- * homestays, gyms and studios, hospitals), newest first, with an optional
- * name or city search. Read-only directory for staff.
+ * Partners: everyone who offers services on Moosam (professionals, homestays,
+ * gyms and studios, hospitals) in any verification state, filtered by standing
+ * like organisations. Companies are on Organisations.
  */
-export async function listPartners(actor: StaffActor, kind: PartnerKind, q = "") {
+export async function listPartners(actor: StaffActor, kind: PartnerKind, q = "", filter: OrgFilter = "active") {
   assertStaff(actor);
-  const db = getDb();
-  const term = q.trim() ? `%${q.trim()}%` : null;
-  if (kind === "professional") {
-    const rows = await db
-      .select({ id: professionalProfile.id, userId: user.id, name: user.name, city: professionalProfile.city, headline: professionalProfile.headline, since: professionalProfile.updatedAt, suspendedAt: user.suspendedAt })
-      .from(professionalProfile)
-      .innerJoin(user, eq(user.id, professionalProfile.userId))
-      .where(and(eq(professionalProfile.verificationStatus, "verified"), isNull(user.deletedAt), term ? or(ilike(user.name, term), ilike(professionalProfile.city, term)) : undefined))
-      .orderBy(desc(professionalProfile.updatedAt))
-      .limit(200);
-    return rows.map((r) => ({ id: r.id, href: `/admin/users/${r.userId}`, name: r.name, city: r.city, detail: r.headline, since: r.since, benefitPartner: null as boolean | null, suspended: Boolean(r.suspendedAt) }));
+  if (kind !== "professional") {
+    const rows = await listOrganizations(actor, q, filter, [kind]);
+    const review = { homestay: "/admin/homestays", facility: "/admin/facilities", hospital: "/admin/hospitals" }[kind];
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      city: r.city,
+      detail: "",
+      verification: r.listingStatus ?? "draft",
+      since: r.verifiedAt,
+      team: r.activeMembers,
+      benefitPartner: kind === "facility" ? r.benefitPartner : null,
+      suspended: Boolean(r.suspendedAt),
+      removed: Boolean(r.removedAt),
+      manageHref: `/admin/organizations/${r.id}`,
+      reviewHref: `${review}/${r.id}`,
+    }));
   }
-  const rows = await db
-    .select({ orgId: listing.orgId, name: organization.name, city: listing.city, since: listing.verifiedAt, benefitPartner: listing.benefitPartner, suspendedAt: organization.suspendedAt })
-    .from(listing)
-    .innerJoin(organization, eq(organization.id, listing.orgId))
-    .where(and(eq(listing.kind, kind), eq(listing.status, "verified"), isNull(organization.removedAt), term ? or(ilike(organization.name, term), ilike(listing.city, term)) : undefined))
-    .orderBy(desc(listing.verifiedAt))
-    .limit(200);
-  const base = { homestay: "/admin/homestays", facility: "/admin/facilities", hospital: "/admin/hospitals" }[kind];
-  return rows.map((r) => ({ id: r.orgId, href: `${base}/${r.orgId}`, name: r.name, city: r.city, detail: "", since: r.since, benefitPartner: kind === "facility" ? r.benefitPartner : null, suspended: Boolean(r.suspendedAt) }));
+  const term = q.trim() ? `%${q.trim()}%` : null;
+  const standing =
+    filter === "active"
+      ? and(isNull(user.suspendedAt), isNull(user.deletedAt))
+      : filter === "suspended"
+        ? and(isNotNull(user.suspendedAt), isNull(user.deletedAt))
+        : filter === "removed"
+          ? isNotNull(user.deletedAt)
+          : undefined;
+  const rows = await getDb()
+    .select({ id: professionalProfile.id, userId: user.id, name: user.name, city: professionalProfile.city, headline: professionalProfile.headline, status: professionalProfile.verificationStatus, since: professionalProfile.updatedAt, suspendedAt: user.suspendedAt, deletedAt: user.deletedAt })
+    .from(professionalProfile)
+    .innerJoin(user, eq(user.id, professionalProfile.userId))
+    .where(and(standing, term ? or(ilike(user.name, term), ilike(professionalProfile.city, term), ilike(professionalProfile.headline, term)) : undefined))
+    .orderBy(desc(professionalProfile.updatedAt))
+    .limit(300);
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    city: r.city,
+    detail: r.headline,
+    verification: r.status as string,
+    since: r.since,
+    team: null as number | null,
+    benefitPartner: null as boolean | null,
+    suspended: Boolean(r.suspendedAt),
+    removed: Boolean(r.deletedAt),
+    manageHref: `/admin/users/${r.userId}`,
+    reviewHref: "/admin/professionals?status=all",
+  }));
 }
 
-/** How many verified partners of each kind (for the Partners tabs). */
+/** Partners of each kind in good standing (for the Partners tabs). */
 export async function partnerCounts(actor: StaffActor) {
   assertStaff(actor);
   const db = getDb();
-  const [[pros], listings] = await Promise.all([
-    db.select({ n: count() }).from(professionalProfile).where(eq(professionalProfile.verificationStatus, "verified")),
-    db.select({ kind: listing.kind, n: count() }).from(listing).innerJoin(organization, eq(organization.id, listing.orgId)).where(and(eq(listing.status, "verified"), isNull(organization.removedAt))).groupBy(listing.kind),
+  const [[pros], orgs] = await Promise.all([
+    db
+      .select({ n: count() })
+      .from(professionalProfile)
+      .innerJoin(user, eq(user.id, professionalProfile.userId))
+      .where(and(isNull(user.suspendedAt), isNull(user.deletedAt))),
+    db
+      .select({ kind: organization.kind, n: count() })
+      .from(organization)
+      .where(and(isNull(organization.suspendedAt), isNull(organization.removedAt)))
+      .groupBy(organization.kind),
   ]);
-  const by = (k: string) => listings.find((r) => r.kind === k)?.n ?? 0;
+  const by = (k: string) => orgs.find((r) => r.kind === k)?.n ?? 0;
   return { professional: pros.n, homestay: by("homestay"), facility: by("facility"), hospital: by("hospital") };
 }
 
@@ -387,7 +422,8 @@ export async function removeUser(actor: StaffActor, userId: string, confirmEmail
 export type OrgFilter = "active" | "suspended" | "removed" | "all";
 
 /** Every organisation with its kind, listing status (homestays and hospitals) and standing. */
-export async function listOrganizations(actor: StaffActor, q = "", filter: OrgFilter = "active") {
+/** Organisations by kind (companies on Organisations; homestays, gyms and hospitals on Partners). */
+export async function listOrganizations(actor: StaffActor, q = "", filter: OrgFilter = "active", kinds?: ("company" | "homestay" | "facility" | "hospital")[]) {
   assertStaff(actor);
   const term = q.trim();
   const standing =
@@ -410,13 +446,15 @@ export async function listOrganizations(actor: StaffActor, q = "", filter: OrgFi
       suspendedAt: organization.suspendedAt,
       removedAt: organization.removedAt,
       listingStatus: listing.status,
+      benefitPartner: listing.benefitPartner,
+      verifiedAt: listing.verifiedAt,
       createdAt: organization.createdAt,
       activeMembers: sql<number>`(select count(*)::int from ${membership} where ${membership.orgId} = ${organization.id} and ${membership.status} = 'active')`,
       pendingMembers: sql<number>`(select count(*)::int from ${membership} where ${membership.orgId} = ${organization.id} and ${membership.status} = 'pending')`,
     })
     .from(organization)
     .leftJoin(listing, eq(listing.orgId, organization.id))
-    .where(and(standing, term ? or(ilike(organization.name, like(term)), ilike(organization.domain, like(term)), ilike(listing.city, like(term))) : undefined))
+    .where(and(standing, kinds?.length ? inArray(organization.kind, kinds) : undefined, term ? or(ilike(organization.name, like(term)), ilike(organization.domain, like(term)), ilike(listing.city, like(term))) : undefined))
     .orderBy(desc(organization.createdAt))
     .limit(300);
 }
