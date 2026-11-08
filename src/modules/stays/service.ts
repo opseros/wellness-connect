@@ -19,7 +19,7 @@ import { getDb, withScope, type Executor, type Tx } from "@/db/client";
 import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit, enqueue } from "@/modules/platform/outbox";
 import { getBookableHomestay, homestayNames, listDirectory, directoryInput } from "@/modules/listings/service";
-import { isActiveMember, ORG_ADMINS, ORG_ALL, requireOrgRole } from "@/modules/organizations/service";
+import { isActiveMember, ORG_ADMINS, ORG_ALL, ORG_BUYERS, assertCompanyOrg, requireOrgRole } from "@/modules/organizations/service";
 import { createStayRefund, stayMoneyForGuest, stayMoneySettings } from "@/modules/marketplace/stay-payments";
 import { checkInInstant, guestCancellationRefund, isoDay, nightsOf, POLICY_TEXT, priceStay, todayIst, type CancellationPolicy } from "./policy";
 
@@ -216,6 +216,8 @@ export const stayRequestInput = z
     purpose: z.enum(STAY_PURPOSES),
     accessNeeds: z.array(z.enum(ACCESS_NEEDS)).default([]),
     message: z.string().trim().max(600).refine(noContact, "Leave out phone numbers and email addresses; you can share them once the stay is confirmed").default(""),
+    // Team retreat for a company the guest buys for (owner, admin or wellness manager).
+    forCompany: z.string().uuid().optional().or(z.literal("").transform(() => undefined)),
     billingName: z.string().trim().max(120).default(""),
     billingGstin: z
       .string()
@@ -234,6 +236,11 @@ export async function requestStay(guest: { id: string }, orgId: string, input: z
   if (await isActiveMember(guest.id, orgId)) throw forbidden("You can't book your own homestay");
   const q = await quoteFor(getDb(), h, d);
   if (!q.ok) throw badRequest(q.reason);
+  if (d.forCompany) {
+    if (d.purpose !== "retreat") throw badRequest("Company bookings are for team retreats");
+    await requireOrgRole(guest.id, d.forCompany, ORG_BUYERS);
+    await assertCompanyOrg(d.forCompany);
+  }
   return withScope({ userId: guest.id }, async (tx) => {
     const open = await tx.query.stay.findFirst({
       where: and(eq(stay.guestUserId, guest.id), eq(stay.orgId, orgId), inArray(stay.status, ["requested", "accepted"]), lt(stay.checkIn, d.checkOut), sql`${stay.checkOut} > ${d.checkIn}`),
@@ -247,6 +254,7 @@ export async function requestStay(guest: { id: string }, orgId: string, input: z
       .values({
         orgId,
         guestUserId: guest.id,
+        companyOrgId: d.forCompany ?? null,
         checkIn: d.checkIn,
         checkOut: d.checkOut,
         nights: q.nights,
@@ -272,6 +280,16 @@ export async function requestStay(guest: { id: string }, orgId: string, input: z
     await enqueue(tx, { type: "stay.requested", payload: { stayId: row.id, orgId } });
     return row;
   });
+}
+
+/** A company's team retreats (requested by any of its buyers), newest first. */
+export async function companyRetreats(userId: string, orgId: string) {
+  const rows = await withScope({ userId, orgId }, async (tx) => {
+    await requireOrgRole(userId, orgId, ORG_BUYERS, tx);
+    return tx.select().from(stay).where(eq(stay.companyOrgId, orgId)).orderBy(desc(stay.createdAt)).limit(100);
+  });
+  const names = await homestayNames(rows.map((r) => r.orgId));
+  return rows.map((s) => ({ ...s, homestay: names.get(s.orgId) ?? null }));
 }
 
 // ---------- Expiry and completion ----------

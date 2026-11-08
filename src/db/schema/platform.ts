@@ -42,3 +42,9 @@ export const featureFlag = pgTable("feature_flag", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   updatedBy: uuid("updated_by").references(() => user.id),
 });
+
+/** Members who asked to hear when Moosam Plus opens. */
+export const plusWaitlist = pgTable("plus_waitlist", {
+  userId: uuid("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

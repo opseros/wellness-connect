@@ -9,6 +9,7 @@ import { inviteMember, removeMember } from "@/modules/organizations/service";
 import { addPhoto, removeDocument, removePhoto, submitListing, updateListing, uploadDocument } from "@/modules/listings/service";
 import { hostCancelStay, respondToStay, updateCalendar } from "@/modules/stays/service";
 import { createPackage, replyToQuote, setPackageActive, updatePackage } from "@/modules/care/service";
+import { addPlan, setBenefitPartner, setPlanActive } from "@/modules/listings/plans";
 
 // Every action re-checks the session; the services check the role again.
 
@@ -205,4 +206,28 @@ export async function replyQuoteAction(form: FormData) {
         : { action, message: str(form, "message") },
     ),
   );
+}
+
+// ---------- Facility plans ----------
+
+export async function addPlanAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = String(form.get("orgId"));
+  await run(orgId, "/plans", "Plan added. Members can buy it from your page.", () =>
+    addPlan(me.id, orgId, { name: String(form.get("name") ?? ""), kind: String(form.get("kind")) as "monthly", priceRupees: String(form.get("price") ?? "") as unknown as number, details: String(form.get("details") ?? "") }),
+  );
+}
+
+export async function setPlanActiveAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = String(form.get("orgId"));
+  const on = form.get("active") === "1";
+  await run(orgId, "/plans", on ? "Plan back on sale." : "Plan taken off sale. People who bought it keep it.", () => setPlanActive(me.id, orgId, String(form.get("planId")), on));
+}
+
+export async function setBenefitPartnerAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = String(form.get("orgId"));
+  const on = form.get("on") === "1";
+  await run(orgId, "/plans", on ? "You're a benefit partner. Employees can now pay with company credits." : "You're no longer a benefit partner.", () => setBenefitPartner(me.id, orgId, on));
 }

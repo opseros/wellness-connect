@@ -20,6 +20,7 @@ import { listCategories, setCategoryCommission } from "@/modules/professionals/s
 import { z } from "zod";
 import { featureFlag, booking, careQuote, invitation, stay, account, auditLog, comment, connection, conversationParticipant, credential, group, listing, listingPhoto, memberProfile, orgDocument, membership, organization, post, professionalProfile, report, session, twoFactor, user } from "@/db/schema";
 import { archiveChallengeById, challengeInput, createPlatformChallenge, platformChallenges } from "@/modules/connect/challenges";
+import { creditsMonthSummary, dueFundings, fundingPaymentInput, recordFundingPayment } from "@/modules/marketplace/credits";
 import { getDb, withScope, type Tx } from "@/db/client";
 import { assertUuid, badRequest, forbidden, notFound } from "@/lib/errors";
 import { audit } from "@/modules/platform/outbox";
@@ -600,6 +601,29 @@ export async function resolveReport(actor: StaffActor, reportId: string, input: 
       if (r.targetType === "comment") await tx.update(comment).set({ hiddenAt: null }).where(eq(comment.id, r.targetId));
     }
     await audit(tx, { actorId: actor.id, action: `report.${action}`, targetType: r.targetType, targetId: r.targetId, metadata: { reportId: r.id } });
+  });
+}
+
+// ---------- Wellness credits: company prepayments ----------
+
+/** Member bookings paid with credits this month, Moosam's fees, and prepayments waiting. */
+export async function memberBookingsSummary(actor: StaffActor) {
+  assertStaff(actor);
+  return withScope({ bypass: true, userId: actor.id }, (tx) => creditsMonthSummary(tx));
+}
+
+export async function listDueCreditFundings(actor: StaffActor) {
+  assertStaff(actor);
+  return withScope({ bypass: true, userId: null }, (tx) => dueFundings(tx));
+}
+
+/** Record that a company's monthly prepayment arrived (bank transfer reference). Finance staff only. */
+export async function recordCreditFunding(actor: StaffActor, fundingId: string, input: z.input<typeof fundingPaymentInput>) {
+  assertStaff(actor);
+  return withScope({ bypass: true, userId: null }, async (tx) => {
+    const row = await recordFundingPayment(tx, fundingId, actor.id, input);
+    await audit(tx, { actorId: actor.id, action: "credits.funding_paid", targetType: "credit_funding", targetId: row.id, metadata: { orgId: row.orgId, period: row.period, duePaise: row.duePaise, reference: row.reference } });
+    return row;
   });
 }
 

@@ -37,6 +37,8 @@ export const stay = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     orgId: uuid("org_id").notNull().references(() => organization.id),
     guestUserId: uuid("guest_user_id").notNull().references(() => user.id),
+    // Team retreats: the company the stay is for. Its owners, admins and wellness managers can see it.
+    companyOrgId: uuid("company_org_id").references(() => organization.id),
     checkIn: date("check_in").notNull(),
     checkOut: date("check_out").notNull(),
     nights: integer("nights").notNull(),
@@ -100,6 +102,8 @@ export const stayPayment = pgTable(
     stayId: uuid("stay_id").notNull().references(() => stay.id),
     orgId: uuid("org_id").notNull().references(() => organization.id),
     guestUserId: uuid("guest_user_id").notNull().references(() => user.id),
+    // Team retreats: the company the stay is for. Its owners, admins and wellness managers can see it.
+    companyOrgId: uuid("company_org_id").references(() => organization.id),
     providerOrderId: text("provider_order_id").unique(),
     providerPaymentId: text("provider_payment_id").unique(),
     method: text("method"),
@@ -124,6 +128,8 @@ export const stayInvoice = pgTable(
     stayId: uuid("stay_id").notNull().references(() => stay.id),
     orgId: uuid("org_id").notNull().references(() => organization.id),
     guestUserId: uuid("guest_user_id").notNull().references(() => user.id),
+    // Team retreats: the company the stay is for. Its owners, admins and wellness managers can see it.
+    companyOrgId: uuid("company_org_id").references(() => organization.id),
     number: text("number").notNull().unique(),
     kind: text("kind", { enum: ["invoice", "credit_note"] }).notNull().default("invoice"),
     status: text("status", { enum: ["unpaid", "paid", "cancelled", "issued"] }).notNull(),
@@ -152,6 +158,8 @@ export const stayRefund = pgTable(
     stayId: uuid("stay_id").notNull().references(() => stay.id),
     orgId: uuid("org_id").notNull().references(() => organization.id),
     guestUserId: uuid("guest_user_id").notNull().references(() => user.id),
+    // Team retreats: the company the stay is for. Its owners, admins and wellness managers can see it.
+    companyOrgId: uuid("company_org_id").references(() => organization.id),
     paymentId: uuid("payment_id").notNull().references(() => stayPayment.id),
     amountPaise: integer("amount_paise").notNull(),
     providerRefundId: text("provider_refund_id").unique(),
@@ -193,6 +201,8 @@ export const stayLedgerEntry = pgTable(
     stayId: uuid("stay_id").notNull().references(() => stay.id),
     orgId: uuid("org_id").notNull().references(() => organization.id),
     guestUserId: uuid("guest_user_id").notNull().references(() => user.id),
+    // Team retreats: the company the stay is for. Its owners, admins and wellness managers can see it.
+    companyOrgId: uuid("company_org_id").references(() => organization.id),
     paymentId: uuid("payment_id").references(() => stayPayment.id),
     refundId: uuid("refund_id").references(() => stayRefund.id),
     payoutId: uuid("payout_id").references(() => stayPayout.id),

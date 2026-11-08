@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { AppError } from "@/lib/errors";
 import { requirePlatformStaff } from "@/modules/identity/session";
 import {
+  recordCreditFunding,
   archivePlatformChallenge,
   createPlatformChallengeAsStaff,
   adminRecordStayPayout,
@@ -181,6 +182,8 @@ export async function financeSettingsAction(form: FormData) {
       stayGstHighPercent: Number(f(form, "stayGstHigh")),
       stayGstThresholdRupees: Number(f(form, "stayThreshold")),
       staySacCode: f(form, "staySac"),
+      memberFeePercent: Number(f(form, "memberFee")),
+      plusPriceRupees: Number(f(form, "plusPrice")),
     }),
   );
 }
@@ -249,7 +252,7 @@ export async function removeOrganizationAction(form: FormData) {
 
 export async function setFeatureAction(form: FormData) {
   const staff = await requirePlatformStaff();
-  const key = String(form.get("key")) as "hospitals";
+  const key = String(form.get("key")) as "hospitals" | "plus";
   const enabled = String(form.get("enabled")) === "1";
   await run("/admin/settings", enabled ? "Switched on. Everyone can see it now." : "Switched off. Only super admins can see it now.", () => setPlatformFeature(staff, { key, enabled }));
 }
@@ -265,4 +268,11 @@ export async function createChallengeAction(form: FormData) {
 export async function archiveChallengeAction(form: FormData) {
   const staff = await requirePlatformStaff();
   await run("/admin/challenges", "Challenge ended and hidden.", () => archivePlatformChallenge(staff, String(form.get("challengeId"))));
+}
+
+export async function recordCreditFundingAction(form: FormData) {
+  const staff = await requirePlatformStaff();
+  await run("/admin/credits", "Payment recorded. The company's credits are on.", () =>
+    recordCreditFunding(staff, String(form.get("fundingId")), { method: "bank_transfer", reference: String(form.get("reference") ?? "") }),
+  );
 }

@@ -779,6 +779,9 @@ export const financeSettingsInput = z.object({
   stayGstHighPercent: z.number().min(0).max(28).optional(),
   stayGstThresholdRupees: z.number().int().min(0).max(1_000_000).optional(),
   staySacCode: z.string().trim().regex(/^\d{4,8}$/, "SAC is 4 to 8 digits").optional(),
+  // Member bookings (sessions, plans, credit spends) and the optional Moosam Plus plan.
+  memberFeePercent: z.number().min(0).max(30).optional(),
+  plusPriceRupees: z.number().int().min(0).max(10_000).optional(),
 });
 
 /** Super admins only (checked by the admin module). Applies to bookings priced from now on. */
@@ -806,6 +809,8 @@ export async function updateFinanceSettings(staffId: string, input: z.input<type
         ...(d.stayGstHighPercent !== undefined ? { stayGstHighBps: Math.round(d.stayGstHighPercent * 100) } : {}),
         ...(d.stayGstThresholdRupees !== undefined ? { stayGstThresholdPaise: d.stayGstThresholdRupees * 100 } : {}),
         ...(d.staySacCode !== undefined ? { staySacCode: d.staySacCode } : {}),
+        ...(d.memberFeePercent !== undefined ? { memberFeeBps: Math.round(d.memberFeePercent * 100) } : {}),
+        ...(d.plusPriceRupees !== undefined ? { plusPricePaise: d.plusPriceRupees * 100 } : {}),
         updatedAt: new Date(),
       })
       .where(eq(financeSettings.id, "default"))

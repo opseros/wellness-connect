@@ -14,6 +14,12 @@ export const FEATURES = {
       "Hospital directory and pages, hospital sign-up and workspaces, treatment packages, quote requests, medical reports and company health checks. When off, only super admins can see any of it.",
     default: false,
   },
+  plus: {
+    label: "Moosam Plus",
+    description:
+      "An optional paid plan for individual members, shown on My benefits and at /plus. Connect stays free for everyone. Until card payments go live, members can join a waitlist. When off, only super admins can see it.",
+    default: false,
+  },
 } as const;
 export type FeatureKey = keyof typeof FEATURES;
 

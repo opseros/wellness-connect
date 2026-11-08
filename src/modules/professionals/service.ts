@@ -409,6 +409,9 @@ export async function listProfessionalDirectory(filters: z.input<typeof proDirec
       modes: professionalProfile.deliveryModes,
       categories: sql<string[]>`coalesce((select array_agg(c.name order by c.name) from ${professionalCategory} pc join ${category} c on c.id = pc.category_id where pc.profile_id = ${professionalProfile.id}), '{}')`,
       priceFromPaise: sql<number | null>`(select min(s.price_min_paise) from ${service} s where s.profile_id = ${professionalProfile.id} and s.active)`,
+      // What members pay for a 1:1 session (only services offered to members).
+      memberFromPaise: sql<number | null>`(select min(s.member_price_paise) from ${service} s where s.profile_id = ${professionalProfile.id} and s.active and s.member_price_paise is not null)`,
+      bookable: sql<boolean>`exists (select 1 from pro_booking_settings b where b.profile_id = ${professionalProfile.id} and b.enabled) and exists (select 1 from ${service} s where s.profile_id = ${professionalProfile.id} and s.active and s.member_price_paise is not null)`,
     })
     .from(professionalProfile)
     .innerJoin(user, eq(user.id, professionalProfile.userId))

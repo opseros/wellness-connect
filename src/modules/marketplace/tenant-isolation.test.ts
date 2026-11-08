@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { createTestDb } from "@/test/db";
 import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import { withScope, type DB } from "@/db/client";
-import { careQuote, careRequest, membership, organization, orgDocument, proposal, requirement, stay, stayLedgerEntry } from "@/db/schema";
+import { benefitPolicy, facilityPlan, planPurchase, careQuote, careRequest, creditEntry, creditFunding, membership, organization, orgDocument, proposal, requirement, stay, stayLedgerEntry } from "@/db/schema";
 import { createRequirement, listOrgRequirements, getMatches, sendEnquiries } from "./service";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
@@ -139,5 +139,31 @@ describe("tenant isolation (row-level security)", () => {
     expect(await withScope({ userId: bob.id, orgId: orgB }, (tx) => tx.select().from(careQuote))).toHaveLength(0);
     // A hospital can't create a request in someone else's name.
     await expect(withScope({ userId: alice.id, orgId: orgA }, (tx) => tx.insert(careRequest).values({ requesterUserId: g.id, treatment: "x" }))).rejects.toThrow();
+  });
+
+  it("wellness credits: policy, prepayments and ledger stay inside the company; employees see only their own entries", async () => {
+    await withScope({ bypass: true, userId: null }, async (tx) => {
+      await tx.insert(benefitPolicy).values({ orgId: orgA, active: true, allowancePaise: 100000 });
+      const [f] = await tx.insert(creditFunding).values({ orgId: orgA, period: "2026-11", seats: 1, allowancePaise: 100000, requiredPaise: 100000, carriedPaise: 0, duePaise: 100000, status: "paid" }).returning();
+      await tx.insert(creditEntry).values({ orgId: orgA, userId: null, period: "2026-11", type: "fund", amountPaise: 100000, fundingId: f.id, idempotencyKey: "iso-fund" });
+      await tx.insert(creditEntry).values({ orgId: orgA, userId: alice.id, period: "2026-11", type: "spend", amountPaise: 5000, feePaise: 250, payablePaise: 4750, category: "sessions", idempotencyKey: "iso-spend" });
+    });
+    const asB = { userId: bob.id, orgId: orgB };
+    expect(await withScope(asB, (tx) => tx.select().from(benefitPolicy))).toHaveLength(0);
+    expect(await withScope(asB, (tx) => tx.select().from(creditFunding))).toHaveLength(0);
+    expect(await withScope(asB, (tx) => tx.select().from(creditEntry))).toHaveLength(0);
+    expect(await withScope({ userId: bob.id }, (tx) => tx.select().from(creditEntry))).toHaveLength(0);
+    expect(await withScope({ userId: alice.id }, (tx) => tx.select().from(creditEntry))).toHaveLength(1);
+    await expect(withScope(asB, (tx) => tx.insert(creditEntry).values({ orgId: orgA, userId: bob.id, period: "2026-11", type: "spend", amountPaise: 1, feePaise: 0, payablePaise: 1, idempotencyKey: "iso-steal" }))).rejects.toThrow();
+  });
+
+  it("plan purchases are visible only to the facility and the member", async () => {
+    await withScope({ bypass: true, userId: null }, async (tx) => {
+      const [p] = await tx.insert(facilityPlan).values({ orgId: orgA, name: "Monthly", kind: "monthly", pricePaise: 100000, validDays: 30 }).returning();
+      await tx.insert(planPurchase).values({ orgId: orgA, planId: p.id, userId: alice.id, planName: "Monthly", pricePaise: 100000, startsOn: "2026-11-01", endsOn: "2026-11-30", paidWith: "card", idempotencyKey: "iso-plan" });
+    });
+    expect(await withScope({ userId: bob.id, orgId: orgB }, (tx) => tx.select().from(planPurchase))).toHaveLength(0);
+    expect(await withScope({ userId: alice.id }, (tx) => tx.select().from(planPurchase))).toHaveLength(1);
+    expect(await withScope({ userId: bob.id, orgId: orgA }, (tx) => tx.select().from(planPurchase))).toHaveLength(1);
   });
 });

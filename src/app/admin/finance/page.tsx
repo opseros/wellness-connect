@@ -215,6 +215,8 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
         <form action={financeSettingsAction} className="card flex flex-col gap-4 p-6">
           <fieldset disabled={!isSuper} className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
             <F id="commission" label="Default commission (%)" hint="Taken from the professional's fee."><input id="commission" name="commission" type="number" step="0.01" min="0" max="50" defaultValue={s.commissionBps / 100} className="input" /></F>
+            <F id="memberFee" label="Moosam fee on member bookings (%)" hint="Sessions, gym plans and credit spends. Taken from the provider's share."><input id="memberFee" name="memberFee" type="number" step="0.01" min="0" max="30" defaultValue={s.memberFeeBps / 100} className="input" /></F>
+            <F id="plusPrice" label="Moosam Plus price (₹ a month)" hint="Shown only when Moosam Plus is switched on in Settings."><input id="plusPrice" name="plusPrice" type="number" step="1" min="0" max="10000" defaultValue={s.plusPricePaise / 100} className="input" /></F>
             <F id="gst" label="GST on the session fee (%)"><input id="gst" name="gst" type="number" step="0.01" min="0" max="28" defaultValue={s.gstBps / 100} className="input" /></F>
             <F id="lateRefund" label="Refund on late cancellation (%)" hint="Inside the free-cancellation window."><input id="lateRefund" name="lateRefund" type="number" step="1" min="0" max="100" defaultValue={s.lateCancelRefundBps / 100} className="input" /></F>
             <F id="terms" label="Invoice payment terms (days)"><input id="terms" name="terms" type="number" min="0" max="60" defaultValue={s.paymentTermsDays} className="input" /></F>

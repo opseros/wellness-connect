@@ -42,6 +42,8 @@ export type OutboxEvent =
   | { type: "care.not_selected"; payload: { quoteId: string; orgId: string } }
   | { type: "care.report_shared"; payload: { quoteId: string; orgId: string } }
   | { type: "session.requested" | "session.declined" | "session.accepted" | "session.confirmed" | "session.expired"; payload: { appointmentId: string } }
+  | { type: "plan.purchased"; payload: { purchaseId: string } }
+  | { type: "credits.funding_due" | "credits.funded"; payload: { fundingId: string; orgId: string } }
   | { type: "buddy.suggested" | "buddy.matched"; payload: { matchId: string; userIds: string[] } }
   | { type: "session.cancelled"; payload: { appointmentId: string; byPro: boolean; wasConfirmed: boolean } };
 

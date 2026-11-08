@@ -4,7 +4,9 @@ import { Badge, Flash } from "@/components/ui";
 import { AppError } from "@/lib/errors";
 import { getCurrentUser } from "@/modules/identity/session";
 import { getSession, MODE_LABEL, SESSION_STATUS_LABEL } from "@/modules/sessions/service";
-import { cancelSessionAction } from "../actions";
+import { myWallets, sessionPaidWithCredits } from "@/modules/marketplace/credits";
+import { randomUUID } from "node:crypto";
+import { cancelSessionAction, payWithCreditsAction } from "../actions";
 
 const when = (d: Date) => new Intl.DateTimeFormat("en-IN", { dateStyle: "full", timeStyle: "short", timeZone: "Asia/Kolkata" }).format(d);
 const rs = (p: number) => (p === 0 ? "Free" : `₹${(p / 100).toLocaleString("en-IN")}`);
@@ -17,6 +19,9 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
     throw e;
   });
   const open = ["requested", "accepted", "confirmed"].includes(s.status);
+  const isMember = s.memberUserId === me.id;
+  const wallet = isMember && s.status === "accepted" ? (await myWallets(me.id)).filter((w) => w.funded && w.covers.sessions).sort((a, b) => b.availablePaise - a.availablePaise)[0] : undefined;
+  const paidWithCredits = isMember && ["confirmed", "completed", "cancelled"].includes(s.status) ? await sessionPaidWithCredits(me.id, s.id) : false;
   return (
     <>
       <Link href="/sessions" className="text-sm font-semibold text-brand hover:underline">← My sessions</Link>
@@ -37,7 +42,19 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
           {s.address && (<><dt className="text-muted">Address</dt><dd>{s.address}</dd></>)}
         </dl>
         {s.status === "requested" && <p className="rounded-xl bg-ground px-4 py-3 text-sm">Waiting for {s.proName.split(" ")[0]} to reply. If they don&apos;t, the request lapses and the time is freed.</p>}
-        {s.status === "accepted" && <p className="rounded-xl bg-[#fff4dc] px-4 py-3 text-sm text-[#7a4b00]">Accepted. Online payment opens shortly; we&apos;ll email you the moment you can pay to confirm.</p>}
+        {s.status === "accepted" && wallet && wallet.availablePaise >= s.pricePaise && (
+          <form action={payWithCreditsAction} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brand-soft px-4 py-3">
+            <input type="hidden" name="id" value={s.id} />
+            <input type="hidden" name="key" value={randomUUID()} />
+            <span className="text-sm text-brand-dark">Accepted. Pay with your {wallet.orgName} wellness credits: {rs(wallet.availablePaise)} left this month.</span>
+            <button className="btn-primary rounded-full">Pay {rs(s.pricePaise)} with credits</button>
+          </form>
+        )}
+        {s.status === "accepted" && wallet && wallet.availablePaise < s.pricePaise && (
+          <p className="rounded-xl bg-[#fff4dc] px-4 py-3 text-sm text-[#7a4b00]">Accepted. Your {wallet.orgName} credits have {rs(wallet.availablePaise)} left this month, not enough for this session. Card payment opens shortly.</p>
+        )}
+        {s.status === "accepted" && !wallet && <p className="rounded-xl bg-[#fff4dc] px-4 py-3 text-sm text-[#7a4b00]">Accepted. Online payment opens shortly; we&apos;ll email you the moment you can pay to confirm.</p>}
+        {paidWithCredits && <p className="rounded-xl bg-brand-soft px-4 py-3 text-sm text-brand-dark">Paid with wellness credits.{s.status === "cancelled" ? " The credits were returned to your allowance." : ""}</p>}
       </section>
       {open && (
         <form action={cancelSessionAction} className="card flex flex-wrap items-end gap-3 p-5">

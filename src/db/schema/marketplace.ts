@@ -236,6 +236,10 @@ export const financeSettings = pgTable("finance_settings", {
   // Share of the total refunded when a company cancels inside the free window (0 = none).
   lateCancelRefundBps: integer("late_cancel_refund_bps").notNull().default(0),
   paymentTermsDays: integer("payment_terms_days").notNull().default(7),
+  // Moosam's fee on what members book themselves (sessions, gym plans, credits spends). 500 = 5%.
+  memberFeeBps: integer("member_fee_bps").notNull().default(500),
+  // Moosam Plus monthly price (shown only when the "plus" switch is on).
+  plusPricePaise: integer("plus_price_paise").notNull().default(29900),
   sellerName: text("seller_name").notNull().default(""),
   sellerGstin: text("seller_gstin").notNull().default(""),
   sellerAddress: text("seller_address").notNull().default(""),

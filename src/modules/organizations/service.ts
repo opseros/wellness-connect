@@ -401,3 +401,19 @@ export async function memberCounts(orgId: string) {
     .groupBy(membership.status);
   return Object.fromEntries(rows.map((r) => [r.status, r.n])) as Partial<Record<"active" | "pending", number>>;
 }
+
+/** People with an active membership of the organisation (for seat counts). */
+export async function countActiveMembers(orgId: string, db: Executor = getDb()) {
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(membership)
+    .innerJoin(user, eq(user.id, membership.userId))
+    .where(and(eq(membership.orgId, orgId), eq(membership.status, "active"), isNull(user.deletedAt)));
+  return n;
+}
+
+/** Is this user an active member of this company (and is the company live)? */
+export async function isActiveCompanyMember(userId: string, orgId: string, db: Executor = getDb()) {
+  const m = (await listMemberships(userId, db)).find((x) => x.organization.id === orgId);
+  return Boolean(m && m.membership.status === "active" && m.organization.kind === "company" && !m.organization.suspendedAt && !m.organization.removedAt);
+}

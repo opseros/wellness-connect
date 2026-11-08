@@ -29,6 +29,7 @@ import {
 } from "@/modules/marketplace/service";
 
 import { archiveCompanyChallenge, createCompanyChallenge } from "@/modules/connect/challenges";
+import { savePolicy } from "@/modules/marketplace/credits";
 
 // Each action re-checks the session; services check the role and RLS scopes the data.
 
@@ -298,4 +299,15 @@ export async function archiveChallengeAction(form: FormData) {
   const me = await requireUser();
   const orgId = str(form, "orgId");
   await run(`/company/${orgId}/challenges`, () => archiveCompanyChallenge(me.id, orgId, str(form, "challengeId")), () => ({ to: `/company/${orgId}/challenges`, msg: "Challenge ended and hidden from members." }));
+}
+
+export async function saveCreditsPolicyAction(form: FormData) {
+  const me = await requireUser();
+  const orgId = str(form, "orgId");
+  const on = (k: string) => form.get(k) === "on";
+  await run(
+    `/company/${orgId}/credits`,
+    () => savePolicy(me.id, orgId, { active: on("active"), allowanceRupees: num(form, "allowance"), coverSessions: on("coverSessions"), coverFacilities: on("coverFacilities"), coverStays: false, partnersOnly: on("partnersOnly") }),
+    () => ({ to: `/company/${orgId}/credits`, msg: "Policy saved." }),
+  );
 }

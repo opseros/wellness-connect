@@ -3,22 +3,27 @@ import { getCurrentUser } from "@/modules/identity/session";
 import { ACCESS_LABEL, PURPOSE_LABEL, quoteStay } from "@/modules/stays/service";
 import { requestStayAction } from "@/app/stays/actions";
 import { todayIst } from "@/modules/stays/policy";
+import { listBuyerOrgs } from "@/modules/organizations/service";
 
 const rs = (p: number) => `₹${(p / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-export type StaySearch = { checkIn?: string; checkOut?: string; rooms?: string; guests?: string; error?: string };
+export type StaySearch = { checkIn?: string; checkOut?: string; rooms?: string; guests?: string; error?: string; for?: string };
 
 /** Dates → live price and availability → request form (signed in) on a homestay page. */
 export async function StayBooking({ orgId, slug, sp, minNights, maxRooms }: { orgId: string; slug: string; sp: StaySearch; minNights: number; maxRooms: number }) {
   const me = await getCurrentUser();
   const today = todayIst();
+  // Team retreat for a company this person buys for (?for=<orgId>).
+  const company = me && sp.for ? (await listBuyerOrgs(me.id)).find((o) => o.organization.id === sp.for && o.organization.kind === "company")?.organization ?? null : null;
   const has = Boolean(sp.checkIn && sp.checkOut);
   const q = has ? await quoteStay(orgId, { checkIn: sp.checkIn!, checkOut: sp.checkOut!, rooms: sp.rooms || 1, guests: sp.guests || 1 }).catch(() => null) : null;
-  const back = `/homestays/${slug}?${new URLSearchParams({ checkIn: sp.checkIn ?? "", checkOut: sp.checkOut ?? "", rooms: sp.rooms ?? "1", guests: sp.guests ?? "1" })}`;
+  const back = `/homestays/${slug}?${new URLSearchParams({ checkIn: sp.checkIn ?? "", checkOut: sp.checkOut ?? "", rooms: sp.rooms ?? "1", guests: sp.guests ?? "1", ...(company ? { for: company.id } : {}) })}`;
   const field = "flex flex-col gap-1 text-[13px] font-semibold";
   return (
     <section aria-labelledby="book-h" className="flex flex-col gap-3">
-      <h2 id="book-h" className="text-lg font-bold">Check dates</h2>
+      <h2 id="book-h" className="text-lg font-bold">{company ? `Team retreat for ${company.name}` : "Check dates"}</h2>
+      {company && <p className="rounded-lg bg-[#e3ecf5] px-3 py-2 text-[13px] text-[#163a5a]">Billed to {company.name}. Your company&apos;s owners, admins and wellness managers can see this request.</p>}
       <form method="get" className="grid grid-cols-2 gap-2">
+        {company && <input type="hidden" name="for" value={company.id} />}
         <label className={field}>Check-in<input name="checkIn" type="date" required min={today} defaultValue={sp.checkIn} className="input" /></label>
         <label className={field}>Check-out<input name="checkOut" type="date" required min={today} defaultValue={sp.checkOut} className="input" /></label>
         <label className={field}>Rooms<input name="rooms" type="number" min={1} max={Math.max(1, maxRooms)} defaultValue={sp.rooms ?? 1} className="input" /></label>
@@ -43,7 +48,13 @@ export async function StayBooking({ orgId, slug, sp, minNights, maxRooms }: { or
               <input type="hidden" name="orgId" value={orgId} />
               <input type="hidden" name="back" value={back} />
               {(["checkIn", "checkOut", "rooms", "guests"] as const).map((k) => <input key={k} type="hidden" name={k} value={sp[k] ?? ""} />)}
-              <fieldset className="flex flex-col gap-1.5">
+              {company && (
+                <>
+                  <input type="hidden" name="forCompany" value={company.id} />
+                  <input type="hidden" name="purpose" value="retreat" />
+                </>
+              )}
+              <fieldset className={`flex flex-col gap-1.5 ${company ? "hidden" : ""}`} disabled={Boolean(company)}>
                 <legend className="mb-1 text-[13px] font-semibold">Reason for the stay</legend>
                 {Object.entries(PURPOSE_LABEL).map(([k, v], i) => (
                   <label key={k} className="flex items-center gap-2 text-sm"><input type="radio" name="purpose" value={k} defaultChecked={i === 1} required className="accent-brand" />{v}</label>
@@ -59,10 +70,10 @@ export async function StayBooking({ orgId, slug, sp, minNights, maxRooms }: { or
                 <textarea name="message" rows={2} maxLength={600} className="input py-2" placeholder="Arrival time, who's coming" />
               </label>
               <p className="text-[12px] text-muted">Please don&apos;t share medical details. Hosts only need your dates and what to prepare.</p>
-              <details className="text-sm">
+              <details className="text-sm" open={Boolean(company)}>
                 <summary className="cursor-pointer font-semibold text-brand">Invoice in a company&apos;s name?</summary>
                 <div className="mt-2 flex flex-col gap-2">
-                  <label className={field}>Name on invoice<input name="billingName" maxLength={120} className="input" /></label>
+                  <label className={field}>Name on invoice<input name="billingName" maxLength={120} defaultValue={company?.name} className="input" /></label>
                   <label className={field}>GSTIN<input name="billingGstin" maxLength={15} className="input uppercase" /></label>
                 </div>
               </details>

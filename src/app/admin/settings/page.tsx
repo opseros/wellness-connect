@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getStaffOrExit, when } from "../staff";
 import { listPlatformFeatures } from "@/modules/admin/service";
+import { plusWaitlistCount } from "@/modules/platform/plus";
 import { setFeatureAction } from "../actions";
 import { Flash, PageTitle } from "../ui";
 
@@ -10,7 +11,7 @@ export const metadata = { title: "Settings" };
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ msg?: string; error?: string }> }) {
   const me = await getStaffOrExit();
   if (me.platformRole !== "super_admin") notFound();
-  const [features, sp] = await Promise.all([listPlatformFeatures(me), searchParams]);
+  const [features, sp, waitlist] = await Promise.all([listPlatformFeatures(me), searchParams, plusWaitlistCount()]);
   return (
     <>
       <PageTitle title="Settings" subtitle="Switch whole parts of the platform on or off. Super admins always see everything, so you can set things up before switching them on." />
@@ -26,6 +27,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${f.enabled ? "bg-brand-soft text-brand-dark" : "bg-[#fbe9e6] text-[#9b2c1f]"}`}>{f.enabled ? "On" : "Off"}</span>
               </div>
               <p className="text-[14.5px] text-muted">{f.description}</p>
+              {f.key === "plus" && <p className="text-[13px] font-semibold">{waitlist} {waitlist === 1 ? "person" : "people"} on the waitlist · price set in Finance</p>}
               {f.updatedAt && <p className="text-[12.5px] text-muted">Last changed {when(f.updatedAt)}</p>}
             </div>
             <button

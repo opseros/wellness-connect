@@ -4,6 +4,7 @@ import { listMyBookings, listMyEnquiries, summarizeEarnings } from "@/modules/ma
 import { formatPaise } from "@/lib/money";
 import { Badge, Flash, PageTitle } from "@/components/ui";
 import { getProOrExit } from "./me";
+import { proMonthEarnings } from "@/modules/marketplace/credits";
 
 const statusCopy: Record<string, string> = {
   unverified: "Upload a credential so our team can verify you.",
@@ -14,7 +15,7 @@ const statusCopy: Record<string, string> = {
 
 export default async function ProOverview({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
   const { me } = await getProOrExit();
-  const [dash, enquiries, bookings, sp] = await Promise.all([getProDashboard(me.id), listMyEnquiries(me.id), listMyBookings(me.id), searchParams]);
+  const [dash, enquiries, bookings, sp, member] = await Promise.all([getProDashboard(me.id), listMyEnquiries(me.id), listMyBookings(me.id), searchParams, proMonthEarnings(me.id)]);
   if (!dash) return null;
   const earnings = summarizeEarnings(bookings);
   const newEnquiries = enquiries.filter((e) => e.status === "sent" || e.status === "viewed");
@@ -29,6 +30,20 @@ export default async function ProOverview({ searchParams }: { searchParams: Prom
         <Stat label="Due to you" value={formatPaise(earnings.duePaise)} note={`${formatPaise(earnings.paidOutPaise)} paid out so far`} />
         <Stat label="Awaiting company payment" value={formatPaise(earnings.awaitingPaymentPaise)} note={`${earnings.bookingCount} booking${earnings.bookingCount === 1 ? "" : "s"} in total`} />
       </div>
+
+      <section aria-labelledby="member-h" className="card flex flex-col gap-4 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="member-h" className="text-lg font-bold">Member sessions this month</h2>
+          <Link href="/pro/sessions" className="text-sm font-semibold text-brand hover:underline">{member.waiting ? `${member.waiting} request${member.waiting === 1 ? "" : "s"} waiting →` : "All sessions →"}</Link>
+        </div>
+        <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+          <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Paid sessions</dt><dd className="font-display text-[24px] font-extrabold">{member.sessions}</dd></div>
+          <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Booked value</dt><dd className="font-display text-[24px] font-extrabold">{formatPaise(member.grossPaise)}</dd></div>
+          <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Moosam fee ({member.feeBps / 100}%)</dt><dd className="font-display text-[24px] font-extrabold">{formatPaise(member.feePaise)}</dd></div>
+          <div className="rounded-2xl bg-brand-soft p-4"><dt className="text-[13px] text-brand-dark">You receive</dt><dd className="font-display text-[24px] font-extrabold text-brand-dark">{formatPaise(member.netPaise)}</dd></div>
+        </dl>
+        <p className="text-[13px] text-muted">Sessions members book directly, including ones paid with company wellness credits. Company workshop bookings are counted separately above.</p>
+      </section>
 
       <section className="card flex flex-col gap-4 p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

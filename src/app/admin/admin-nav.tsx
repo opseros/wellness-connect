@@ -12,6 +12,7 @@ export function AdminNav({ pending, homestays = 0, hospitals = 0, facilities = 0
     { href: "/admin/users", label: "Users", match: (p: string) => p.startsWith("/admin/users") },
     { href: "/admin/organizations", label: "Organizations", match: (p: string) => p.startsWith("/admin/organizations") },
     { href: "/admin/finance", label: "Finance", badge: finance, match: (p: string) => p.startsWith("/admin/finance") },
+    { href: "/admin/credits", label: "Credits", match: (p: string) => p.startsWith("/admin/credits") },
     { href: "/admin/challenges", label: "Challenges", match: (p: string) => p.startsWith("/admin/challenges") },
     { href: "/admin/reports", label: "Reports", badge: reports, match: (p: string) => p.startsWith("/admin/reports") },
     { href: "/admin/audit", label: "Audit log", match: (p: string) => p.startsWith("/admin/audit") },

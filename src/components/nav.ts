@@ -1,6 +1,6 @@
 import type { CurrentUser } from "@/modules/identity/session";
 
-type Section = "home" | "company" | "pro" | "listing" | "connect" | "admin" | "account";
+type Section = "home" | "company" | "pro" | "listing" | "connect" | "explore" | "bookings" | "admin" | "account";
 
 /**
  * Main navigation for signed-in pages. "Company" appears for owners, admins
@@ -17,6 +17,8 @@ export function mainNav(me: Pick<CurrentUser, "platformRole">, active: Section, 
     ...(opts.professional ? [{ href: "/pro", label: "Professional", key: "pro" as const }] : []),
     ...(opts.listing ? [{ href: opts.listing.href, label: opts.listing.label, key: "listing" as const }] : []),
     { href: "/connect", label: "Connect", key: "connect" },
+    { href: "/explore", label: "Explore", key: "explore" },
+    { href: "/bookings", label: "My bookings", key: "bookings" },
     ...(me.platformRole !== "user" ? [{ href: "/admin", label: "Admin", key: "admin" as const }] : []),
     { href: "/account/security", label: "Account", key: "account" },
   ];

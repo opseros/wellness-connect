@@ -1,4 +1,5 @@
-import { pgTable, uuid, text, timestamp, integer, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, boolean, index, date, check, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { user } from "./auth";
 import { organization } from "./organizations";
 
@@ -88,6 +89,8 @@ export const listing = pgTable(
     dropInPaise: integer("drop_in_paise"),
     freeTrial: boolean("free_trial").notNull().default(false),
     corporatePlans: boolean("corporate_plans").notNull().default(false),
+    // Accepts company wellness credits for its plans (Moosam benefit partner).
+    benefitPartner: boolean("benefit_partner").notNull().default(false),
     // Review
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
@@ -135,4 +138,48 @@ export const listingPhoto = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("listing_photo_org_idx").on(t.orgId)],
+);
+
+// ---------- Facility plans (gyms, studios, wellness centres) ----------
+
+export const PLAN_KINDS = ["monthly", "quarterly", "classes", "day_pass", "session"] as const;
+
+/** Plans and passes a facility sells on Moosam. Public prices; no personal data. */
+export const facilityPlan = pgTable(
+  "facility_plan",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    kind: text("kind", { enum: PLAN_KINDS }).notNull(),
+    pricePaise: integer("price_paise").notNull(),
+    validDays: integer("valid_days").notNull(),
+    details: text("details").notNull().default(""),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("facility_plan_org_idx").on(t.orgId), check("facility_plan_price_chk", sql`${t.pricePaise} > 0 and ${t.validDays} between 1 and 400`)],
+);
+
+export const PLAN_PURCHASE_STATUSES = ["active", "cancelled"] as const;
+
+/** A member's plan at a facility. Visible to the member and the facility (RLS). */
+export const planPurchase = pgTable(
+  "plan_purchase",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orgId: uuid("org_id").notNull().references(() => organization.id),
+    planId: uuid("plan_id").notNull().references(() => facilityPlan.id),
+    userId: uuid("user_id").notNull().references(() => user.id),
+    planName: text("plan_name").notNull(),
+    pricePaise: integer("price_paise").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on").notNull(),
+    paidWith: text("paid_with", { enum: ["credits", "card"] }).notNull(),
+    status: text("status", { enum: PLAN_PURCHASE_STATUSES }).notNull().default("active"),
+    idempotencyKey: text("idempotency_key").notNull().unique(),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("plan_purchase_org_idx").on(t.orgId), index("plan_purchase_user_idx").on(t.userId), uniqueIndex("plan_purchase_key_uq").on(t.idempotencyKey)],
 );

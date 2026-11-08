@@ -17,6 +17,7 @@ import {
 import { SPACE_TINT, SpaceIcon, type SpaceKey } from "@/components/landing";
 import { myCircles, pendingBuddyCount, syncCircles } from "@/modules/connect/social";
 import { istToday, listChallenges } from "@/modules/connect/challenges";
+import { myWallets } from "@/modules/marketplace/credits";
 import { ChallengeLink, QuickLog, Ring, unitText } from "../challenge-ui";
 import { connectAction, joinGroupAction, respondAction } from "../actions";
 import { Composer } from "../composer";
@@ -67,6 +68,7 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
     pendingBuddyCount(me.id),
     listChallenges(me.id),
   ]);
+  const wallet = (await myWallets(me.id))[0];
   const myLive = challenges.filter((c) => c.joined && c.state === "live").slice(0, 2);
   const toJoin = challenges.find((c) => !c.joined && c.state !== "ended");
   const today = istToday();
@@ -179,6 +181,22 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
               </div>
             ))}
           </RailCard>
+        )}
+
+        {wallet && (
+          <section aria-labelledby="credits-h" className="flex flex-col gap-2 rounded-[22px] bg-[linear-gradient(140deg,#0f6b5c_0%,#0b4f44_100%)] p-4 text-white">
+            <h2 id="credits-h" className="text-[13px] font-semibold text-white/85">{wallet.orgName} wellness credits</h2>
+            {wallet.funded ? (
+              <>
+                <span className="font-display text-[28px] leading-none font-extrabold">₹{(wallet.availablePaise / 100).toLocaleString("en-IN")}</span>
+                <span aria-hidden className="h-1.5 overflow-hidden rounded-full bg-white/25"><span className="block h-full rounded-full bg-[#f2c46d]" style={{ width: `${Math.min(100, (wallet.usedPaise / Math.max(1, wallet.allowancePaise)) * 100)}%` }} /></span>
+                <span className="text-[12.5px] text-white/85">left of ₹{(wallet.allowancePaise / 100).toLocaleString("en-IN")} this month</span>
+              </>
+            ) : (
+              <span className="text-[13.5px]">This month&apos;s credits switch on once your company pays.</span>
+            )}
+            <Link href="/explore?tab=pros&covered=1" className="btn mt-1 min-h-9 self-start rounded-full bg-white px-4 text-sm text-ink hover:bg-[#f7f3ec]">Find covered options</Link>
+          </section>
         )}
 
         {(myLive.length > 0 || toJoin) && (

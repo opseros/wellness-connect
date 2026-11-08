@@ -6,6 +6,8 @@ import { registerOutboxHandler } from "./outbox";
 import { orgAdminEmails } from "@/modules/organizations/service";
 import { sendRefundToRazorpay } from "@/modules/marketplace/payments";
 import { sendStayRefundToRazorpay } from "@/modules/marketplace/stay-payments";
+import { periodLabel, refundSessionCredits } from "@/modules/marketplace/credits";
+import { creditFunding, planPurchase } from "@/db/schema";
 import { BRAND } from "@/lib/brand";
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -423,6 +425,8 @@ registerOutboxHandler("session.expired", async (tx, p) => {
 });
 
 registerOutboxHandler("session.cancelled", async (tx, p) => {
+  // Paid with wellness credits? Give them back (idempotent).
+  await refundSessionCredits(tx, String(p.appointmentId));
   const c = await sessionCtx(tx, String(p.appointmentId));
   if (!c) return;
   const to = p.byPro ? c.member : c.pro;
@@ -432,4 +436,36 @@ registerOutboxHandler("session.cancelled", async (tx, p) => {
     subject: `Cancelled: ${c.a.serviceTitle}`,
     text: `The session on ${c.when} was cancelled by ${p.byPro ? "the professional" : "the member"}.${c.a.cancelReason ? `\n\nReason: ${c.a.cancelReason}` : ""}${p.byPro && p.wasConfirmed ? "\n\nIf you paid, your refund is on its way." : ""}`,
   });
+});
+
+// Wellness credits: tell the company's buyers what to pay, and when it's received.
+const rupeesText = (paise: number) => `₹${(paise / 100).toLocaleString("en-IN")}`;
+registerOutboxHandler("credits.funding_due", async (tx, p) => {
+  const f = await tx.query.creditFunding.findFirst({ where: eq(creditFunding.id, String(p.fundingId)) });
+  if (!f || f.status !== "due") return;
+  for (const to of await orgAdminEmails(f.orgId, tx)) {
+    await sendEmail({
+      to,
+      subject: `Wellness credits for ${periodLabel(f.period)}: ${rupeesText(f.duePaise)} to pay`,
+      text: `${f.seats} people × ${rupeesText(f.allowancePaise)}, less ${rupeesText(f.carriedPaise)} still unspent from earlier months.\n\nCredits switch on for your team as soon as the payment arrives. Payment details: ${appUrl()}/company/${f.orgId}/credits`,
+    });
+  }
+});
+registerOutboxHandler("credits.funded", async (tx, p) => {
+  const f = await tx.query.creditFunding.findFirst({ where: eq(creditFunding.id, String(p.fundingId)) });
+  if (!f) return;
+  for (const to of await orgAdminEmails(f.orgId, tx)) {
+    await sendEmail({ to, subject: `Payment received: wellness credits for ${periodLabel(f.period)}`, text: `Thanks. Your team can now spend this month's credits. ${appUrl()}/company/${f.orgId}/credits` });
+  }
+});
+
+// A plan bought on Moosam: tell the facility (who and which plan, never how the employer pays).
+registerOutboxHandler("plan.purchased", async (tx, p) => {
+  const pp = await tx.query.planPurchase.findFirst({ where: eq(planPurchase.id, String(p.purchaseId)) });
+  if (!pp) return;
+  const buyer = await tx.query.user.findFirst({ where: eq(user.id, pp.userId), columns: { name: true, email: true } });
+  for (const to of await orgAdminEmails(pp.orgId, tx)) {
+    await sendEmail({ to, subject: `New member: ${buyer?.name ?? "A member"} bought ${pp.planName}`, text: `Valid ${pp.startsOn} to ${pp.endsOn}. See your members: ${appUrl()}/listing/${pp.orgId}/members` });
+  }
+  if (buyer) await sendEmail({ to: buyer.email, subject: `Your plan: ${pp.planName}`, text: `You're all set from ${pp.startsOn} to ${pp.endsOn}. Show this email or your name at the front desk.` });
 });

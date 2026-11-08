@@ -6,6 +6,7 @@ import { ZodError } from "zod";
 import { AppError } from "@/lib/errors";
 import { withMessage } from "@/lib/flash";
 import { requireUser } from "@/modules/identity/session";
+import { paySessionWithCredits } from "@/modules/marketplace/credits";
 import { addTimeOff, cancelSession, removeTimeOff, requestSession, respondToSession, saveBookingSettings, setWeeklyHours } from "@/modules/sessions/service";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -98,4 +99,10 @@ export async function cancelSessionAction(form: FormData) {
   const id = str(form, "id");
   const back = str(form, "back") || `/sessions/${id}`;
   await run(back.startsWith("/") ? back : `/sessions/${id}`, "Cancelled. The other side has been emailed.", () => cancelSession(me.id, id, { reason: str(form, "reason") }));
+}
+
+export async function payWithCreditsAction(form: FormData) {
+  const me = await requireUser();
+  const id = str(form, "id");
+  await run(`/sessions/${id}`, "Paid with your wellness credits. The session is confirmed.", () => paySessionWithCredits(me.id, id, { idempotencyKey: str(form, "key") }));
 }

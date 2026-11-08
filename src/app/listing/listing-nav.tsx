@@ -6,7 +6,11 @@ export function ListingNav({ base, pending, kind = "homestay" }: { base: string;
   const path = usePathname();
   const items =
     kind === "facility"
-      ? [{ href: base, label: "Profile", match: (p: string) => p === base }]
+      ? [
+          { href: base, label: "Profile", match: (p: string) => p === base },
+          { href: `${base}/plans`, label: "Plans & passes", match: (p: string) => p.startsWith(`${base}/plans`) },
+          { href: `${base}/members`, label: "Members", match: (p: string) => p.startsWith(`${base}/members`) },
+        ]
       : kind === "hospital"
       ? [
           { href: base, label: "Profile", match: (p: string) => p === base },

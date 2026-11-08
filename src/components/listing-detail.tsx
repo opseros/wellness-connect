@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/modules/identity/session";
 import { AMENITY_LABEL, FACILITY_TYPE_LABEL, FEATURE_LABEL, getPublicListing, SERVES_LABEL } from "@/modules/listings/service";
 import { DirectoryShell, rupees } from "./directory";
 import { StayBooking, type StaySearch } from "./stay-booking";
+import { FacilityPlans } from "./facility-plans";
 import { POLICY_TEXT, type CancellationPolicy } from "@/modules/stays/policy";
 import { careTravelEnabled, listPublicPackages } from "@/modules/care/service";
 
@@ -127,6 +128,7 @@ export async function ListingDetail({ kind, slug, sp = {} }: { kind: "homestay" 
               <div key={k}><dt className="text-[13px] text-muted">{k}</dt><dd className="font-semibold">{v}</dd></div>
             ))}
           </dl>
+          {facility && d.isPublic && <FacilityPlans orgId={d.orgId} slug={d.slug} benefitPartner={l.benefitPartner} error={sp.error} />}
           {facility ? (
             <div className="flex flex-col gap-2 border-t border-line pt-4">
               {l.website ? (
