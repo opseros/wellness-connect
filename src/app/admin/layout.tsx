@@ -4,6 +4,8 @@ import { getStaffOrExit } from "./staff";
 import { adminCounts } from "@/modules/admin/service";
 import { Logo } from "@/components/brand";
 import { AdminNav } from "./admin-nav";
+import { AdminSectionTabs } from "./section-tabs";
+import { adminSections } from "./sections";
 
 export const metadata: Metadata = {
   title: { default: "Admin", template: "%s · Admin" },
@@ -17,6 +19,8 @@ export default async function AdminLayout({
 }) {
   const me = await getStaffOrExit();
   const counts = await adminCounts(me);
+  const isSuper = me.platformRole === "super_admin";
+  const sections = adminSections(counts, isSuper);
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 bg-ink pt-[env(safe-area-inset-top)] text-white">
@@ -43,19 +47,10 @@ export default async function AdminLayout({
       </header>
       <div className="mx-auto grid max-w-[1360px] gap-6 px-4 pt-[22px] pb-16 sm:px-6 lg:grid-cols-[232px_minmax(0,1fr)]">
         <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-          <AdminNav
-            pending={counts.pendingCredentials}
-            homestays={counts.pendingHomestays}
-            hospitals={counts.pendingHospitals}
-            facilities={counts.pendingFacilities}
-            showHospitals={counts.hospitals}
-            hospitalsOn={counts.hospitalsOn}
-            isSuper={me.platformRole === "super_admin"}
-            reports={counts.openReports}
-            finance={counts.financeAttention}
-          />
+          <AdminNav sections={sections} isSuper={isSuper} />
         </aside>
         <main className="flex min-w-0 flex-col gap-[18px]">
+          <AdminSectionTabs sections={sections} />
           {children}
         </main>
       </div>

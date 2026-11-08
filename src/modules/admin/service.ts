@@ -111,6 +111,51 @@ export async function listListingQueue(actor: StaffActor, status: ListingQueueSt
     .limit(200);
 }
 
+export const PARTNER_KINDS = ["professional", "homestay", "facility", "hospital"] as const;
+export type PartnerKind = (typeof PARTNER_KINDS)[number];
+
+/**
+ * Partners: everyone verified to offer services on Moosam (professionals,
+ * homestays, gyms and studios, hospitals), newest first, with an optional
+ * name or city search. Read-only directory for staff.
+ */
+export async function listPartners(actor: StaffActor, kind: PartnerKind, q = "") {
+  assertStaff(actor);
+  const db = getDb();
+  const term = q.trim() ? `%${q.trim()}%` : null;
+  if (kind === "professional") {
+    const rows = await db
+      .select({ id: professionalProfile.id, userId: user.id, name: user.name, city: professionalProfile.city, headline: professionalProfile.headline, since: professionalProfile.updatedAt, suspendedAt: user.suspendedAt })
+      .from(professionalProfile)
+      .innerJoin(user, eq(user.id, professionalProfile.userId))
+      .where(and(eq(professionalProfile.verificationStatus, "verified"), isNull(user.deletedAt), term ? or(ilike(user.name, term), ilike(professionalProfile.city, term)) : undefined))
+      .orderBy(desc(professionalProfile.updatedAt))
+      .limit(200);
+    return rows.map((r) => ({ id: r.id, href: `/admin/users/${r.userId}`, name: r.name, city: r.city, detail: r.headline, since: r.since, benefitPartner: null as boolean | null, suspended: Boolean(r.suspendedAt) }));
+  }
+  const rows = await db
+    .select({ orgId: listing.orgId, name: organization.name, city: listing.city, since: listing.verifiedAt, benefitPartner: listing.benefitPartner, suspendedAt: organization.suspendedAt })
+    .from(listing)
+    .innerJoin(organization, eq(organization.id, listing.orgId))
+    .where(and(eq(listing.kind, kind), eq(listing.status, "verified"), isNull(organization.removedAt), term ? or(ilike(organization.name, term), ilike(listing.city, term)) : undefined))
+    .orderBy(desc(listing.verifiedAt))
+    .limit(200);
+  const base = { homestay: "/admin/homestays", facility: "/admin/facilities", hospital: "/admin/hospitals" }[kind];
+  return rows.map((r) => ({ id: r.orgId, href: `${base}/${r.orgId}`, name: r.name, city: r.city, detail: "", since: r.since, benefitPartner: kind === "facility" ? r.benefitPartner : null, suspended: Boolean(r.suspendedAt) }));
+}
+
+/** How many verified partners of each kind (for the Partners tabs). */
+export async function partnerCounts(actor: StaffActor) {
+  assertStaff(actor);
+  const db = getDb();
+  const [[pros], listings] = await Promise.all([
+    db.select({ n: count() }).from(professionalProfile).where(eq(professionalProfile.verificationStatus, "verified")),
+    db.select({ kind: listing.kind, n: count() }).from(listing).innerJoin(organization, eq(organization.id, listing.orgId)).where(and(eq(listing.status, "verified"), isNull(organization.removedAt))).groupBy(listing.kind),
+  ]);
+  const by = (k: string) => listings.find((r) => r.kind === k)?.n ?? 0;
+  return { professional: pros.n, homestay: by("homestay"), facility: by("facility"), hospital: by("hospital") };
+}
+
 /** Everything staff need to verify a listing. Document rows are read with audited staff bypass. */
 export async function getListingForReview(actor: StaffActor, orgId: string) {
   assertStaff(actor);

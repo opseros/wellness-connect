@@ -5,7 +5,7 @@ import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import type { DB } from "@/db/client";
 import { withScope } from "@/db/client";
 import { creditEntry, membership, organization, service } from "@/db/schema";
-import { adminOverview, listDueCreditFundings, recordCreditFunding } from "@/modules/admin/service";
+import { adminOverview, listDueCreditFundings, listPartners, partnerCounts, recordCreditFunding } from "@/modules/admin/service";
 import { cancelSession, getSession, istDay, requestSession, respondToSession, saveBookingSettings, setWeeklyHours } from "@/modules/sessions/service";
 import { companyCredits, creditPeriod, ensureFunding, proMonthEarnings, proEarningsByMonth, myCoverage, myWallets, paySessionWithCredits, refundSessionCredits, savePolicy, splitFee } from "./credits";
 
@@ -141,6 +141,10 @@ describe("what HR sees", () => {
     expect(byMonth.months.slice(1).every((m) => m.sessions === 0)).toBe(true);
     await expect(adminOverview({ id: emp.id, platformRole: "user", twoFactorEnabled: false } as never)).rejects.toMatchObject({ status: 403 });
     expect(await adminOverview(ops())).toMatchObject({ companies: 1, professionals: 1 });
+    expect(await partnerCounts(ops())).toMatchObject({ professional: 1, homestay: 0, facility: 0 });
+    expect(await listPartners(ops(), "professional")).toHaveLength(1);
+    expect(await listPartners(ops(), "professional", "no-such-name")).toHaveLength(0);
+    await expect(listPartners({ id: emp.id, platformRole: "user", twoFactorEnabled: false } as never, "facility")).rejects.toMatchObject({ status: 403 });
     const c = await companyCredits(hr.id, orgId);
     expect(c.usedPaise).toBe(120000);
     expect(c.activePeople).toBe(1);

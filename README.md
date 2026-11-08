@@ -161,6 +161,7 @@ Only `super_admin` and `ops` users with two-factor on can open it; everyone else
 
 | Section | Ops | Super admin |
 |---|---|---|
+| Admin menu (as in the prototype): Overview, Approvals (professionals, homestays, gyms, hospitals), Organisations (organisations, people), Partners (verified providers by type), Bookings (company bookings & stays, wellness credits), Reports (reported content, challenges, audit log), Settings (super admins). Sections with several pages show tabs. | ✓ | ✓ |
 | Overview (`/admin`): what needs attention, member bookings and fees this month, totals | ✓ | ✓ |
 | Verification queue (`/admin/professionals`): view documents, approve, request info, reject (professional is emailed) | ✓ | ✓ |
 | Users: search and view | ✓ | ✓ |
