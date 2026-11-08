@@ -29,7 +29,7 @@ export default async function CompanyCredits({ params, searchParams }: { params:
           <dl className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
             <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">People</dt><dd className="font-display text-[24px] font-extrabold">{c.current.seats}</dd></div>
             <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Allowance each</dt><dd className="font-display text-[24px] font-extrabold">{rs(c.current.allowancePaise)}</dd></div>
-            <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Unspent from before</dt><dd className="font-display text-[24px] font-extrabold">− {rs(c.current.carriedPaise)}</dd></div>
+            <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Unspent from before</dt><dd className="font-display text-[24px] font-extrabold">{c.current.carriedPaise > 0 ? "− " : ""}{rs(c.current.carriedPaise)}</dd></div>
             <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">{c.current.status === "due" ? "To pay now" : "Paid"}</dt><dd className="font-display text-[24px] font-extrabold">{rs(c.current.duePaise)}</dd></div>
           </dl>
           {c.current.status === "due" && (

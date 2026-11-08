@@ -44,6 +44,10 @@ npm test          # 172 tests: matching, tenant isolation, auth, company flow, p
 npm run typecheck && npm run lint && npm run build
 ```
 
+### Demo data
+
+To make a local or preview database look like the prototype, run `DEMO_PASSWORD='<10+ characters>' npm run db:seed-demo`. It creates six sign-in-ready accounts at `@demo.moosam.test` (an employee with credits, a wellness manager, a yoga coach, a gym, a homestay and an independent member) plus a city circle, posts, a meet-up and a challenge, all through the real services. It refuses to run in production or twice, and discards the emails it queues.
+
 ## Deploy (Vercel + Neon)
 
 1. **Push this repo to GitHub** and import it in Vercel (framework: Next.js).
@@ -140,7 +144,9 @@ drizzle/                  SQL migrations (0001 adds RLS policies, ledger trigger
 - Member fee and dashboards: Moosam keeps a member fee (5% by default, from the provider's share) on everything paid with wellness credits. Super admins change it in Admin → Finance (0–30%); it applies to new spends only. Professionals see "Member sessions this month" (sessions, gross, fee, net) on `/pro`; facilities see active members, plans sold, sold via credits and net on Plans & passes; Admin → Credits shows the month's prepaid, spent, refunded and fee totals.
 - Moosam Plus (`/plus`): an optional paid plan for individuals, OFF by default. Super admins switch it on in Admin → Settings (feature `plus`) and set its monthly price in Admin → Finance; while off, only super admins see a preview. Until card payments (Razorpay) go live, members join a waitlist (count shown in Admin → Settings). Connect stays free either way; the perks listed in `src/modules/platform/plus.ts` need founder sign-off.
 - Home page (`/`): a professional network first. The hero's role choice ("I want to connect" or "I'm a wellness professional") changes the promise and where the new account goes after verifying (Connect profile or the professional set-up); join and sign-in sit in the same card. Companies, homestays and hospitals are in an "Also on" section. Dedicated `/sign-up` (`?as=pro`) and `/sign-in` pages share a split layout.
-- Signed-in home (`/app`): "Use" (Connect, book a stay, Care & Travel) and "Offer" (professional profile, company, homestay or hospital you run).
+- Signed-in layout (as in the Wellness Connect prototype): Connect is home (`/app` sends you to the feed). Top menu: Connect, Explore, My bookings, Benefits (employees with credits) or Moosam Plus (when switched on), then any workspaces you run, Admin and Account. Every member page (Connect, Explore, bookings, benefits, Plus, sessions, stays) shares one left menu (Feed, My network, Messages, Groups & circles, Meet-ups, Challenges, Find a buddy; Explore, My bookings, My benefits; Your workspaces). The feed's right rail shows wellness credits, Next up, challenges, circles and buddy suggestions.
+- Your workspaces (`/app/workspaces`): the professional profile, companies, homestays, gyms and hospitals you run, and how to start one.
+- Workspaces use the same left-menu layout: professional (Dashboard, Session requests, Schedule, Earnings, Enquiries, Proposals & bookings, Profile, Services, Credentials), company (Overview, People, Benefit policy, Team retreats, Challenges, Requirements, Proposals, Bookings, Invoices), homestay/gym/hospital, and admin. Professionals have an Earnings page (`/pro/earnings`, member sessions month by month after the Moosam fee, plus company bookings).
 - Screens: sign-in, sign-up, verify, forgot/reset password, two-factor, onboarding (company / professional / Connect), home, professional workspace, public profile, Connect (feed, network, member pages, messages, groups and spaces, meet-ups, referrals) and profile setup, Join as, homestay/hospital workspace, directories.
 
 ## Performance
@@ -155,7 +161,8 @@ Only `super_admin` and `ops` users with two-factor on can open it; everyone else
 
 | Section | Ops | Super admin |
 |---|---|---|
-| Verification queue: view documents, approve, request info, reject (professional is emailed) | ✓ | ✓ |
+| Overview (`/admin`): what needs attention, member bookings and fees this month, totals | ✓ | ✓ |
+| Verification queue (`/admin/professionals`): view documents, approve, request info, reject (professional is emailed) | ✓ | ✓ |
 | Users: search and view | ✓ | ✓ |
 | Users: grant/remove ops, suspend/unsuspend (signs out everywhere, blocks sign-in) | | ✓ |
 | Users: edit name/email (an email change must be re-verified and signs them out) | | ✓ |

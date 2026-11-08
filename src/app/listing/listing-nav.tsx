@@ -1,38 +1,25 @@
-"use client";
-import { IntentLink } from "@/components/intent-link";
-import { usePathname } from "next/navigation";
+import { SideNav, type SideGroup } from "@/components/side-nav";
 
-export function ListingNav({ base, pending, kind = "homestay" }: { base: string; pending: number; kind?: "homestay" | "hospital" | "facility" }) {
-  const path = usePathname();
+/** Homestay, gym/studio or hospital workspace menu. */
+export function ListingNav({ base, name, pending, kind = "homestay" }: { base: string; name: string; pending: number; kind?: "homestay" | "hospital" | "facility" }) {
   const items =
     kind === "facility"
       ? [
-          { href: base, label: "Profile", match: (p: string) => p === base },
-          { href: `${base}/plans`, label: "Plans & passes", match: (p: string) => p.startsWith(`${base}/plans`) },
-          { href: `${base}/members`, label: "Members", match: (p: string) => p.startsWith(`${base}/members`) },
+          { href: base, label: "Overview & listing", exact: true },
+          { href: `${base}/plans`, label: "Plans & passes", isNew: true },
+          { href: `${base}/members`, label: "Members", isNew: true },
         ]
       : kind === "hospital"
-      ? [
-          { href: base, label: "Profile", match: (p: string) => p === base },
-          { href: `${base}/packages`, label: "Packages", match: (p: string) => p.startsWith(`${base}/packages`) },
-          { href: `${base}/requests`, label: "Quote requests", badge: pending, match: (p: string) => p.startsWith(`${base}/requests`) },
-        ]
-      : [
-          { href: base, label: "Listing", match: (p: string) => p === base },
-          { href: `${base}/calendar`, label: "Calendar & prices", match: (p: string) => p.startsWith(`${base}/calendar`) },
-          { href: `${base}/bookings`, label: "Bookings", badge: pending, match: (p: string) => p.startsWith(`${base}/bookings`) },
-        ];
-  return (
-    <nav aria-label={{ homestay: "Homestay", hospital: "Hospital", facility: "Facility" }[kind]} className="flex flex-wrap gap-1 text-sm font-semibold">
-      {items.map((i) => {
-        const on = i.match(path);
-        return (
-          <IntentLink key={i.href} href={i.href} aria-current={on ? "page" : undefined} className={`flex min-h-10 items-center gap-2 rounded-lg px-3.5 ${on ? "bg-ink text-white" : "text-[#3d4842] hover:bg-white"}`}>
-            {i.label}
-            {i.badge ? <span className={`rounded-full px-2 text-xs ${on ? "bg-white text-ink" : "bg-[#f2c46d] text-ink"}`}>{i.badge}</span> : null}
-          </IntentLink>
-        );
-      })}
-    </nav>
-  );
+        ? [
+            { href: base, label: "Profile", exact: true },
+            { href: `${base}/packages`, label: "Packages" },
+            { href: `${base}/requests`, label: "Quote requests", badge: pending },
+          ]
+        : [
+            { href: base, label: "Overview & listing", exact: true },
+            { href: `${base}/bookings`, label: "Stay requests", badge: pending },
+            { href: `${base}/calendar`, label: "Calendar & prices" },
+          ];
+  const groups: SideGroup[] = [{ items }];
+  return <SideNav label={{ homestay: "Homestay", hospital: "Hospital", facility: "Facility" }[kind]} heading={name} groups={groups} />;
 }

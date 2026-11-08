@@ -25,7 +25,7 @@ export default async function CredentialReview({
 
   return (
     <>
-      <Link href="/admin" className="text-sm font-semibold text-brand hover:underline">← Verification queue</Link>
+      <Link href="/admin/professionals" className="text-sm font-semibold text-brand hover:underline">← Verification queue</Link>
       <PageTitle title={c.name} subtitle={`${owner?.name ?? "Unknown"} · ${owner?.email ?? ""}`} />
       <Flash error={sp.error} />
       <div className="flex flex-wrap items-start gap-5">

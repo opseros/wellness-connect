@@ -5,9 +5,9 @@ import { categoryBySlug, makeProfessional, makeUser } from "@/test/factories";
 import type { DB } from "@/db/client";
 import { withScope } from "@/db/client";
 import { creditEntry, membership, organization, service } from "@/db/schema";
-import { listDueCreditFundings, recordCreditFunding } from "@/modules/admin/service";
+import { adminOverview, listDueCreditFundings, recordCreditFunding } from "@/modules/admin/service";
 import { cancelSession, getSession, istDay, requestSession, respondToSession, saveBookingSettings, setWeeklyHours } from "@/modules/sessions/service";
-import { companyCredits, creditPeriod, ensureFunding, proMonthEarnings, myCoverage, myWallets, paySessionWithCredits, refundSessionCredits, savePolicy, splitFee } from "./credits";
+import { companyCredits, creditPeriod, ensureFunding, proMonthEarnings, proEarningsByMonth, myCoverage, myWallets, paySessionWithCredits, refundSessionCredits, savePolicy, splitFee } from "./credits";
 
 let t: Awaited<ReturnType<typeof createTestDb>>;
 let db: DB;
@@ -135,6 +135,12 @@ describe("what HR sees", () => {
     await paySessionWithCredits(emp2.id, id, { idempotencyKey: key() });
     const e = await proMonthEarnings(pro.id, creditPeriod(new Date(Date.now() + 4 * 86_400_000)));
     expect(e).toMatchObject({ sessions: 1, grossPaise: 120000, feePaise: 6000, netPaise: 114000, feeBps: 500 });
+    const byMonth = await proEarningsByMonth(pro.id, 3, new Date(Date.now() + 4 * 86_400_000));
+    expect(byMonth.months).toHaveLength(3);
+    expect(byMonth.months[0]).toMatchObject({ sessions: 1, netPaise: 114000 });
+    expect(byMonth.months.slice(1).every((m) => m.sessions === 0)).toBe(true);
+    await expect(adminOverview({ id: emp.id, platformRole: "user", twoFactorEnabled: false } as never)).rejects.toMatchObject({ status: 403 });
+    expect(await adminOverview(ops())).toMatchObject({ companies: 1, professionals: 1 });
     const c = await companyCredits(hr.id, orgId);
     expect(c.usedPaise).toBe(120000);
     expect(c.activePeople).toBe(1);

@@ -17,7 +17,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Logo href="/admin" light />
           <span className="rounded-md bg-white/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">Admin</span>
         </span>
-        <AdminNav pending={counts.pendingCredentials} homestays={counts.pendingHomestays} hospitals={counts.pendingHospitals} facilities={counts.pendingFacilities} showHospitals={counts.hospitals} hospitalsOn={counts.hospitalsOn} isSuper={me.platformRole === "super_admin"} reports={counts.openReports} finance={counts.financeAttention} />
         <div className="flex items-center gap-3 text-sm">
           <span className="text-[#d5dcd8]">
             {me.name} · {me.platformRole === "super_admin" ? "Super admin" : "Ops"}
@@ -25,7 +24,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/app" className="font-semibold text-white hover:underline">Exit admin</Link>
         </div>
       </header>
-      <main className="mx-auto flex max-w-[1180px] flex-col gap-6 px-6 py-8">{children}</main>
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
+        <aside className="min-w-0 flex-[1_1_200px] lg:sticky lg:top-4 lg:max-w-[220px]">
+          <AdminNav pending={counts.pendingCredentials} homestays={counts.pendingHomestays} hospitals={counts.pendingHospitals} facilities={counts.pendingFacilities} showHospitals={counts.hospitals} hospitalsOn={counts.hospitalsOn} isSuper={me.platformRole === "super_admin"} reports={counts.openReports} finance={counts.financeAttention} />
+        </aside>
+        <main className="flex min-w-0 flex-[999_1_640px] flex-col gap-6">{children}</main>
+      </div>
     </div>
   );
 }

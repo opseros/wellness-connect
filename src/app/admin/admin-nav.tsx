@@ -1,34 +1,46 @@
-"use client";
-import { IntentLink } from "@/components/intent-link";
-import { usePathname } from "next/navigation";
+import { SideNav, type SideGroup } from "@/components/side-nav";
 
+/** Admin left-hand menu, grouped as in the prototype: overview, approvals, people, money, community, system. */
 export function AdminNav({ pending, homestays = 0, hospitals = 0, facilities = 0, showHospitals = true, hospitalsOn = true, isSuper = false, reports, finance = 0 }: { pending: number; homestays?: number; hospitals?: number; facilities?: number; showHospitals?: boolean; hospitalsOn?: boolean; isSuper?: boolean; reports: number; finance?: number }) {
-  const path = usePathname();
-  const items = [
-    { href: "/admin", label: "Professionals", badge: pending, match: (p: string) => p === "/admin" || p.startsWith("/admin/credentials") },
-    { href: "/admin/homestays", label: "Homestays", badge: homestays, match: (p: string) => p.startsWith("/admin/homestays") },
-    { href: "/admin/facilities", label: "Gyms & studios", badge: facilities, match: (p: string) => p.startsWith("/admin/facilities") },
-    ...(showHospitals ? [{ href: "/admin/hospitals", label: hospitalsOn ? "Hospitals" : "Hospitals (off)", badge: hospitals, match: (p: string) => p.startsWith("/admin/hospitals") }] : []),
-    { href: "/admin/users", label: "Users", match: (p: string) => p.startsWith("/admin/users") },
-    { href: "/admin/organizations", label: "Organizations", match: (p: string) => p.startsWith("/admin/organizations") },
-    { href: "/admin/finance", label: "Finance", badge: finance, match: (p: string) => p.startsWith("/admin/finance") },
-    { href: "/admin/credits", label: "Credits", match: (p: string) => p.startsWith("/admin/credits") },
-    { href: "/admin/challenges", label: "Challenges", match: (p: string) => p.startsWith("/admin/challenges") },
-    { href: "/admin/reports", label: "Reports", badge: reports, match: (p: string) => p.startsWith("/admin/reports") },
-    { href: "/admin/audit", label: "Audit log", match: (p: string) => p.startsWith("/admin/audit") },
-    ...(isSuper ? [{ href: "/admin/settings", label: "Settings", match: (p: string) => p.startsWith("/admin/settings") }] : []),
+  const groups: SideGroup[] = [
+    { items: [{ href: "/admin", label: "Overview", exact: true, isNew: true }] },
+    {
+      title: "Approvals",
+      items: [
+        { href: "/admin/professionals", label: "Professionals", badge: pending, also: ["/admin/credentials"] },
+        { href: "/admin/homestays", label: "Homestays", badge: homestays },
+        { href: "/admin/facilities", label: "Gyms & studios", badge: facilities },
+        ...(showHospitals ? [{ href: "/admin/hospitals", label: hospitalsOn ? "Hospitals" : "Hospitals (off)", badge: hospitals }] : []),
+      ],
+    },
+    {
+      title: "People",
+      items: [
+        { href: "/admin/users", label: "Users" },
+        { href: "/admin/organizations", label: "Organisations" },
+      ],
+    },
+    {
+      title: "Money",
+      items: [
+        { href: "/admin/finance", label: "Finance", badge: finance },
+        { href: "/admin/credits", label: "Wellness credits", isNew: true },
+      ],
+    },
+    {
+      title: "Community",
+      items: [
+        { href: "/admin/challenges", label: "Challenges" },
+        { href: "/admin/reports", label: "Reports", badge: reports },
+      ],
+    },
+    {
+      title: "System",
+      items: [
+        { href: "/admin/audit", label: "Audit log" },
+        ...(isSuper ? [{ href: "/admin/settings", label: "Settings" }] : []),
+      ],
+    },
   ];
-  return (
-    <nav aria-label="Admin" className="flex flex-wrap gap-1 text-sm font-semibold">
-      {items.map((i) => {
-        const active = i.match(path);
-        return (
-          <IntentLink key={i.href} href={i.href} aria-current={active ? "page" : undefined} className={`flex items-center gap-2 rounded-lg px-3.5 py-2.5 ${active ? "bg-white/15 text-white" : "text-[#d5dcd8] hover:bg-white/10"}`}>
-            {i.label}
-            {i.badge ? <span className="rounded-full bg-[#f2c46d] px-1.5 text-xs text-ink">{i.badge}</span> : null}
-          </IntentLink>
-        );
-      })}
-    </nav>
-  );
+  return <SideNav label="Admin" heading="Admin" groups={groups} />;
 }

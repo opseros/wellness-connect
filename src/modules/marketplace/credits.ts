@@ -403,6 +403,23 @@ export async function proMonthEarnings(userId: string, period = creditPeriod()) 
   return { period, sessions: paid.length, grossPaise, feePaise, netPaise: grossPaise - feePaise, feeBps, waiting: sessions.filter((x) => x.status === "requested").length };
 }
 
+/** The last `months` months of member-session earnings, newest first (one read of the sessions). */
+export async function proEarningsByMonth(userId: string, months = 6, now = new Date()) {
+  const [sessions, feeBps] = await Promise.all([listProSessions(userId), memberFeeBps(getDb())]);
+  const paid = sessions.filter((x) => ["confirmed", "completed"].includes(x.status) && x.pricePaise > 0);
+  const out: { period: string; sessions: number; grossPaise: number; feePaise: number; netPaise: number }[] = [];
+  const [y, m] = creditPeriod(now).split("-").map(Number);
+  for (let i = 0; i < months; i++) {
+    const d = new Date(Date.UTC(y, m - 1 - i, 1));
+    const period = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+    const rows = paid.filter((x) => inMonth(x.startsAt, period));
+    const grossPaise = rows.reduce((a, x) => a + x.pricePaise, 0);
+    const feePaise = rows.reduce((a, x) => a + splitFee(x.pricePaise, feeBps).feePaise, 0);
+    out.push({ period, sessions: rows.length, grossPaise, feePaise, netPaise: grossPaise - feePaise });
+  }
+  return { feeBps, months: out };
+}
+
 /** A facility's plan sales this month and active members. */
 export async function facilityMonthStats(userId: string, orgId: string, period = creditPeriod()) {
   const [rows, feeBps] = await Promise.all([facilityMembers(userId, orgId), memberFeeBps(getDb())]);

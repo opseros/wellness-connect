@@ -61,7 +61,7 @@ export async function decideCredentialAction(form: FormData) {
     redirect(withMessage(`/admin/credentials/${id}`, "error", text));
   }
   revalidatePath("/admin", "layout");
-  redirect(withMessage("/admin", "msg", `${labels[decision] ?? "Saved"}. The professional has been emailed.`));
+  redirect(withMessage("/admin/professionals", "msg", `${labels[decision] ?? "Saved"}. The professional has been emailed.`));
 }
 
 export async function setRoleAction(form: FormData) {

@@ -1,32 +1,36 @@
-"use client";
-import { IntentLink } from "@/components/intent-link";
-import { usePathname } from "next/navigation";
+import { SideNav, type SideGroup } from "@/components/side-nav";
 
-export function CompanyNav({ base, toReview, isBuyer, isAdmin, healthChecks = false }: { base: string; toReview: number; isBuyer: boolean; isAdmin: boolean; healthChecks?: boolean }) {
-  const path = usePathname();
-  const items = [
-    { href: base, label: "Dashboard", show: true, match: (p: string) => p === base },
-    { href: `${base}/requirements`, label: "Requirements", show: isBuyer, match: (p: string) => p.startsWith(`${base}/requirements`) },
-    { href: `${base}/proposals`, label: "Proposals", show: isBuyer, badge: toReview, match: (p: string) => p.startsWith(`${base}/proposals`) },
-    { href: `${base}/bookings`, label: "Bookings", show: isBuyer, match: (p: string) => p.startsWith(`${base}/bookings`) },
-    { href: `${base}/health-checks`, label: "Health check-ups", show: isBuyer && healthChecks, match: (p: string) => p.startsWith(`${base}/health-checks`) },
-    { href: `${base}/credits`, label: "Wellness credits", show: isBuyer, match: (p: string) => p.startsWith(`${base}/credits`) },
-    { href: `${base}/retreats`, label: "Team retreats", show: isBuyer, match: (p: string) => p.startsWith(`${base}/retreats`) },
-    { href: `${base}/challenges`, label: "Challenges", show: isBuyer, match: (p: string) => p.startsWith(`${base}/challenges`) },
-    { href: `${base}/invoices`, label: "Invoices", show: isBuyer, match: (p: string) => p.startsWith(`${base}/invoices`) },
-    { href: `${base}/settings`, label: isAdmin ? "Settings & members" : "Members", show: true, match: (p: string) => p.startsWith(`${base}/settings`) },
-  ].filter((i) => i.show);
-  return (
-    <nav aria-label="Company" className="flex flex-wrap items-center gap-1 text-sm font-semibold">
-      {items.map((i) => {
-        const active = i.match(path);
-        return (
-          <IntentLink key={i.href} href={i.href} aria-current={active ? "page" : undefined} className={`flex items-center gap-2 rounded-lg px-3.5 py-2.5 ${active ? "bg-brand text-white" : "text-[#3d4842] hover:bg-white"}`}>
-            {i.label}
-            {i.badge ? <span className={`rounded-full px-1.5 text-xs ${active ? "bg-white text-brand-dark" : "bg-[#f2c46d] text-ink"}`}>{i.badge}</span> : null}
-          </IntentLink>
-        );
-      })}
-    </nav>
-  );
+/** Company workspace menu, grouped as in the prototype: overview and people, benefits, buying, records. */
+export function CompanyNav({ base, name, toReview, isBuyer, isAdmin, healthChecks = false }: { base: string; name: string; toReview: number; isBuyer: boolean; isAdmin: boolean; healthChecks?: boolean }) {
+  const groups: SideGroup[] = [
+    {
+      items: [
+        { href: base, label: "Overview", exact: true },
+        { href: `${base}/settings`, label: isAdmin ? "People & settings" : "People" },
+      ],
+    },
+    ...(isBuyer
+      ? [
+          {
+            title: "Benefits",
+            items: [
+              { href: `${base}/credits`, label: "Benefit policy", isNew: true },
+              { href: `${base}/retreats`, label: "Team retreats", isNew: true },
+              { href: `${base}/challenges`, label: "Challenges" },
+              ...(healthChecks ? [{ href: `${base}/health-checks`, label: "Health check-ups" }] : []),
+            ],
+          },
+          {
+            title: "Programmes",
+            items: [
+              { href: `${base}/requirements`, label: "Requirements" },
+              { href: `${base}/proposals`, label: "Proposals", badge: toReview },
+              { href: `${base}/bookings`, label: "Bookings" },
+              { href: `${base}/invoices`, label: "Invoices" },
+            ],
+          },
+        ]
+      : []),
+  ];
+  return <SideNav label="Company" heading={name} groups={groups} />;
 }

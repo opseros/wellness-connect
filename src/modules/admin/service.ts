@@ -612,6 +612,29 @@ export async function memberBookingsSummary(actor: StaffActor) {
   return withScope({ bypass: true, userId: actor.id }, (tx) => creditsMonthSummary(tx));
 }
 
+/** Admin overview: the platform at a glance (people, organisations, listings) and this month's member bookings. */
+export async function adminOverview(actor: StaffActor) {
+  assertStaff(actor);
+  const db = getDb();
+  const [[users], [companies], [pros], listings, members] = await Promise.all([
+    db.select({ n: count() }).from(user).where(isNull(user.deletedAt)),
+    db.select({ n: count() }).from(organization).where(and(eq(organization.kind, "company"), isNull(organization.removedAt))),
+    db.select({ n: count() }).from(professionalProfile).where(eq(professionalProfile.verificationStatus, "verified")),
+    db.select({ kind: listing.kind, n: count() }).from(listing).where(eq(listing.status, "verified")).groupBy(listing.kind),
+    memberBookingsSummary(actor),
+  ]);
+  const verified = (k: string) => listings.find((r) => r.kind === k)?.n ?? 0;
+  return {
+    users: users.n,
+    companies: companies.n,
+    professionals: pros.n,
+    homestays: verified("homestay"),
+    facilities: verified("facility"),
+    hospitals: verified("hospital"),
+    members,
+  };
+}
+
 export async function listDueCreditFundings(actor: StaffActor) {
   assertStaff(actor);
   return withScope({ bypass: true, userId: null }, (tx) => dueFundings(tx));

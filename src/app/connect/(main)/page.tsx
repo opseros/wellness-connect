@@ -18,6 +18,7 @@ import { SPACE_TINT, SpaceIcon, type SpaceKey } from "@/components/landing";
 import { myCircles, pendingBuddyCount, syncCircles } from "@/modules/connect/social";
 import { istToday, listChallenges } from "@/modules/connect/challenges";
 import { myWallets } from "@/modules/marketplace/credits";
+import { listMyBookings } from "@/modules/bookings/service";
 import { ChallengeLink, QuickLog, Ring, unitText } from "../challenge-ui";
 import { connectAction, joinGroupAction, respondAction } from "../actions";
 import { Composer } from "../composer";
@@ -68,7 +69,9 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
     pendingBuddyCount(me.id),
     listChallenges(me.id),
   ]);
-  const wallet = (await myWallets(me.id))[0];
+  const [wallets, bookings] = await Promise.all([myWallets(me.id), listMyBookings(me.id)]);
+  const wallet = wallets[0];
+  const nextUp = bookings.filter((b) => b.upcoming && b.kind !== "plan").slice(0, 2);
   const myLive = challenges.filter((c) => c.joined && c.state === "live").slice(0, 2);
   const toJoin = challenges.find((c) => !c.joined && c.state !== "ended");
   const today = istToday();
@@ -197,6 +200,21 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
             )}
             <Link href="/explore?tab=pros&covered=1" className="btn mt-1 min-h-9 self-start rounded-full bg-white px-4 text-sm text-ink hover:bg-[#f7f3ec]">Find covered options</Link>
           </section>
+        )}
+
+        {nextUp.length > 0 && (
+          <RailCard title="Next up" href="/bookings" link="My bookings">
+            <ul className="flex flex-col gap-2">
+              {nextUp.map((b) => (
+                <li key={b.kind + b.id}>
+                  <Link href={b.href} className="-mx-1 flex flex-col rounded-xl p-1 text-sm hover:bg-ground">
+                    <span className="font-semibold">{b.title}</span>
+                    <span className="text-[12.5px] text-muted">{b.whenLabel} · {b.status}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </RailCard>
         )}
 
         {(myLive.length > 0 || toJoin) && (

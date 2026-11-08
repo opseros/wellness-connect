@@ -25,18 +25,23 @@ export default async function CompanyLayout({ children, params }: { children: Re
   return (
     <div>
       <AppHeader name={me.name} nav={mainNav(me, "company", { ...nav, companyHref: `/company/${orgId}` })} />
-      <div className="border-b border-line bg-ground">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center justify-between gap-x-4 gap-y-1 px-6 py-2">
-          <CompanyNav base={`/company/${orgId}`} toReview={toReview} isBuyer={isBuyer} isAdmin={isAdmin} healthChecks={healthChecks} />
-          <span className="flex items-center gap-2 text-sm text-muted">
-            <span className="font-semibold text-ink">{org.name}</span>
-            {others.map((o) => (
-              <Link key={o.organization.id} href={`/company/${o.organization.id}`} className="text-brand hover:underline">· {o.organization.name}</Link>
-            ))}
-          </span>
-        </div>
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
+        <aside className="flex min-w-0 flex-[1_1_200px] flex-col gap-3 lg:sticky lg:top-4 lg:max-w-[230px]">
+          <CompanyNav base={`/company/${orgId}`} name={org.name} toReview={toReview} isBuyer={isBuyer} isAdmin={isAdmin} healthChecks={healthChecks} />
+          {others.length > 0 && (
+            <p className="hidden px-3.5 text-[13px] text-muted lg:block">
+              Also:{" "}
+              {others.map((o, i) => (
+                <span key={o.organization.id}>
+                  {i > 0 && ", "}
+                  <Link href={`/company/${o.organization.id}`} className="font-semibold text-brand hover:underline">{o.organization.name}</Link>
+                </span>
+              ))}
+            </p>
+          )}
+        </aside>
+        <main className="flex min-w-0 flex-[999_1_640px] flex-col gap-6">{children}</main>
       </div>
-      <main className="mx-auto flex max-w-[1180px] flex-col gap-6 px-6 py-8">{children}</main>
     </div>
   );
 }

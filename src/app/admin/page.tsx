@@ -1,44 +1,85 @@
 import Link from "next/link";
-import { getStaffOrExit, when } from "./staff";
-import { listCredentialQueue, type QueueStatus } from "@/modules/admin/service";
-import { Badge, Flash, PageTitle, Table, Tabs } from "./ui";
+import { getStaffOrExit } from "./staff";
+import { adminCounts, adminOverview } from "@/modules/admin/service";
+import { periodLabel } from "@/modules/marketplace/credits";
+import { PageTitle } from "./ui";
 
-const STATUSES: { key: QueueStatus; label: string }[] = [
-  { key: "pending", label: "Waiting for review" },
-  { key: "info_requested", label: "Info requested" },
-  { key: "approved", label: "Approved" },
-  { key: "rejected", label: "Rejected" },
-  { key: "all", label: "All" },
-];
+const rs = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
 
-export default async function VerificationQueue({ searchParams }: { searchParams: Promise<{ status?: string; msg?: string; error?: string }> }) {
+function Tile({ label, value, note, href }: { label: string; value: React.ReactNode; note?: React.ReactNode; href?: string }) {
+  const body = (
+    <>
+      <dt className="text-[13px] text-muted">{label}</dt>
+      <dd className="text-[24px] font-bold tabular-nums">{value}</dd>
+      {note && <dd className="text-[12.5px] text-muted">{note}</dd>}
+    </>
+  );
+  return href ? (
+    <Link href={href} className="rounded-2xl bg-white p-4 ring-1 ring-line hover:ring-brand">{body}</Link>
+  ) : (
+    <div className="rounded-2xl bg-white p-4 ring-1 ring-line">{body}</div>
+  );
+}
+
+/** Admin overview: what needs doing, the platform at a glance, and this month's member bookings. */
+export default async function AdminOverview() {
   const me = await getStaffOrExit();
-  const sp = await searchParams;
-  const status = (STATUSES.find((s) => s.key === sp.status)?.key ?? "pending") as QueueStatus;
-  const rows = await listCredentialQueue(me, status);
+  const [o, c] = await Promise.all([adminOverview(me), adminCounts(me)]);
+  const todo = [
+    { label: "Professionals to verify", n: c.pendingCredentials, href: "/admin/professionals" },
+    { label: "Homestays to verify", n: c.pendingHomestays, href: "/admin/homestays" },
+    { label: "Gyms & studios to verify", n: c.pendingFacilities, href: "/admin/facilities" },
+    ...(c.hospitals ? [{ label: "Hospitals to verify", n: c.pendingHospitals, href: "/admin/hospitals" }] : []),
+    { label: "Open reports", n: c.openReports, href: "/admin/reports" },
+    { label: "Finance items", n: c.financeAttention, href: "/admin/finance" },
+    { label: "Credit prepayments waiting", n: o.members.dueCount, href: "/admin/credits" },
+  ];
+  const waiting = todo.filter((t) => t.n > 0);
 
   return (
     <>
-      <PageTitle title="Credential verification" subtitle={status === "pending" ? `${rows.length} waiting · oldest first` : `${rows.length} shown`} />
-      <Flash msg={sp.msg} error={sp.error} />
-      <Tabs current={status} items={STATUSES.map((s) => ({ key: s.key, label: s.label, href: s.key === "pending" ? "/admin" : `/admin?status=${s.key}` }))} />
-      <Table head={["Professional", "Credential", "Submitted", "Status", ""]} empty={rows.length === 0 && "Nothing here. New uploads appear automatically."}>
-        {rows.map((r) => (
-          <tr key={r.id}>
-            <td>
-              <span className="block font-semibold">{r.professionalName}</span>
-              <span className="text-[13px] text-muted">{r.professionalEmail}{r.city ? ` · ${r.city}` : ""}</span>
-            </td>
-            <td>
-              <span className="block font-semibold">{r.name}</span>
-              {r.issuer && <span className="text-[13px] text-muted">{r.issuer}</span>}
-            </td>
-            <td className="whitespace-nowrap">{when(r.createdAt)}</td>
-            <td><Badge status={r.status} /></td>
-            <td className="text-right"><Link href={`/admin/credentials/${r.id}`} className="font-semibold text-brand hover:underline">Review</Link></td>
-          </tr>
-        ))}
-      </Table>
+      <PageTitle title="Overview" subtitle={`Moosam today · ${periodLabel(o.members.period)}`} />
+
+      <section aria-labelledby="todo-h" className="flex flex-col gap-3">
+        <h2 id="todo-h" className="text-lg font-bold">Needs attention</h2>
+        {waiting.length === 0 ? (
+          <p className="rounded-2xl bg-brand-soft px-4 py-3 text-sm text-brand-dark">All clear. Nothing is waiting for the team.</p>
+        ) : (
+          <ul className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+            {waiting.map((t) => (
+              <li key={t.href}>
+                <Link href={t.href} className="flex items-center justify-between gap-3 rounded-2xl bg-[#fff4dc] px-4 py-3 text-sm font-semibold text-[#7a4b00] hover:ring-1 hover:ring-[#7a4b00]/40">
+                  {t.label}
+                  <span className="rounded-full bg-[#f2c46d] px-2.5 py-0.5 text-ink tabular-nums">{t.n}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="m-h" className="flex flex-col gap-3">
+        <h2 id="m-h" className="text-lg font-bold">Member bookings this month</h2>
+        <dl className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+          <Tile label="Booked with credits" value={rs(o.members.spentPaise)} href="/admin/credits" />
+          <Tile label="Moosam fees" value={rs(o.members.feePaise)} />
+          <Tile label="Prepaid by companies" value={rs(o.members.fundedPaise)} note={`${o.members.companies} compan${o.members.companies === 1 ? "y" : "ies"}`} />
+          <Tile label="Prepayments due" value={rs(o.members.duePaise)} note={`${o.members.dueCount} waiting`} href="/admin/credits" />
+        </dl>
+        <p className="text-[13px] text-muted">Company workshop bookings and homestay stays are in <Link href="/admin/finance" className="font-semibold text-brand hover:underline">Finance</Link>.</p>
+      </section>
+
+      <section aria-labelledby="p-h" className="flex flex-col gap-3">
+        <h2 id="p-h" className="text-lg font-bold">On Moosam</h2>
+        <dl className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+          <Tile label="Members" value={o.users.toLocaleString("en-IN")} href="/admin/users" />
+          <Tile label="Companies" value={o.companies} href="/admin/organizations" />
+          <Tile label="Verified professionals" value={o.professionals} href="/admin/professionals?status=approved" />
+          <Tile label="Homestays" value={o.homestays} href="/admin/homestays" />
+          <Tile label="Gyms & studios" value={o.facilities} href="/admin/facilities" />
+          {c.hospitals && <Tile label="Hospitals" value={o.hospitals} note={c.hospitalsOn ? undefined : "Switched off"} href="/admin/hospitals" />}
+        </dl>
+      </section>
     </>
   );
 }
