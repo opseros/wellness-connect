@@ -7,9 +7,11 @@ export default function manifest(): MetadataRoute.Manifest {
     name: `${BRAND.name} · ${BRAND.tagline}`,
     short_name: BRAND.name,
     start_url: "/app",
+    scope: "/",
+    orientation: "portrait",
     display: "standalone",
     background_color: "#f5f7f5",
-    theme_color: "#0f6b5c",
+    theme_color: "#ffffff",
     description: `${BRAND.tagline}: verified wellness professionals for teams.`,
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },

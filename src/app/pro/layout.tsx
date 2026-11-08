@@ -43,8 +43,8 @@ export default async function ProLayout({ children }: { children: React.ReactNod
   return (
     <div>
       <AppHeader name={me.name} nav={mainNav(me, "pro", await navOptions(me.id))} />
-      <div className="mx-auto flex max-w-[1240px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
-        <aside className="min-w-0 flex-[1_1_200px] lg:sticky lg:top-4 lg:max-w-[230px]">
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
+        <aside className="min-w-0 flex-[1_1_200px] lg:sticky lg:top-20 lg:max-w-[230px]">
           <SideNav label="Professional" heading="Professional workspace" groups={groups} />
         </aside>
         <main className="flex min-w-0 flex-[999_1_640px] flex-col gap-6">{children}</main>

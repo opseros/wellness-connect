@@ -26,7 +26,7 @@ export default async function CompanyLayout({ children, params }: { children: Re
     <div>
       <AppHeader name={me.name} nav={mainNav(me, "company", { ...nav, companyHref: `/company/${orgId}` })} />
       <div className="mx-auto flex max-w-[1280px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
-        <aside className="flex min-w-0 flex-[1_1_200px] flex-col gap-3 lg:sticky lg:top-4 lg:max-w-[230px]">
+        <aside className="flex min-w-0 flex-[1_1_200px] flex-col gap-3 lg:sticky lg:top-20 lg:max-w-[230px]">
           <CompanyNav base={`/company/${orgId}`} name={org.name} toReview={toReview} isBuyer={isBuyer} isAdmin={isAdmin} healthChecks={healthChecks} />
           {others.length > 0 && (
             <p className="hidden px-3.5 text-[13px] text-muted lg:block">

@@ -58,8 +58,8 @@ export async function MemberShell({ section, next, children }: { section: Sectio
   return (
     <div>
       <AppHeader name={me.name} nav={mainNav(me, section, nav)} />
-      <div className="mx-auto flex max-w-[1240px] flex-wrap items-start gap-5 px-4 py-6 sm:px-6">
-        <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-3 lg:sticky lg:top-4 lg:max-w-[230px]">
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-start gap-5 px-4 py-6 sm:px-6">
+        <div className="flex min-w-0 flex-[1_1_200px] flex-col gap-3 lg:sticky lg:top-20 lg:max-w-[230px]">
           <section aria-label="Your profile" className="card hidden flex-col overflow-hidden lg:flex">
             <div aria-hidden className="h-14 bg-[linear-gradient(120deg,var(--color-wellness),var(--color-travel),var(--color-meetup))]" />
             <div className="-mt-7 flex flex-col gap-1 px-4 pb-4">
@@ -81,7 +81,7 @@ export async function MemberShell({ section, next, children }: { section: Sectio
               </div>
             </div>
           </section>
-          <SideNav label="Member menu" groups={groups} />
+          <SideNav label="Member menu" heading="Connect" headingOnDesktop={false} groups={groups} />
         </div>
         <div className="flex min-w-0 flex-[999_1_640px] flex-col gap-5">{children}</div>
       </div>

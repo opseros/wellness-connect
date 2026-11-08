@@ -60,3 +60,16 @@ body {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
 }
+
+/* Signed-in shell on phones and tablets: room for the bottom tab bar (and the iPhone home indicator). */
+@media (max-width: 1023.98px) {
+  body:has([data-tabbar]) {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes slide-in {
+  from { transform: translateX(100%); }
+}

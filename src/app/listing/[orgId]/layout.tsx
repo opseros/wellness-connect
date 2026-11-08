@@ -30,8 +30,8 @@ export default async function ListingLayout({ children, params }: { children: Re
   return (
     <div>
       <AppHeader name={me.name} nav={mainNav(me, "listing", { ...nav, listing: { href: `/listing/${orgId}`, label } })} />
-      <div className="mx-auto flex max-w-[1240px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
-        <aside className="min-w-0 flex-[1_1_200px] lg:sticky lg:top-4 lg:max-w-[230px]">
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
+        <aside className="min-w-0 flex-[1_1_200px] lg:sticky lg:top-20 lg:max-w-[230px]">
           <ListingNav base={`/listing/${orgId}`} name={w.org.name} pending={pending} kind={kind} />
         </aside>
         <main className="flex min-w-0 flex-[999_1_640px] flex-col gap-6">{children}</main>

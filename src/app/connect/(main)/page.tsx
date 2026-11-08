@@ -157,7 +157,7 @@ export default async function ConnectFeed({ searchParams }: { searchParams: Prom
         {q.before && <Link href={href(q.show)} className="self-center text-sm font-semibold text-brand hover:underline">Back to newest</Link>}
       </main>
 
-      <aside className="flex flex-[1_1_260px] flex-col gap-4 xl:sticky xl:top-4">
+      <aside className="flex flex-[1_1_260px] flex-col gap-4 xl:sticky xl:top-20">
         {invites.length > 0 && (
           <RailCard title={`Invitations · ${invites.length}`} href={invites.length > 3 ? "/connect/network" : undefined}>
             {invites.slice(0, 3).map((i) => (
