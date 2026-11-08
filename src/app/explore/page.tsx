@@ -75,7 +75,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   return (
     <>
       <header className="flex flex-col gap-2">
-        <h1 className="font-display text-[32px] leading-tight font-extrabold tracking-[-0.02em]">Explore</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Explore <span className="tag-new ml-1 align-[0.35em]">New</span></h1>
         <p className="max-w-[640px] text-[15px] text-muted">Verified professionals, gyms and studios, and homestays in one place. Book a session, pick a plan or request a stay.{hasCredits ? " Anything marked Covered can be paid with your wellness credits." : ""}</p>
       </header>
 

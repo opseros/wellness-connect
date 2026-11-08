@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getProDashboard } from "@/modules/professionals/service";
 import { listMyBookings, listMyEnquiries, summarizeEarnings } from "@/modules/marketplace/service";
 import { formatPaise } from "@/lib/money";
-import { Badge, Flash, PageTitle } from "@/components/ui";
+import { Badge, Flash, Kpi, PageTitle, Table } from "@/components/ui";
+import { listProSessions, MODE_LABEL, SESSION_STATUS_LABEL } from "@/modules/sessions/service";
 import { getProOrExit } from "./me";
 import { proMonthEarnings } from "@/modules/marketplace/credits";
 
@@ -15,34 +16,47 @@ const statusCopy: Record<string, string> = {
 
 export default async function ProOverview({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
   const { me } = await getProOrExit();
-  const [dash, enquiries, bookings, sp, member] = await Promise.all([getProDashboard(me.id), listMyEnquiries(me.id), listMyBookings(me.id), searchParams, proMonthEarnings(me.id)]);
+  const [dash, enquiries, bookings, sp, member, sessions] = await Promise.all([getProDashboard(me.id), listMyEnquiries(me.id), listMyBookings(me.id), searchParams, proMonthEarnings(me.id), listProSessions(me.id)]);
   if (!dash) return null;
   const earnings = summarizeEarnings(bookings);
   const newEnquiries = enquiries.filter((e) => e.status === "sent" || e.status === "viewed");
+  // Open sessions (the daily lifecycle job moves past ones to completed or expired).
+  const coming = sessions.filter((r) => ["requested", "accepted", "confirmed"].includes(r.status)).slice(0, 6);
 
   return (
     <>
-      <PageTitle title={`Hello, ${me.name.split(" ")[0]}`} subtitle={dash.profile.headline || "Your professional workspace"} />
+      <PageTitle title="Dashboard" isNew subtitle={`${me.name} · ${dash.profile.headline || "Wellness professional"}`} />
       <Flash msg={sp.msg} />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
-        <Stat label="Verification" value={<Badge status={dash.profile.verificationStatus} />} note={statusCopy[dash.profile.verificationStatus]} />
-        <Stat label="Enquiries waiting" value={String(newEnquiries.length)} note={<Link href="/pro/enquiries" className="font-semibold text-brand hover:underline">Open inbox →</Link>} />
-        <Stat label="Due to you" value={formatPaise(earnings.duePaise)} note={`${formatPaise(earnings.paidOutPaise)} paid out so far`} />
-        <Stat label="Awaiting company payment" value={formatPaise(earnings.awaitingPaymentPaise)} note={`${earnings.bookingCount} booking${earnings.bookingCount === 1 ? "" : "s"} in total`} />
+      <div className="grid grid-cols-2 gap-[10px] sm:gap-[14px] md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+        <Kpi label="Sessions this month" value={member.sessions} note={`${formatPaise(member.grossPaise)} booked`} />
+        <Kpi label="Requests waiting" value={member.waiting} note={member.waiting ? <Link href="/pro/sessions" className="font-semibold text-brand hover:underline">Answer within 24 hours →</Link> : "All answered"} />
+        <Kpi label="Earnings this month" isNew highlight value={formatPaise(member.netPaise)} note={<Link href="/pro/earnings" className="hover:underline">after the {member.feeBps / 100}% Moosam fee</Link>} />
+        <Kpi label="Verification" value={<Badge status={dash.profile.verificationStatus} />} note={statusCopy[dash.profile.verificationStatus]} />
       </div>
 
-      <section aria-labelledby="member-h" className="card flex flex-col gap-4 p-6">
+      <Table head={["Session", "Member", "When", "Mode", "Amount", "Status"]} empty={coming.length === 0 && "No sessions coming up. Members book from your public profile."}>
+        {coming.map((r) => (
+          <tr key={r.id}>
+            <td className="font-bold">{r.serviceTitle}</td>
+            <td>{r.memberName}</td>
+            <td className="whitespace-nowrap">{when(r.startsAt)}</td>
+            <td>{MODE_LABEL[r.mode]}</td>
+            <td className="text-right tabular-nums">{r.pricePaise ? formatPaise(r.pricePaise) : "Free"}</td>
+            <td><Badge status={r.status === "requested" ? "pending" : "confirmed"} label={SESSION_STATUS_LABEL[r.status]} /></td>
+          </tr>
+        ))}
+      </Table>
+
+      <section aria-labelledby="co-h" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="member-h" className="text-lg font-bold">Member sessions this month</h2>
-          <Link href="/pro/sessions" className="text-sm font-semibold text-brand hover:underline">{member.waiting ? `${member.waiting} request${member.waiting === 1 ? "" : "s"} waiting →` : "All sessions →"}</Link>
+          <h2 id="co-h" className="text-[19px] font-bold">Company work</h2>
+          <Link href="/pro/enquiries" className="text-sm font-semibold text-brand hover:underline">Enquiries{newEnquiries.length ? ` · ${newEnquiries.length} new` : ""} →</Link>
         </div>
-        <dl className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-          <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Paid sessions</dt><dd className="font-display text-[24px] font-extrabold">{member.sessions}</dd></div>
-          <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Booked value</dt><dd className="font-display text-[24px] font-extrabold">{formatPaise(member.grossPaise)}</dd></div>
-          <div className="rounded-2xl bg-ground p-4"><dt className="text-[13px] text-muted">Moosam fee ({member.feeBps / 100}%)</dt><dd className="font-display text-[24px] font-extrabold">{formatPaise(member.feePaise)}</dd></div>
-          <div className="rounded-2xl bg-brand-soft p-4"><dt className="text-[13px] text-brand-dark">You receive</dt><dd className="font-display text-[24px] font-extrabold text-brand-dark">{formatPaise(member.netPaise)}</dd></div>
-        </dl>
-        <p className="text-[13px] text-muted">Sessions members book directly, including ones paid with company wellness credits. Company workshop bookings are counted separately above.</p>
+        <div className="grid grid-cols-2 gap-[10px] sm:gap-[14px] md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+          <Kpi label="Enquiries waiting" value={newEnquiries.length} />
+          <Kpi label="Due to you" value={formatPaise(earnings.duePaise)} note={`${formatPaise(earnings.paidOutPaise)} paid out so far`} />
+          <Kpi label="Awaiting company payment" value={formatPaise(earnings.awaitingPaymentPaise)} note={`${earnings.bookingCount} booking${earnings.bookingCount === 1 ? "" : "s"} in total`} />
+        </div>
       </section>
 
       <section className="card flex flex-col gap-4 p-6">
@@ -84,12 +98,4 @@ export default async function ProOverview({ searchParams }: { searchParams: Prom
   );
 }
 
-function Stat({ label, value, note }: { label: string; value: React.ReactNode; note?: React.ReactNode }) {
-  return (
-    <div className="card flex flex-col gap-1.5 p-5">
-      <span className="text-sm text-muted">{label}</span>
-      <span className="text-[22px] font-bold">{value}</span>
-      {note && <span className="text-[13px] text-muted">{note}</span>}
-    </div>
-  );
-}
+const when = (d: Date) => new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" }).format(d);

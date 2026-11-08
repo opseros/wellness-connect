@@ -20,7 +20,7 @@ export default async function SchedulePage({ searchParams }: { searchParams: Pro
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Schedule</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Schedule</h1>
         <p className="text-[15px] text-muted">Members book one-to-one sessions from your profile at these times. Set a member price on a service to make it bookable.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

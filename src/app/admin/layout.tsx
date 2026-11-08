@@ -20,7 +20,7 @@ export default async function AdminLayout({
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-40 bg-ink pt-[env(safe-area-inset-top)] text-white">
-        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-[1360px] items-center justify-between gap-4 px-4 sm:px-6">
           <span className="flex items-center gap-3">
             <Logo href="/admin" light />
             <span className="rounded-md bg-white/15 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
@@ -41,8 +41,8 @@ export default async function AdminLayout({
           </div>
         </div>
       </header>
-      <div className="mx-auto flex max-w-[1280px] flex-wrap items-start gap-6 px-4 py-6 sm:px-6">
-        <aside className="min-w-0 flex-[1_1_200px] lg:sticky lg:top-20 lg:max-w-[220px]">
+      <div className="mx-auto grid max-w-[1360px] gap-6 px-4 pt-[22px] pb-16 sm:px-6 lg:grid-cols-[232px_minmax(0,1fr)]">
+        <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
           <AdminNav
             pending={counts.pendingCredentials}
             homestays={counts.pendingHomestays}
@@ -55,7 +55,7 @@ export default async function AdminLayout({
             finance={counts.financeAttention}
           />
         </aside>
-        <main className="flex min-w-0 flex-[999_1_640px] flex-col gap-6">
+        <main className="flex min-w-0 flex-col gap-[18px]">
           {children}
         </main>
       </div>

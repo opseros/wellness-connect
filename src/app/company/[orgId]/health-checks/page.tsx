@@ -21,7 +21,7 @@ export default async function HealthChecks({ params, searchParams }: { params: P
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Health check-ups</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Health check-ups</h1>
         <p className="text-[15px] text-muted">Ask verified hospitals to quote for your team&apos;s check-ups. Share only how many people and the age band: never individual employees&apos; health information. The hospital sends results to each employee, not to you.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

@@ -26,7 +26,7 @@ export default async function SessionPage({ params, searchParams }: { params: Pr
     <>
       <Link href="/sessions" className="text-sm font-semibold text-brand hover:underline">← My sessions</Link>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[28px] font-bold">{s.serviceTitle}</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">{s.serviceTitle}</h1>
         <Badge status={s.status === "confirmed" || s.status === "completed" ? "active" : open ? "pending" : s.status} label={SESSION_STATUS_LABEL[s.status]} />
       </div>
       <Flash msg={sp.msg} error={sp.error} />

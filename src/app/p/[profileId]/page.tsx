@@ -47,7 +47,7 @@ export default async function PublicProfile({ params, searchParams }: { params: 
         <section className="card flex flex-wrap items-start gap-5 p-6">
           <span aria-hidden className="grid size-20 shrink-0 place-items-center rounded-2xl bg-brand-soft text-2xl font-bold text-brand-dark">{initials}</span>
           <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-1.5">
-            <h1 className="flex flex-wrap items-center gap-2 text-[26px] font-bold">
+            <h1 className="flex flex-wrap items-center gap-2 font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">
               {d.name}
               {p.verificationStatus === "verified" && <Badge status="verified" label="✓ Verified" />}
             </h1>

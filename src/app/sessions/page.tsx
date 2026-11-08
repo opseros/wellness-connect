@@ -24,7 +24,7 @@ export default async function MySessions({ searchParams }: { searchParams: Promi
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] font-bold">My sessions</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">My sessions</h1>
         <p className="text-[15px] text-muted">One-to-one sessions you&apos;ve booked with professionals.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

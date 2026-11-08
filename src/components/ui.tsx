@@ -1,11 +1,32 @@
 // Small presentational pieces shared by the admin portal and the professional workspace.
 import Link from "next/link";
 
-export function PageTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+/** Page heading as in the prototype: big display title, optional "New" tag, muted line, actions on the right. */
+export function PageTitle({ title, subtitle, isNew, actions }: { title: string; subtitle?: React.ReactNode; isNew?: boolean; actions?: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1">
-      <h1 className="text-[26px] font-bold">{title}</h1>
-      {subtitle && <p className="text-[15px] text-muted">{subtitle}</p>}
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">
+          {title}
+          {isNew && <span className="tag-new ml-2.5 align-[0.35em]">New</span>}
+        </h1>
+        {subtitle && <p className="max-w-[68ch] text-[15px] text-muted">{subtitle}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+/** KPI tile (prototype `.kpi`). */
+export function Kpi({ label, value, note, isNew, highlight }: { label: string; value: React.ReactNode; note?: React.ReactNode; isNew?: boolean; highlight?: boolean }) {
+  return (
+    <div className={`kpi ${highlight ? "ring-2 ring-new/40" : ""}`}>
+      <span className="text-[13px] font-semibold text-muted">
+        {label}
+        {isNew && <span className="tag-new ml-1.5">New</span>}
+      </span>
+      <span className="font-display text-[23px] leading-[1.1] font-extrabold tracking-[-0.02em] break-words tabular-nums sm:text-[28px]">{value}</span>
+      {note && <span className="text-[12.5px] text-muted">{note}</span>}
     </div>
   );
 }
@@ -53,9 +74,9 @@ export function Badge({ status, label }: { status: string; label?: string }) {
 
 export function Tabs({ items, current }: { items: { href: string; label: string; key: string }[]; current: string }) {
   return (
-    <div role="tablist" className="flex flex-wrap gap-2">
+    <div role="tablist" className="inline-flex max-w-full flex-wrap gap-1 self-start rounded-full border border-line bg-white p-1">
       {items.map((i) => (
-        <Link key={i.key} role="tab" aria-selected={i.key === current} href={i.href} className={`rounded-full px-3.5 py-2 text-sm font-semibold ${i.key === current ? "bg-brand text-white" : "border border-line bg-white text-[#3d4842]"}`}>
+        <Link key={i.key} role="tab" aria-selected={i.key === current} href={i.href} className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${i.key === current ? "bg-brand text-white" : "text-[#33433b] hover:bg-ground"}`}>
           {i.label}
         </Link>
       ))}
@@ -78,13 +99,13 @@ export function Table({ head, children, empty }: { head: string[]; children: Rea
     <div className="card overflow-x-auto">
       <table className="w-full min-w-[720px] border-collapse text-sm">
         <thead>
-          <tr className="text-left text-muted">
+          <tr className="bg-ground text-left text-muted">
             {head.map((h) => (
-              <th key={h} className="px-4 py-3 font-semibold">{h}</th>
+              <th key={h} className="px-4 py-3 text-[11.5px] font-bold tracking-[0.08em] whitespace-nowrap uppercase">{h}</th>
             ))}
           </tr>
         </thead>
-        <tbody className="[&>tr]:border-t [&>tr]:border-[#eef1ef] [&_td]:px-4 [&_td]:py-3 [&_td]:align-top">{children}</tbody>
+        <tbody className="[&>tr]:border-t [&>tr]:border-line [&_td]:px-4 [&_td]:py-3 [&_td]:align-middle">{children}</tbody>
       </table>
       {empty && <p className="px-4 py-6 text-center text-sm text-muted">{empty}</p>}
     </div>

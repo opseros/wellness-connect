@@ -45,7 +45,7 @@ export default async function CareRequestPage({ params, searchParams }: { params
     <>
       <Link href="/care/requests" className="text-sm font-semibold text-brand hover:underline">← My care requests</Link>
       <div className="flex flex-col gap-1">
-        <h1 className="font-display text-[30px] font-extrabold leading-tight">{r.treatment}</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">{r.treatment}</h1>
         <p className="text-[15px] text-muted">
           {company ? `Health check-up for ${r.headcount} people${r.ageRange ? `, ages ${r.ageRange}` : ""}` : `${AGE_LABEL[r.ageRange as keyof typeof AGE_LABEL] ?? ""} · from ${r.travellingFrom}${r.companions ? ` · with ${r.companions}` : ""}`}
           {r.needs.length ? ` · ${r.needs.map((n) => NEED_LABEL[n as keyof typeof NEED_LABEL]).join(", ")}` : ""}

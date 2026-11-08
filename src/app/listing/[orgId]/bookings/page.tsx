@@ -53,7 +53,7 @@ export default async function Bookings({ params, searchParams }: { params: Promi
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Bookings</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Bookings</h1>
         <p className="text-[15px] text-muted">Guests share their dates, who&apos;s coming and any access needs, never medical details. Your share is the room charges minus our commission; it&apos;s paid to your bank after check-in.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

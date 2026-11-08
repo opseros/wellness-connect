@@ -30,7 +30,7 @@ export default async function Messages({ searchParams }: { searchParams: Promise
   return (
     <>
       <AutoRefresh />
-      <h1 className="text-[26px] font-bold">Messages</h1>
+      <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Messages</h1>
       <Flash msg={sp.msg} error={sp.error} />
       <div className="flex flex-wrap items-start gap-4">
         <section aria-label="Conversations" className="card flex flex-[1_1_260px] flex-col overflow-hidden">

@@ -13,7 +13,7 @@ export default async function Meetups({ searchParams }: { searchParams: Promise<
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Meet-ups</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Meet-ups</h1>
         <p className="text-[15px] text-muted">Upcoming walks, runs and get-togethers from your network, your groups{profile?.city ? ` and ${profile.city}` : ""}.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

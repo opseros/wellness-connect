@@ -28,7 +28,7 @@ export default async function CalendarPage({ params, searchParams }: { params: P
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Calendar &amp; prices</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Calendar &amp; prices</h1>
         <p className="text-[15px] text-muted">
           Prices are per room per night. Your usual price is {rs(cal.basePricePaise)} (change it under Listing); set a different price for festivals or weekends, and block dates you&apos;re closed. You have {cal.rooms} room{cal.rooms === 1 ? "" : "s"}.
         </p>

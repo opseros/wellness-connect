@@ -42,7 +42,7 @@ export default async function Packages({ params, searchParams }: { params: Promi
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Treatment packages</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Treatment packages</h1>
         <p className="text-[15px] text-muted">Prices are indicative ranges; you confirm the final price after the consultation. Patients pay you directly. Packages appear on your public page once you&apos;re verified.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

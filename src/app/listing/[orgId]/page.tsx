@@ -4,7 +4,9 @@ import { listMembers } from "@/modules/organizations/service";
 import { ACCREDITATIONS_LIST, AMENITY_LABEL, FACILITY_TYPE_LABEL, FEATURE_LABEL, getListingWorkspace, SERVES_LABEL, STATUS_LABEL } from "@/modules/listings/service";
 import { POLICY_TEXT } from "@/modules/stays/policy";
 import { STATE_NAMES } from "@/modules/marketplace/payments";
-import { Badge, Flash } from "@/components/ui";
+import { Badge, Flash, Kpi, PageTitle } from "@/components/ui";
+import { facilityMonthStats } from "@/modules/marketplace/credits";
+import { formatPaise } from "@/lib/money";
 import {
   addPhotoAction,
   inviteAction,
@@ -32,24 +34,35 @@ export default async function ListingWorkspace({ params, searchParams }: { param
   const hidden = <input type="hidden" name="orgId" value={orgId} />;
   const ro = !w.canEdit;
   const field = "flex flex-col gap-1.5 text-sm font-semibold";
+  // Gyms and studios: this month's plan sales (facility admins only).
+  const stats = facility && w.canEdit ? await facilityMonthStats(me.id, orgId).catch(() => null) : null;
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-[13px] font-semibold uppercase tracking-wide text-muted">{{ homestay: "Homestay workspace", hospital: "Hospital workspace", facility: "Facility workspace" }[l.kind]}</span>
-          <h1 className="font-display text-[30px] font-extrabold leading-tight">{w.org.name}</h1>
-        </div>
-        <span className="flex items-center gap-3">
-          <Badge status={l.status} label={STATUS_LABEL[l.status]} />
-          <Link href={publicHref} className="text-sm font-semibold text-brand hover:underline">{l.status === "verified" ? "View public page" : "Preview public page"}</Link>
-        </span>
-      </div>
+      <PageTitle
+        title="Overview"
+        subtitle={`${w.org.name}${l.city ? ` · ${l.city}` : ""} · ${{ homestay: "Homestay", hospital: "Hospital", facility: "Gym, studio or wellness centre" }[l.kind]}`}
+        actions={
+          <span className="flex items-center gap-3">
+            <Badge status={l.status} label={STATUS_LABEL[l.status]} />
+            <Link href={publicHref} className="btn-outline min-h-10 px-4 text-sm">{l.status === "verified" ? "View public page" : "Preview public page"}</Link>
+          </span>
+        }
+      />
       <Flash msg={sp.msg} error={sp.error} />
 
-      <nav aria-label="Sections" className="flex flex-wrap gap-1 text-sm font-semibold">
+      {stats && (
+        <div className="grid grid-cols-2 gap-[10px] sm:gap-[14px] md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+          <Kpi label="Active plan members" isNew highlight value={stats.activeMembers} note={<Link href={`/listing/${orgId}/members`} className="hover:underline">See members →</Link>} />
+          <Kpi label="Paid with company credits" isNew highlight value={stats.viaCredits} note={`of ${stats.soldThisMonth} sold this month`} />
+          <Kpi label="Sales this month" value={formatPaise(stats.grossPaise)} />
+          <Kpi label="You receive" value={formatPaise(stats.netPaise)} note={`after Moosam's ${stats.feeBps / 100}% fee`} />
+        </div>
+      )}
+
+      <nav aria-label="Sections" className="flex max-w-full flex-wrap gap-1 self-start rounded-full border border-line bg-white p-1 text-sm font-semibold">
         {[["#details", "Details"], ["#photos", `Photos (${w.photos.length})`], ["#documents", "Documents"], ["#team", "Team"]].map(([h, t]) => (
-          <a key={h} href={h} className="rounded-lg px-3 py-2 text-[#3d4842] hover:bg-white">{t}</a>
+          <a key={h} href={h} className="rounded-full px-3.5 py-1.5 text-[#33433b] hover:bg-ground">{t}</a>
         ))}
       </nav>
 

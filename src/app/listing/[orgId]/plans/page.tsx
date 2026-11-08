@@ -16,7 +16,7 @@ export default async function PlansPage({ params, searchParams }: { params: Prom
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Plans & passes</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Plans & passes</h1>
         <p className="text-muted">Sell memberships, class packs and day passes on your Moosam page.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

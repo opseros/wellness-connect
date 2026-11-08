@@ -36,7 +36,7 @@ export default async function ChallengePage({ params, searchParams }: { params: 
           <span className="text-[13px] text-muted">{range(c)}</span>
         </div>
         <div>
-          <h1 className="font-display text-[28px] leading-tight font-extrabold tracking-[-0.02em]">{c.title}</h1>
+          <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">{c.title}</h1>
           {c.about && <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-[#3d4842]">{c.about}</p>}
         </div>
 

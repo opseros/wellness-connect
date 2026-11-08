@@ -45,7 +45,7 @@ export default async function BookPage({ params, searchParams }: { params: Promi
       <AppHeader name={me.name} nav={mainNav(me, "connect", await navOptions(me.id))} />
       <main className="mx-auto flex max-w-[880px] flex-col gap-5 px-6 py-8">
         <Link href={`/p/${profileId}`} className="text-sm font-semibold text-brand hover:underline">← {d.name}</Link>
-        <h1 className="text-[28px] font-bold">Book a session with {d.name.split(" ")[0]}</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Book a session with {d.name.split(" ")[0]}</h1>
         <Flash msg={sp.msg} error={sp.error} />
 
         <nav aria-label="Service" className="flex flex-wrap gap-2">

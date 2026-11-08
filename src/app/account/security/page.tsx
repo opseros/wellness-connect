@@ -37,7 +37,7 @@ export default async function SecurityPage({ searchParams }: { searchParams: Pro
       />
       <main className="mx-auto flex max-w-[820px] flex-col gap-5 px-6 py-8">
         <div className="flex flex-col gap-1">
-          <h1 className="text-[28px] font-bold">Account security</h1>
+          <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Account security</h1>
           <p className="text-[15px] text-muted">{me.email}</p>
         </div>
 

@@ -20,7 +20,7 @@ export default async function ProSessions({ searchParams }: { searchParams: Prom
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="text-[26px] font-bold">Sessions</h1>
+          <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Sessions</h1>
           <p className="text-[15px] text-muted">One-to-one sessions booked by members.</p>
         </div>
         <Link href="/pro/schedule" className="btn-outline">Schedule and settings</Link>

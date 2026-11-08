@@ -32,7 +32,7 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
       <Flash msg={sp.msg} error={sp.error} />
       <section className="card flex flex-wrap items-start justify-between gap-4 p-6">
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1.5">
-          <h1 className="font-display text-[30px] font-extrabold leading-tight">{g.name}</h1>
+          <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">{g.name}</h1>
           <p className="text-sm text-muted">{[g.kind === "space" ? "Space" : "Community", g.city, `${d.members} member${d.members === 1 ? "" : "s"}`, g.privacy === "approval" ? "Moderators approve new members" : "Open to all"].filter(Boolean).join(" · ")}</p>
           {g.about && <p className="mt-1 text-[15px] leading-relaxed">{g.about}</p>}
           {d.moderators.length > 0 && <p className="text-[13px] text-muted">Moderators: {d.moderators.map((m) => m.name).join(", ")}</p>}

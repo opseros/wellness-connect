@@ -28,7 +28,7 @@ export default async function StayPage({ params, searchParams }: { params: Promi
       <Link href="/stays" className="text-sm font-semibold text-brand hover:underline">← My stays</Link>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <h1 className="font-display text-[30px] font-extrabold leading-tight">{h?.name ?? "Homestay"}</h1>
+          <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">{h?.name ?? "Homestay"}</h1>
           <span className="text-[15px] text-muted">{dd(s.checkIn)} → {dd(s.checkOut)} · {s.nights} night{s.nights > 1 ? "s" : ""} · {s.rooms} room{s.rooms > 1 ? "s" : ""} · {s.guests} guest{s.guests > 1 ? "s" : ""}</span>
         </div>
         <Badge status={tone[s.status]} label={STAY_STATUS_LABEL[s.status]} />

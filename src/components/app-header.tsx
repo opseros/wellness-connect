@@ -5,6 +5,7 @@ import { IntentLink } from "./intent-link";
 import { BrandLockup } from "./brand-mark";
 import { BRAND } from "@/lib/brand";
 import Link from "next/link";
+import { avatarColor, initialsOf as initials } from "./avatar-tone";
 
 type NavItem = { href: string; label: string; active?: boolean };
 
@@ -24,13 +25,49 @@ function Icon({ d, className = "size-6" }: { d: string; className?: string }) {
   );
 }
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
+function Initials({ name, size = 32 }: { name: string; size?: number }) {
+  return (
+    <span aria-hidden className="grid shrink-0 place-items-center rounded-full font-extrabold text-white" style={{ width: size, height: size, fontSize: size / 2.7, background: avatarColor(name) }}>
+      {initials(name)}
+    </span>
+  );
+}
+
+/** Desktop account menu: avatar and name; opens Account, Your workspaces, Sign out. */
+function AccountMenu({ name }: { name: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative hidden shrink-0 xl:block">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls={id} className="flex items-center gap-2 rounded-full py-1 pr-3 pl-1 text-[13.5px] font-semibold hover:bg-ground">
+        <Initials name={name} />
+        <span className="max-w-[200px] truncate">{name}</span>
+        <svg aria-hidden viewBox="0 0 24 24" className="size-4 text-muted" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <div id={id} className="absolute top-full right-0 z-50 mt-2 flex w-56 flex-col rounded-2xl border border-line bg-white p-1.5 text-[14.5px] font-semibold shadow-[0_20px_44px_-24px_rgba(16,35,28,0.45)]">
+          <Link href="/account/security" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 hover:bg-ground">Account</Link>
+          <Link href="/app/workspaces" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 hover:bg-ground">Your workspaces</Link>
+          <Link href="/connect/setup" onClick={() => setOpen(false)} className="rounded-xl px-3 py-2.5 hover:bg-ground">Edit my profile</Link>
+          <form action="/sign-out" method="post" className="mt-1 border-t border-line pt-1">
+            <button className="w-full rounded-xl px-3 py-2.5 text-left text-brand hover:bg-ground">Sign out</button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -75,39 +112,34 @@ export function AppHeader({ name, nav }: { name: string; nav: NavItem[] }) {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-line bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur supports-[backdrop-filter]:bg-white/85">
-        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-[1360px] items-center gap-5 px-4 sm:px-6">
           <Link href="/app" aria-label={`${BRAND.name}, ${BRAND.tagline}`} className="flex shrink-0 items-center">
             <BrandLockup size="sm" name={BRAND.name} tag={BRAND.tagline} />
           </Link>
 
-          <nav aria-label="Main" className="hidden min-w-0 items-center gap-0.5 text-sm font-semibold xl:flex">
-            {nav.map((n) => (
+          <nav aria-label="Main" className="hidden min-w-0 flex-1 items-center gap-1 text-[15px] font-semibold xl:flex">
+            {nav.filter((n) => !n.href.startsWith("/account")).map((n) => (
               <IntentLink
                 key={n.href}
                 href={n.href}
                 aria-current={n.active ? "page" : undefined}
-                className={`rounded-lg px-3 py-2.5 whitespace-nowrap ${n.active ? "bg-brand-soft text-brand-dark" : "text-[#3d4842] hover:bg-ground"}`}
+                className={`rounded-full px-3 py-2 whitespace-nowrap ${n.active ? "bg-brand-soft text-brand-dark" : "text-[#33433b] hover:bg-ground"}`}
               >
                 {n.label}
               </IntentLink>
             ))}
           </nav>
 
-          <div className="hidden shrink-0 items-center gap-3 text-sm xl:flex">
-            <span className="max-w-[160px] truncate text-muted" title={name}>{name}</span>
-            <form action="/sign-out" method="post">
-              <button className="font-semibold text-brand hover:underline">Sign out</button>
-            </form>
-          </div>
+          <AccountMenu name={name} />
 
           <button
             type="button"
             onClick={() => setOpen(true)}
             aria-expanded={open}
             aria-controls={panelId}
-            className="-mr-2 flex items-center gap-2 rounded-xl px-2 py-2 text-[#3d4842] hover:bg-ground xl:hidden"
+            className="-mr-2 ml-auto flex items-center gap-2 rounded-xl px-2 py-2 text-[#3d4842] hover:bg-ground xl:hidden"
           >
-            <span aria-hidden className="grid size-8 place-items-center rounded-full bg-brand-soft text-[12px] font-bold text-brand-dark">{initials(name)}</span>
+            <Initials name={name} />
             <Icon d={ICONS.menu} />
             <span className="sr-only">Open menu</span>
           </button>
@@ -120,7 +152,7 @@ export function AppHeader({ name, nav }: { name: string; nav: NavItem[] }) {
           <div className="absolute inset-y-0 right-0 flex w-[min(340px,88vw)] flex-col bg-white pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-2xl motion-safe:animate-[slide-in_200ms_cubic-bezier(0.22,1,0.36,1)]">
             <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
               <span className="flex min-w-0 items-center gap-3">
-                <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand-dark">{initials(name)}</span>
+                <Initials name={name} size={40} />
                 <span className="truncate font-semibold">{name}</span>
               </span>
               <button ref={closeRef} type="button" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-xl text-[#3d4842] hover:bg-ground">
@@ -134,12 +166,16 @@ export function AppHeader({ name, nav }: { name: string; nav: NavItem[] }) {
                   key={n.href}
                   href={n.href}
                   aria-current={n.active ? "page" : undefined}
-                  className={`flex min-h-12 items-center rounded-xl px-4 text-[16px] font-semibold ${n.active ? "bg-brand text-white" : "text-[#26302b] hover:bg-ground"}`}
+                  className={`flex min-h-12 items-center rounded-xl px-4 text-[16px] font-semibold ${n.active ? "bg-brand-soft text-brand-dark" : "text-[#26302b] hover:bg-ground"}`}
                 >
                   {n.label}
                 </IntentLink>
               ))}
             </nav>
+            <div className="flex flex-col gap-0.5 border-t border-line p-3">
+              <IntentLink href="/app/workspaces" className="flex min-h-11 items-center rounded-xl px-4 text-[15px] font-semibold text-[#26302b] hover:bg-ground">Your workspaces</IntentLink>
+              <IntentLink href="/connect/setup" className="flex min-h-11 items-center rounded-xl px-4 text-[15px] font-semibold text-[#26302b] hover:bg-ground">Edit my profile</IntentLink>
+            </div>
             <form action="/sign-out" method="post" className="border-t border-line p-3">
               <button className="flex min-h-12 w-full items-center rounded-xl px-4 text-[16px] font-semibold text-brand hover:bg-ground">Sign out</button>
             </form>

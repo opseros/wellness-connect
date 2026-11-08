@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { companyDashboard } from "@/modules/marketplace/service";
-import { Badge, Flash, PageTitle } from "@/components/ui";
+import { Badge, Flash, Kpi, PageTitle } from "@/components/ui";
+import { companyCredits, periodLabel } from "@/modules/marketplace/credits";
+import { formatPaise } from "@/lib/money";
 import { dayTime, getCompanyOrExit, MODE_LABEL, REQ_STATUS, ROLE_LABEL } from "./company";
 
 const tone: Record<string, string> = { draft: "pending", published: "active", closed: "submitted", withdrawn: "closed" };
@@ -27,7 +29,11 @@ export default async function CompanyDashboard({ params, searchParams }: { param
     );
   }
 
-  const d = await companyDashboard(me.id, orgId);
+  const [d, c] = await Promise.all([companyDashboard(me.id, orgId), companyCredits(me.id, orgId)]);
+  const credits = c.policy?.active && c.current ? c.current : null;
+  const given = credits?.requiredPaise ?? 0;
+  const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
+  const maxCat = Math.max(1, ...c.categories.map((x) => x.netPaise ?? 0));
   const stats = [
     { label: "Open requirements", value: d.stats.openRequirements, note: d.stats.drafts ? `${d.stats.drafts} draft${d.stats.drafts === 1 ? "" : "s"}` : null },
     { label: "Proposals to review", value: d.stats.proposalsToReview, note: null },
@@ -36,23 +42,77 @@ export default async function CompanyDashboard({ params, searchParams }: { param
 
   return (
     <>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <PageTitle title={`${greeting()}, ${me.name.split(" ")[0]}`} subtitle="Here's where your wellness programs stand." />
-        <Link href={`${base}/requirements/new`} className="btn-primary">+ New requirement</Link>
-      </div>
+      <PageTitle
+        title="Overview"
+        isNew
+        subtitle={credits ? `${org.name} · ${periodLabel(c.period)} wellness credits` : `${greeting()}, ${me.name.split(" ")[0]}. Here's where your wellness programmes stand.`}
+        actions={
+          <>
+            <Link href={`${base}/settings`} className="btn-primary">Invite people</Link>
+            <Link href={`${base}/requirements/new`} className="btn-outline">+ New requirement</Link>
+          </>
+        }
+      />
       <Flash msg={sp.msg} error={sp.error} />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
-        {stats.map((s) => (
-          <div key={s.label} className="card flex flex-col gap-1 p-5">
-            <span className="text-sm text-muted">{s.label}</span>
-            <span className="text-[28px] font-bold">{s.value}</span>
-            {s.note && <span className="text-[13px] text-muted">{s.note}</span>}
-          </div>
-        ))}
-      </div>
 
-      <div className="flex flex-wrap items-start gap-5">
-        <section className="card min-w-0 flex-[999_1_560px] overflow-x-auto">
+      {credits ? (
+        <>
+          <div className="grid grid-cols-2 gap-[10px] sm:gap-[14px] md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+            <Kpi label="Enrolled" value={credits.seats} note="people with credits" />
+            <Kpi label="Credits given" isNew highlight value={formatPaise(given)} note={`${formatPaise(credits.allowancePaise)} each`} />
+            <Kpi label="Credits used" isNew highlight value={formatPaise(c.usedPaise)} note={`${pct(c.usedPaise, given)}% used`} />
+            <Kpi label="Active this month" value={c.activePeople} note={`${pct(c.activePeople, credits.seats)}% of enrolled`} />
+          </div>
+          <div className="grid gap-[14px] md:grid-cols-2">
+            <section aria-labelledby="cat-h" className="card flex flex-col gap-3 p-[18px] ring-2 ring-new/40">
+              <h2 id="cat-h" className="text-[19px] font-bold">Spend by category <span className="tag-new">New</span></h2>
+              {c.categories.map((x) => (
+                <div key={x.category} className="flex flex-col gap-1.5">
+                  <span className="flex justify-between gap-3 text-[14px]">
+                    {x.label}
+                    <b className="tabular-nums">{x.netPaise !== null ? formatPaise(x.netPaise) : x.people > 0 ? "Fewer than 3 people" : "—"}</b>
+                  </span>
+                  <span aria-hidden className="h-2 overflow-hidden rounded-full bg-ground ring-1 ring-line ring-inset">
+                    <i className="block h-full rounded-full bg-brand" style={{ width: `${x.netPaise ? Math.max(4, (x.netPaise / maxCat) * 100) : 0}%` }} />
+                  </span>
+                </div>
+              ))}
+              <Link href={`${base}/credits`} className="mt-1 text-sm font-semibold text-brand hover:underline">Benefit policy and payments →</Link>
+            </section>
+            <section aria-labelledby="month-h" className="card flex flex-col p-[18px]">
+              <h2 id="month-h" className="pb-2 text-[19px] font-bold">This month</h2>
+              <ul className="flex flex-col [&>li]:flex [&>li]:items-center [&>li]:justify-between [&>li]:gap-3 [&>li]:border-t [&>li]:border-line [&>li]:py-2.5 [&>li:first-child]:border-0">
+                <li><span>Open requirements</span><b>{d.stats.openRequirements}</b></li>
+                <li><span>Proposals to review</span>{d.stats.proposalsToReview ? <Badge status="sent" label={`${d.stats.proposalsToReview} new`} /> : <b>0</b>}</li>
+                <li><span>Upcoming sessions</span><b>{d.stats.upcomingSessions}</b></li>
+                <li><span>Prepayment</span><Badge status={credits.status === "paid" ? "confirmed" : "pending"} label={credits.status === "paid" ? "Paid" : `Due ${formatPaise(credits.duePaise)}`} /></li>
+              </ul>
+            </section>
+          </div>
+          <p className="flex items-start gap-2.5 rounded-[14px] bg-calm px-3.5 py-3 text-[13.5px] text-[#33433b]">
+            <svg aria-hidden viewBox="0 0 24 24" className="mt-0.5 size-[18px] shrink-0 text-calm-ink" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+            You see totals by category, shown once 3 or more people have used it, never which employee booked which professional, gym or stay.
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-[10px] sm:gap-[14px] md:grid-cols-[repeat(auto-fit,minmax(190px,1fr))]">
+            {stats.map((x) => (
+              <Kpi key={x.label} label={x.label} value={x.value} note={x.note ?? undefined} />
+            ))}
+          </div>
+          <section className="card flex flex-wrap items-center justify-between gap-3 p-[18px] ring-2 ring-new/40">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-[19px] font-bold">Wellness credits <span className="tag-new">New</span></h2>
+              <p className="text-sm text-muted">Give everyone a monthly allowance for sessions and partner gyms. You see totals only.</p>
+            </div>
+            <Link href={`${base}/credits`} className="btn-primary">Set up a benefit policy</Link>
+          </section>
+        </>
+      )}
+
+      <div className="grid items-start gap-[14px] xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="card min-w-0 overflow-x-auto">
           <h2 className="px-5 pt-5 text-lg font-bold">Requirements</h2>
           {d.requirements.length === 0 ? (
             <div className="flex flex-col items-start gap-3 p-5">
@@ -100,7 +160,7 @@ export default async function CompanyDashboard({ params, searchParams }: { param
           )}
         </section>
 
-        <section className="card flex flex-[1_1_300px] flex-col gap-3 p-5">
+        <section className="card flex min-w-0 flex-col gap-3 p-5">
           <h2 className="text-lg font-bold">Upcoming sessions</h2>
           {d.upcoming.length === 0 ? (
             <p className="text-sm text-muted">Nothing booked yet. Accepted proposals appear here.</p>

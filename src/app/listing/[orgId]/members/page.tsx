@@ -14,7 +14,7 @@ export default async function MembersPage({ params }: { params: Promise<{ orgId:
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Members</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Members</h1>
         <p className="text-muted">People who bought a plan on Moosam. Check names at the front desk.</p>
       </div>
       {rows.length === 0 ? (

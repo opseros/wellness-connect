@@ -28,7 +28,7 @@ export default async function Member({ params, searchParams }: { params: Promise
       <section className="card flex flex-wrap items-start gap-5 p-6">
         <Avatar name={m.name} size={84} />
         <div className="flex min-w-0 flex-[1_1_280px] flex-col gap-1.5">
-          <h1 className="font-display text-[28px] font-extrabold leading-tight">{m.name}</h1>
+          <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">{m.name}</h1>
           <p className="text-[16px]">{m.headline || "Member"}</p>
           <p className="text-sm text-muted">{[m.jobTitle && m.company ? `${m.jobTitle} at ${m.company}` : m.jobTitle || m.company, m.city].filter(Boolean).join(" · ")}</p>
           {m.intro && <p className="mt-1 max-w-[560px] text-[15px] leading-relaxed text-[#3d4842]">{m.intro}</p>}

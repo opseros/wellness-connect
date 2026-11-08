@@ -3,11 +3,21 @@
 @theme {
   --color-brand: #0f6b5c;
   --color-brand-dark: #0b4f44;
-  --color-brand-soft: #e6f1ee;
-  --color-ink: #18211d;
-  --color-muted: #55615b;
-  --color-line: #e0e5e2;
-  --color-ground: #f5f7f5;
+  --color-brand-soft: #e4f1ea;
+  --color-ink: #10231c;
+  --color-muted: #5b6a62;
+  --color-line: #e0e7e2;
+  /* Page background (warm sand, as in the Wellness Connect prototype). */
+  --color-page: #f7f3ec;
+  /* Soft fill inside white cards (tiles, hovers, table heads). */
+  --color-ground: #f6f8f6;
+  --color-sun: #e0a32e;
+  --color-sun-soft: #fbeccb;
+  --color-sun-ink: #7a4a00;
+  --color-new: #7a3fb0;
+  --color-new-soft: #efe5f8;
+  --color-calm: #e3ecf5;
+  --color-calm-ink: #1d4f7a;
   --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Bricolage Grotesque Variable", "Bricolage Grotesque", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   /* Connect spaces: each has a tint and an ink that passes contrast on the tint. */
@@ -26,26 +36,45 @@
 }
 
 body {
-  background: var(--color-ground);
+  background: var(--color-page);
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
 
 @utility input {
-  @apply min-h-11 w-full rounded-lg border border-[#c9d1cc] bg-white px-3.5 text-[15px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;
+  @apply min-h-11 w-full rounded-xl border border-[#cfd8d2] bg-white px-3.5 text-[15px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;
 }
 @utility btn {
-  @apply inline-flex min-h-11 items-center justify-center rounded-lg px-5 text-[15px] font-semibold transition-colors disabled:opacity-60;
+  @apply inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-5 text-[15px] font-bold whitespace-nowrap transition-colors disabled:opacity-60;
 }
 @utility btn-primary {
   @apply btn bg-brand text-white hover:bg-brand-dark;
 }
 @utility btn-outline {
-  @apply btn border border-[#c9d1cc] bg-white text-ink hover:bg-ground;
+  @apply btn border border-line bg-white text-ink hover:border-[#9aa8a0];
 }
 @utility card {
-  @apply rounded-2xl border border-line bg-white;
+  @apply rounded-[20px] border border-line bg-white;
 }
+/* "New" marker for features from the Wellness Connect upgrade. */
+@utility tag-new {
+  @apply inline-flex items-center rounded-md bg-new-soft px-1.5 py-px align-middle text-[10.5px] font-extrabold tracking-[0.06em] text-new uppercase;
+}
+/* KPI tile: small label, big display number, optional note. */
+@utility kpi {
+  @apply flex min-w-0 flex-col gap-1 rounded-[20px] border border-line bg-white p-3.5 sm:p-[18px];
+}
+@layer base {
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  textarea.input {
+    padding-block: 0.6rem;
+  }
+}
+
 @utility label {
   @apply text-sm font-semibold;
 }

@@ -35,7 +35,7 @@ export default async function Network({ searchParams }: { searchParams: Promise<
   const back = <input type="hidden" name="back" value="/connect/network" />;
   return (
     <>
-      <h1 className="text-[26px] font-bold">My network</h1>
+      <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">My network</h1>
       <Flash msg={sp.msg} error={sp.error} />
       {invites.length > 0 && (
         <section className="card p-5">

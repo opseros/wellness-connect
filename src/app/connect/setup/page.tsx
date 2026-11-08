@@ -17,7 +17,7 @@ export default async function ConnectSetupPage({ searchParams }: { searchParams:
       <Logo href="/app" />
       <div className="flex w-full max-w-[720px] flex-col gap-1.5">
         <span className="text-[13px] font-semibold text-brand">FREE ACCOUNT</span>
-        <h1 className="text-[30px] font-bold">Your Connect profile</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Your Connect profile</h1>
         <p className="text-[15px] text-muted">This is what other members see when you connect, post or comment.</p>
       </div>
       <div className="w-full max-w-[720px]"><Flash error={sp.error} /></div>

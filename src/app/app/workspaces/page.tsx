@@ -68,7 +68,7 @@ export default async function Workspaces({ searchParams }: { searchParams: Promi
     <MemberShell section="home" next="/app/workspaces">
       <main className="flex min-w-0 flex-col gap-8">
         <div className="flex flex-col gap-1">
-          <h1 className="font-display text-[28px] font-bold tracking-tight">Your workspaces</h1>
+          <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Your workspaces</h1>
           <p className="text-[15px] text-muted">Things you run on Moosam. Each is optional and uses this same account.</p>
         </div>
         {notice === "suspended" && <p role="status" className="rounded-xl bg-[#fff4dc] px-4 py-3 text-sm text-[#7a4b00]">That organisation is suspended by our team, so its workspace is closed for now. Contact support to find out more.</p>}

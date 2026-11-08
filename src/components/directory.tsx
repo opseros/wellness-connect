@@ -7,7 +7,7 @@ import { LandingHeader } from "./landing";
 export async function DirectoryShell({ children }: { children: React.ReactNode }) {
   const me = await getCurrentUser();
   return (
-    <div className="min-h-screen bg-ground">
+    <div className="min-h-screen bg-page">
       <LandingHeader home={false} signedIn={Boolean(me)} />
       <main className="mx-auto flex max-w-[1200px] flex-col gap-6 px-4 pt-4 pb-16 sm:px-8">{children}</main>
       <footer className="border-t border-line bg-white">

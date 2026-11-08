@@ -40,7 +40,7 @@ export default async function Groups({ searchParams }: { searchParams: Promise<{
     );
   return (
     <>
-      <h1 className="text-[26px] font-bold">Groups &amp; spaces</h1>
+      <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Groups &amp; spaces</h1>
       <Flash msg={sp.msg} error={sp.error} />
       <section id="circles" aria-labelledby="circles-h" className="flex scroll-mt-24 flex-col gap-3">
         <div>

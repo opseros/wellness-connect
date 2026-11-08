@@ -40,8 +40,8 @@ export function SideNav({ label, heading, groups, tone = "light", headingOnDeskt
 
   const list = (mobile: boolean) =>
     groups.map((g, gi) => (
-      <div key={gi} className={`flex flex-col gap-0.5 ${gi > 0 ? "mt-3 border-t pt-3 " + (dark ? "border-white/10" : "border-line") : ""}`}>
-        {g.title && <p className={`px-3.5 pb-1 text-[11.5px] font-bold tracking-[0.12em] uppercase ${dark ? "text-[#9fb3aa]" : "text-muted"}`}>{g.title}</p>}
+      <div key={gi} className={`flex flex-col gap-0.5 ${gi > 0 ? (mobile ? "mt-3 border-t pt-3 border-line" : "mt-2.5") : ""}`}>
+        {g.title && <p className={`px-3 pb-1 text-[11.5px] font-bold tracking-[0.12em] uppercase ${dark ? "text-[#9fb3aa]" : "text-muted"}`}>{g.title}</p>}
         {g.items.map((i) => {
           const active = isActive(path, i);
           return (
@@ -49,15 +49,21 @@ export function SideNav({ label, heading, groups, tone = "light", headingOnDeskt
               key={i.href + i.label}
               href={i.href}
               aria-current={active ? "page" : undefined}
-              className={`flex ${mobile ? "min-h-12" : "min-h-11"} items-center justify-between gap-2 rounded-xl px-3.5 text-[15px] font-semibold ${
-                active ? "bg-brand text-white" : dark ? "text-[#d5dcd8] hover:bg-white/10" : mobile ? "text-[#26302b] hover:bg-ground" : "text-[#3d4842] hover:bg-white"
+              className={`flex ${mobile ? "min-h-12" : "min-h-10"} items-center justify-between gap-2 rounded-xl px-3 text-[15px] font-semibold ${
+                mobile
+                  ? active
+                    ? "bg-brand-soft text-brand-dark"
+                    : "text-[#26302b] hover:bg-ground"
+                  : active
+                    ? "bg-white text-brand-dark shadow-[0_0_0_1px_var(--color-line)]"
+                    : "text-[#33433b] hover:bg-white"
               }`}
             >
               <span className="flex items-center gap-2">
                 {i.label}
-                {i.isNew && <span className={`rounded-full px-1.5 py-px text-[10.5px] font-bold tracking-wide uppercase ${active ? "bg-white/20 text-white" : "bg-[#fdf0d2] text-[#7a4b00]"}`}>New</span>}
+                {i.isNew && <span className="tag-new">New</span>}
               </span>
-              {i.badge ? <span className={`rounded-full px-2 text-xs ${active ? "bg-white text-brand-dark" : "bg-[#f2c46d] text-ink"}`}>{i.badge}</span> : null}
+              {i.badge ? <span className="rounded-full bg-sun px-[7px] text-[11px] font-extrabold text-[#1c1300]">{i.badge}</span> : null}
             </IntentLink>
           );
         })}
@@ -67,7 +73,7 @@ export function SideNav({ label, heading, groups, tone = "light", headingOnDeskt
   return (
     <>
       <nav aria-label={label} className="hidden flex-col lg:flex">
-        {heading && headingOnDesktop && <p className={`px-3.5 pb-2 text-[11.5px] font-bold tracking-[0.14em] uppercase ${dark ? "text-[#9fb3aa]" : "text-muted"}`}>{heading}</p>}
+        {heading && headingOnDesktop && <p className={`px-3 pt-1 pb-2 text-[11.5px] font-bold tracking-[0.14em] uppercase ${dark ? "text-[#9fb3aa]" : "text-muted"}`}>{heading}</p>}
         {list(false)}
       </nav>
 
@@ -84,7 +90,7 @@ export function SideNav({ label, heading, groups, tone = "light", headingOnDeskt
             <span className="truncate text-[15.5px] font-bold">{current?.label ?? "Menu"}</span>
           </span>
           <span className="flex shrink-0 items-center gap-2">
-            {!open && waiting > 0 && <span className="rounded-full bg-[#f2c46d] px-2 text-xs font-semibold">{waiting}</span>}
+            {!open && waiting > 0 && <span className="rounded-full bg-sun px-[7px] text-[11px] font-extrabold text-[#1c1300]">{waiting}</span>}
             <svg aria-hidden viewBox="0 0 24 24" className={`size-5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
           </span>
         </button>

@@ -4,7 +4,7 @@ import { rupees } from "@/components/directory";
 import { getCurrentUser } from "@/modules/identity/session";
 import { listMyBookings, type BookingTone, type MyBooking } from "@/modules/bookings/service";
 import { myWallets } from "@/modules/marketplace/credits";
-import { Flash } from "@/components/ui";
+import { Flash, PageTitle } from "@/components/ui";
 
 export const metadata: Metadata = { title: "My bookings" };
 
@@ -16,23 +16,57 @@ const TONE: Record<BookingTone, string> = {
   stopped: "bg-[#f9e4e2] text-[#9b2c24]",
 };
 
+/** Prototype table on wider screens; stacked rows on phones. */
 function Rows({ rows }: { rows: MyBooking[] }) {
   return (
-    <ul className="flex flex-col divide-y divide-line rounded-[20px] bg-white ring-1 ring-line">
-      {rows.map((b) => (
-        <li key={`${b.kind}-${b.id}`}>
-          <Link href={b.href} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-4 hover:bg-ground sm:grid-cols-[110px_1fr_auto_auto]">
-            <span className="text-[12px] font-bold uppercase tracking-[0.1em] text-brand sm:order-none">{KIND[b.kind]}</span>
-            <span className="col-span-2 flex min-w-0 flex-col sm:col-span-1">
-              <span className="truncate font-semibold">{b.title}</span>
-              <span className="truncate text-[13px] text-muted">{b.detail} · {b.whenLabel}</span>
-            </span>
-            <span className="text-sm font-semibold tabular-nums">{b.amountPaise ? rupees(b.amountPaise) : "Free"}</span>
-            <span className={`justify-self-end rounded-full px-2.5 py-0.5 text-[12px] font-semibold ${TONE[b.tone]}`}>{b.status}</span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <>
+      <div className="hidden overflow-x-auto rounded-[18px] border border-line bg-white md:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-ground text-left text-[11.5px] font-bold tracking-[0.08em] text-muted uppercase">
+              <th className="px-3.5 py-[11px]">Booking</th>
+              <th className="px-3.5 py-[11px]">Type</th>
+              <th className="px-3.5 py-[11px]">When</th>
+              <th className="px-3.5 py-[11px] text-right">Amount</th>
+              <th className="px-3.5 py-[11px]">Status</th>
+              <th className="px-3.5 py-[11px]"><span className="sr-only">Open</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((b) => (
+              <tr key={`${b.kind}-${b.id}`} className="border-t border-line">
+                <td className="px-3.5 py-[11px]">
+                  <Link href={b.href} className="flex flex-col hover:underline">
+                    <b className="text-[14.5px]">{b.title}</b>
+                    <span className="text-[12.5px] text-muted">{b.detail}</span>
+                  </Link>
+                </td>
+                <td className="px-3.5 py-[11px] text-muted">{KIND[b.kind]}</td>
+                <td className="px-3.5 py-[11px] whitespace-nowrap">{b.whenLabel}</td>
+                <td className="px-3.5 py-[11px] text-right tabular-nums">{b.amountPaise ? rupees(b.amountPaise) : "Free"}</td>
+                <td className="px-3.5 py-[11px]"><span className={`rounded-full px-2.5 py-0.5 text-[12px] font-bold whitespace-nowrap ${TONE[b.tone]}`}>{b.status}</span></td>
+                <td className="px-3.5 py-[11px] text-right"><Link href={b.href} className="font-semibold text-brand hover:underline">Open</Link></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <ul className="flex flex-col divide-y divide-line rounded-[20px] bg-white ring-1 ring-line md:hidden">
+        {rows.map((b) => (
+          <li key={`${b.kind}-${b.id}`}>
+            <Link href={b.href} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3.5 hover:bg-ground">
+              <span className="text-[11.5px] font-bold tracking-[0.1em] text-brand uppercase">{KIND[b.kind]}</span>
+              <span className={`justify-self-end rounded-full px-2.5 py-0.5 text-[12px] font-bold ${TONE[b.tone]}`}>{b.status}</span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate font-semibold">{b.title}</span>
+                <span className="truncate text-[13px] text-muted">{b.detail} · {b.whenLabel}</span>
+              </span>
+              <span className="text-sm font-semibold tabular-nums">{b.amountPaise ? rupees(b.amountPaise) : "Free"}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -45,13 +79,7 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
   const past = all.filter((b) => !b.upcoming);
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-2">
-          <h1 className="font-display text-[32px] leading-tight font-extrabold tracking-[-0.02em]">My bookings</h1>
-          <p className="text-[15px] text-muted">Sessions, stays and gym plans in one list. Open one to pay, cancel or see the details.</p>
-        </div>
-        <Link href="/explore" className="btn-primary rounded-full">Explore</Link>
-      </header>
+      <PageTitle title="My bookings" isNew subtitle="Sessions, gym plans and stays in one list. Open one to pay, cancel or see the details." actions={<Link href="/explore" className="btn-primary">Explore</Link>} />
       <Flash msg={sp.msg} error={sp.error} />
       {w && (
         <Link href="/benefits" className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-brand-soft px-5 py-4 ring-1 ring-[#0f6b5c]/15 hover:ring-[#0f6b5c]/40">
@@ -71,12 +99,12 @@ export default async function MyBookingsPage({ searchParams }: { searchParams: P
       ) : (
         <>
           <section aria-labelledby="up-h" className="flex flex-col gap-3">
-            <h2 id="up-h" className="text-lg font-bold">Coming up</h2>
+            <h2 id="up-h" className="text-[19px] font-bold">Coming up</h2>
             {upcoming.length ? <Rows rows={upcoming} /> : <p className="text-sm text-muted">Nothing coming up.</p>}
           </section>
           {past.length > 0 && (
             <section aria-labelledby="past-h" className="flex flex-col gap-3">
-              <h2 id="past-h" className="text-lg font-bold text-muted">Past and cancelled</h2>
+              <h2 id="past-h" className="text-[19px] font-bold text-muted">Past and cancelled</h2>
               <Rows rows={past} />
             </section>
           )}

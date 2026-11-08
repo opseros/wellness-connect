@@ -15,7 +15,7 @@ export default async function NewRequest({ searchParams }: { searchParams: Promi
   if (!careTravelEnabled()) {
     return (
       <section className="card flex flex-col gap-3 p-6">
-        <h1 className="text-[26px] font-bold">Quote requests open soon</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Quote requests open soon</h1>
         <p className="text-[15px] text-muted">We&apos;re finishing our privacy protections for medical information before opening quote requests. You can already browse verified hospitals.</p>
         <Link href="/hospitals" className="btn-outline self-start">Browse hospitals</Link>
       </section>
@@ -24,7 +24,7 @@ export default async function NewRequest({ searchParams }: { searchParams: Promi
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[28px] font-bold">Ask hospitals for a quote</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Ask hospitals for a quote</h1>
         <p className="text-[15px] text-muted">Choose up to three verified hospitals. They see only what you write here, not your name or contact details, until you accept a quote. You can share reports later, with the hospitals you choose.</p>
       </div>
       <Flash error={sp.error} />

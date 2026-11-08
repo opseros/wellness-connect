@@ -14,7 +14,7 @@ export default async function BenefitsPage() {
   return (
     <>
       <header className="flex flex-col gap-2">
-        <h1 className="font-display text-[32px] leading-tight font-extrabold tracking-[-0.02em]">My benefits</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">My benefits <span className="tag-new ml-1 align-[0.35em]">New</span></h1>
         <p className="text-[15px] text-muted">Wellness credits from your employer. Spend them on covered sessions and gym or studio plans; they reset on the 1st of each month.</p>
       </header>
       {wallets.length === 0 ? (

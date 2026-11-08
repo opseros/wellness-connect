@@ -31,7 +31,7 @@ export default async function Referrals({ searchParams }: { searchParams: Promis
   return (
     <>
       <div className="flex flex-col gap-1">
-        <h1 className="text-[26px] font-bold">Referrals</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">Referrals</h1>
         <p className="text-[15px] text-muted">Pass work to professionals you trust. Share the minimum: who it&apos;s for in a few words and what they need. No names, contact details or health information.</p>
       </div>
       <Flash msg={sp.msg} error={sp.error} />

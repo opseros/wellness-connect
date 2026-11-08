@@ -13,7 +13,7 @@ export default async function MyRequests() {
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-[28px] font-bold">My care requests</h1>
+        <h1 className="font-display text-[30px] leading-[1.05] font-extrabold tracking-[-0.02em]">My care requests</h1>
         <Link href="/care/request" className="btn-primary">Ask for quotes</Link>
       </div>
       {rows.length === 0 && <p className="card p-6 text-[15px] text-muted">No requests yet. Browse <Link href="/hospitals" className="text-brand underline">verified hospitals</Link> and ask up to three for a quote.</p>}
