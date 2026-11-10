@@ -10,6 +10,8 @@ export const metadata: Metadata = {
   description: `${BRAND.name} ${BRAND.tagline}: book verified wellness professionals for your teams, and connect with professionals.`,
   manifest: "/manifest.webmanifest",
   icons: { apple: "/icons/apple-touch-icon.png" },
+  // Google Search Console ownership check: renders <meta name="google-site-verification">.
+  ...(process.env.GOOGLE_SITE_VERIFICATION ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } } : {}),
 };
 
 export const viewport: Viewport = { themeColor: "#ffffff", viewportFit: "cover", width: "device-width", initialScale: 1 };

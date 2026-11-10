@@ -44,6 +44,10 @@ npm test          # 172 tests: matching, tenant isolation, auth, company flow, p
 npm run typecheck && npm run lint && npm run build
 ```
 
+### Google Search Console
+
+Choose the "HTML tag" method, copy only the `content` value, set it as `GOOGLE_SITE_VERIFICATION` in Vercel (Production), redeploy, then click Verify. The tag is added to every page's `<head>`.
+
 ### Demo data
 
 To make a local or preview database look like the prototype, run `DEMO_PASSWORD='<10+ characters>' npm run db:seed-demo`. It creates six sign-in-ready accounts at `@demo.moosam.test` (an employee with credits, a wellness manager, a yoga coach, a gym, a homestay and an independent member) plus a city circle, posts, a meet-up and a challenge, all through the real services. It refuses to run in production or twice, and discards the emails it queues.
@@ -161,7 +165,7 @@ Only `super_admin` and `ops` users with two-factor on can open it; everyone else
 
 | Section | Ops | Super admin |
 |---|---|---|
-| Admin menu (as in the prototype): Overview, Approvals (professionals, homestays, gyms, hospitals), Organisations (organisations, people), Partners (verified providers by type), Bookings (company bookings & stays, wellness credits), Reports (reported content, challenges, audit log), Settings (super admins). Sections with several pages show tabs. | ✓ | ✓ |
+| Admin menu (as in the prototype): Overview, Approvals (professionals, homestays, gyms, hospitals), Organisations (companies; people), Partners (professionals, homestays, gyms, hospitals in any verification state, with Review and Manage), Finance (bookings & payouts, wellness credits), Reports (reported content, challenges, audit log), Settings (super admins). Sections with several pages show tabs. | ✓ | ✓ |
 | Overview (`/admin`): what needs attention, member bookings and fees this month, totals | ✓ | ✓ |
 | Verification queue (`/admin/professionals`): view documents, approve, request info, reject (professional is emailed) | ✓ | ✓ |
 | Users: search and view | ✓ | ✓ |
